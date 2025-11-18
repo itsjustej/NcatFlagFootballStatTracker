@@ -1,15 +1,25 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Scoreboard } from './Scoreboard';
-import { PlayerSection } from './PlayerSection';
-import { ActionGrid } from './ActionGrid.jsx';
-import { Footer } from './Footer';
-import { FollowUpModal } from './FollowUpModal.jsx';
-import { StatusOverlay } from './StatusOverlay.jsx';
-import { SubstitutionModal } from './SubstitutionModal';
-import { StatsPanel } from './StatsPanel';
-import { calculatePlayerStats, calculateTeamStats, calculatePlusMinus } from "../utils/StatCalculations.jsx";
+// COMPONENTS
+import { Scoreboard } from "../components/scoreboard/Scoreboard.jsx";
+import { PlayerSection } from "../components/players/PlayerSection.jsx";
+import { ActionGrid } from "../components/actions/ActionGrid.jsx";
+import { Footer } from "../components/layout/Footer.jsx";
 
-// PLAYER CARD AND PLAYER SECTION
+// MODALS & OVERLAYS
+import { FollowUpModal } from "../components/modals/FollowUpModal.jsx";
+import { StatusOverlay } from "../components/modals/StatusOverlay.jsx";
+import { SubstitutionModal } from "../components/modals/SubstitutionModal.jsx";
+
+// STATS
+import { StatsPanel } from "../components/stats/StatsPanel.jsx";
+
+// STAT CALCULATIONS
+import {
+  calculatePlayerStats,
+  calculateTeamStats,
+  calculatePlusMinus
+} from "../utils/StatCalculations.jsx";
+
 
 
 function GamePage() {

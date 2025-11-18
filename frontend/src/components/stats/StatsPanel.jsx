@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { BarChart3, Users, Activity } from 'lucide-react';
-import { extractPlayByPlay } from "../utils/StatCalculations.jsx";
+import { extractPlayByPlay } from "../../utils/StatCalculations.jsx";
 
 
 export const StatsPanel = ({
