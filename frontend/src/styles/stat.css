@@ -1,0 +1,265 @@
+/* =========================================
+   GLOBAL
+========================================= */
+body {
+  font-family: 'Inter', Arial, sans-serif;
+  background: #f5f7fa;
+  margin: 0;
+  padding: 0;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+}
+
+/* =========================================
+   SCOREBOARD (IDENTICAL TO ORIGINAL)
+========================================= */
+.scoreboard {
+  width: 100%;
+  background: #06184A;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 20px;
+  align-items: center;
+}
+
+.team-box {
+  width: 25%;
+  text-align: center;
+}
+
+.team-name {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.team-score {
+  font-size: 46px;
+  font-weight: 900;
+}
+
+.team-fouls {
+  font-size: 14px;
+  margin-top: 2px;
+  opacity: 0.9;
+}
+
+.quarter-box {
+  text-align: center;
+}
+
+.quarter-title {
+  font-size: 14px;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+
+.quarter-number {
+  background: #4E5873;
+  padding: 4px 12px;
+  border-radius: 10px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.quarter-buttons {
+  margin-top: 4px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.q-btn {
+  background: #4E5873;
+  color: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.q-btn:hover {
+  background: #65708a;
+}
+
+.q-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* =========================================
+   PLAYER CARDS
+========================================= */
+.player-panels {
+  display: flex;
+  gap: 24px;
+  padding: 20px;
+}
+
+.player-panel {
+  flex: 1;
+}
+
+.player-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 600;
+  border: none;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Team A – Blue */
+.player-btn.blue {
+  background: #3089ff;
+  color: white;
+}
+
+/* Team B – Gold */
+.player-btn.gold {
+  background: #eebc35;
+  color: #4a3900;
+}
+
+/* Hover */
+.player-btn:hover {
+  transform: scale(1.02);
+}
+
+/* Selected state */
+.player-btn.selected {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 4px #c6ccd6;
+}
+
+.player-number {
+  font-weight: 800;
+  opacity: 0.9;
+}
+
+/* =========================================
+   ACTION BUTTONS
+========================================= */
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 20px 0;
+}
+
+.act-btn {
+  width: 110px;
+  height: 100px;
+  border-radius: 12px;
+  font-size: 16px;
+  padding-top: 14px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+  transition: transform 0.12s ease;
+}
+
+.act-btn:hover {
+  transform: scale(1.05);
+}
+
+/* Make (Green) */
+.act-btn.make {
+  background: #b8f7c1;
+  color: #0f7512;
+}
+
+/* Miss (Red) */
+.act-btn.miss {
+  background: #f7b7b7;
+  color: #8b0000;
+}
+
+/* Disabled buttons */
+.act-btn.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* =========================================
+   TOP NAVIGATION (Box Score / Stats / PbP)
+========================================= */
+.topnav {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 20px;
+  background: white;
+  border-bottom: 1px solid #d9dee5;
+}
+
+.nav-item {
+  background: #f5f7fa;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid #d7dee9;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-item:hover {
+  background: #e9eef5;
+}
+
+/* =========================================
+   TEAM HEADERS
+========================================= */
+.team-header {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0047ab;
+  margin: 20px 0 10px 0;
+  padding-left: 16px;
+}
+
+/* =========================================
+   STATS TABLE
+========================================= */
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 30px;
+}
+
+.stats-table thead {
+  background: #e9f1ff;
+}
+
+.stats-table th {
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  border-bottom: 1px solid #c8d3e1;
+}
+
+.stats-table td {
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.stats-table tbody tr:nth-child(even) {
+  background: #f7fbff;
+}
