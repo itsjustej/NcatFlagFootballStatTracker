@@ -20,7 +20,7 @@ export const ActionGrid = ({ onAction, disabled }) => {
     // Row 2
     { label: 'Steal', icon: '🦾', color: 'gray', action: 'STEAL' },
     { label: 'Block', icon: '🚫', color: 'gray', action: 'BLOCK' },
-    { label: 'Rebound', icon: '⬆️', color: 'gray', action: 'REBOUND' },
+    { label: 'Rebound', icon: '⬆️', color: 'yellow', action: 'REBOUND' },
     { label: 'Assist', icon: '🤝', color: 'yellow', action: 'ASSIST' },
     { label: 'Turnover', icon: '?', color: 'orange', action: 'TURNOVER' },
     { label: 'Foul', icon: '⚠️', color: 'orange', action: 'FOUL' },

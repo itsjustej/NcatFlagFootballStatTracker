@@ -1,440 +1,412 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
-// COMPONENTS
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback
+} from "react";
+
 import { Scoreboard } from "../components/scoreboard/Scoreboard.jsx";
 import { PlayerSection } from "../components/players/PlayerSection.jsx";
 import { ActionGrid } from "../components/actions/ActionGrid.jsx";
 import { Footer } from "../components/layout/Footer.jsx";
-
-// MODALS & OVERLAYS
 import { FollowUpModal } from "../components/modals/FollowUpModal.jsx";
 import { StatusOverlay } from "../components/modals/StatusOverlay.jsx";
 import { SubstitutionModal } from "../components/modals/SubstitutionModal.jsx";
-
-// STATS
 import { StatsPanel } from "../components/stats/StatsPanel.jsx";
 
-// STAT CALCULATIONS
 import {
   calculatePlayerStats,
   calculateTeamStats,
   calculatePlusMinus
 } from "../utils/StatCalculations.jsx";
 
+import { defaultGameState } from "../data/gameDefaults.js";
 
+export default function GamePage() {
+  /* ---------------------------------------------------------
+     LOAD GAME
+  --------------------------------------------------------- */
+  const [loaded, setLoaded] = useState(false);
+  const [teamA, setTeamA] = useState([]);
+  const [teamB, setTeamB] = useState([]);
+  const [settings, setSettings] = useState(null);
+  const [gameState, setGameState] = useState(defaultGameState);
 
-function GamePage() {
-  // Game State
-  const [gameState, setGameState] = useState({
-    teamAScore: 0,
-    teamBScore: 0,
-    quarter: '1',
-    teamAFouls: 0,
-    teamBFouls: 0,
-  });
-  
-  // Players
-  const [teamAPlayers, setTeamAPlayers] = useState([
-    { id: 'a1', name: 'Sapri Sise', jerseyNumber: 23, team: 'A', isActive: true },
-    { id: 'a2', name: 'Ej Lockhart', jerseyNumber: 15, team: 'A', isActive: true },
-    { id: 'a3', name: 'Ant DesRavines', jerseyNumber: 7, team: 'A', isActive: true },
-    { id: 'a4', name: 'Elias Lopes', jerseyNumber: 32, team: 'A', isActive: true },
-    { id: 'a5', name: 'Imani Dinkins', jerseyNumber: 11, team: 'A', isActive: true },
-    // Bench players
-    { id: 'a6', name: 'Jadin Hutchinson', jerseyNumber: 44, team: 'A', isActive: false },
-    { id: 'a7', name: 'Elijah Lewis', jerseyNumber: 9, team: 'A', isActive: false },
-  ]);
+  useEffect(() => {
+    const saved = localStorage.getItem("currentGame");
 
-  const [teamBPlayers, setTeamBPlayers] = useState([
-    { id: 'b1', name: 'Seth Williams', jerseyNumber: 24, team: 'B', isActive: true },
-    { id: 'b2', name: 'Weston Culpepper', jerseyNumber: 8, team: 'B', isActive: true },
-    { id: 'b3', name: 'Staci Tranquill', jerseyNumber: 16, team: 'B', isActive: true },
-    { id: 'b4', name: 'Madison Pegram', jerseyNumber: 3, team: 'B', isActive: true },
-    { id: 'b5', name: 'Jevaun Keith', jerseyNumber: 21, team: 'B', isActive: true },
-    // Bench players
-    { id: 'b6', name: 'Jamaal Davis', jerseyNumber: 0, team: 'B', isActive: false },
-    { id: 'b7', name: 'Kendall Dixon', jerseyNumber: 4, team: 'B', isActive: false },
-  ]);
+    if (!saved) {
+      window.location.href = "/start-game";
+      return;
+    }
 
-  const [teams, setTeams] = useState({
-  A: { name: "Aggies", roster: teamAPlayers },
-  B: { name: "Bulldogs", roster: teamBPlayers }
-  });
+    const parsed = JSON.parse(saved);
 
-  // UI State
+    setTeamA(
+      parsed.teamA.players.map((p) => ({
+        ...p,
+        team: "A",
+        isActive: p.isActive ?? true
+      }))
+    );
+
+    setTeamB(
+      parsed.teamB.players.map((p) => ({
+        ...p,
+        team: "B",
+        isActive: p.isActive ?? true
+      }))
+    );
+
+    setSettings(parsed.settings);
+
+    setGameState({
+      ...defaultGameState,
+      teamAScore: parsed.settings.startScore ?? 0,
+      teamBScore: parsed.settings.startScore ?? 0,
+      quarterLength: parsed.settings.quarterLength ?? 12
+    });
+
+    setLoaded(true);
+  }, []);
+
+  /* ---------------------------------------------------------
+     UI STATE
+  --------------------------------------------------------- */
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [statHistory, setStatHistory] = useState([]);
-  const [substitutionHistory, setSubstitutionHistory] = useState([]);
-  const [followUpAction, setFollowUpAction] = useState(null);
   const [statusMessages, setStatusMessages] = useState([]);
-  const [substitutionModal, setSubstitutionModal] = useState({
-    isOpen: false,
-  });
+  const [substitutionModal, setSubstitutionModal] = useState({ isOpen: false });
 
-  // Get active players for display
-  const activeTeamAPlayers = teams.A.roster.filter(p => p.isActive);
-  const activeTeamBPlayers = teams.B.roster.filter(p => p.isActive);
+  // Follow-up state
+  const [followUpAction, setFollowUpAction] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+
+  /* ---------------------------------------------------------
+     PLAYER GROUPS
+  --------------------------------------------------------- */
+  const activeTeamAPlayers = teamA.filter((p) => p.isActive);
+  const activeTeamBPlayers = teamB.filter((p) => p.isActive);
   const allActivePlayers = [...activeTeamAPlayers, ...activeTeamBPlayers];
-  const allPlayers = [...teams.A.roster, ...teams.B.roster];
+  const allPlayers = [...teamA, ...teamB];
 
-  // Calculate stats with plus-minus
+  /* ---------------------------------------------------------
+     STATS
+  --------------------------------------------------------- */
   const playerStats = useMemo(() => {
-    const baseStats = calculatePlayerStats(allPlayers, statHistory);
-    const plusMinusMap = calculatePlusMinus(allPlayers, statHistory);
-    
-    return baseStats.map(stats => ({
-      ...stats,
-      plusMinus: plusMinusMap[stats.playerId] || 0
+    const base = calculatePlayerStats(allPlayers, statHistory);
+    const plusMinus = calculatePlusMinus(allPlayers, statHistory);
+
+    return base.map((p) => ({
+      ...p,
+      plusMinus: plusMinus[p.playerId] || 0
     }));
   }, [allPlayers, statHistory]);
-  
-  const teamAStats = useMemo(() => 
-    calculateTeamStats('A', playerStats), 
+
+  const teamAStats = useMemo(
+    () => calculateTeamStats("A", playerStats),
     [playerStats]
   );
-  
-  const teamBStats = useMemo(() => 
-    calculateTeamStats('B', playerStats), 
+  const teamBStats = useMemo(
+    () => calculateTeamStats("B", playerStats),
     [playerStats]
   );
 
+  /* ---------------------------------------------------------
+     STATUS MESSAGE
+  --------------------------------------------------------- */
   const showStatus = useCallback((text, color) => {
-    setStatusMessages(prev => [...prev, { text, color }]);
+    setStatusMessages((prev) => [...prev, { text, color }]);
   }, []);
 
-  // Takes in a player object when a user clicks/selects a player.
-  // Checks If the previously selected player's ID matches the one just clicked, 
-  // it deselects the player by setting selectedPlayer to null if so
-  // Otherwise, it selects the new player by setting selectedPlayer to that player
-  const handlePlayerSelect = useCallback((player) => {
-    setSelectedPlayer(prev => prev?.id === player.id ? null : player);
+  const statusColor = (type) =>
+    ({
+      ASSIST: "bg-yellow-500",
+      REBOUND: "bg-purple-500",
+      STEAL: "bg-black",
+      BLOCK: "bg-black",
+      FOUL: "bg-orange-500",
+      "2PT_MAKE": "bg-green-500",
+      "3PT_MAKE": "bg-green-500",
+      "FT_MAKE": "bg-green-600",
+      "2PT_MISS": "bg-red-500",
+      "3PT_MISS": "bg-red-500",
+      "FT_MISS": "bg-red-500",
+      TURNOVER: "bg-red-500"
+    }[type] || "bg-gray-800");
+
+  /* ---------------------------------------------------------
+     SELECT PLAYER
+  --------------------------------------------------------- */
+  const handlePlayerSelect = useCallback((p) => {
+    setSelectedPlayer(p);
   }, []);
 
-  const getStatusColor = (type) => {
-    switch (type) {
-      case 'ASSIST': return 'bg-yellow-500';
-      case 'REBOUND': return 'bg-purple-500';
-      case 'STEAL': return 'bg-black';
-      case 'BLOCK': return 'bg-black';
-      case 'FOUL': return 'bg-orange-500';
-      case '2PT_MAKE': return 'bg-green-500';
-      case '3PT_MAKE': return 'bg-green-500';
-      case 'FT_MAKE': return 'bg-green-600';
-      case '2PT_MISS': return 'bg-red-500';
-      case '3PT_MISS': return 'bg-red-500';
-      case 'FT_MISS': return 'bg-red-500';
-      case 'TURNOVER': return 'bg-red-500';
-      default: return 'bg-gray-800';
-    }
-  };
-
-  // Take the new stat action and add it to the end of the existing stat history list
-  const addStatToHistory = useCallback((statAction) => {
-    setStatHistory(prev => [...prev, statAction]);
-  }, []);
-
-  const handleAction = useCallback((action, points) => {
-    
-    // Depending on what team a player is on decides what value is returned for their updated score
-
-    const newTeamAScore = selectedPlayer.team === 'A' 
-  ? gameState.teamAScore + (points || 0) 
-  : gameState.teamAScore;
-
-    const newTeamBScore = selectedPlayer.team === 'B' 
-  ? gameState.teamBScore + (points || 0) 
-  : gameState.teamBScore;
-
-
-    // creates an array of player ids of players whos onCourt boolean is set to true
-    const activePlayersAtTime = allActivePlayers.map(p => p.id);
-
-    const statAction = {
-      // one row in play-by-play log, and it's what gets pushed to statHistory array
+  /* ---------------------------------------------------------
+     LOG STAT ENTRY
+  --------------------------------------------------------- */
+  const logStat = (player, action, points, newAScore, newBScore) => {
+    const entry = {
       id: Date.now().toString(),
-      playerId: selectedPlayer.id,
-      playerName: selectedPlayer.name,
-      team: selectedPlayer.team,
-      // this.action = action
+      playerId: player.id,
+      playerName: player.name,
+      team: player.team,
       action,
       points,
       quarter: gameState.quarter,
-      teamAScoreAfter: newTeamAScore,
-      teamBScoreAfter: newTeamBScore,
-      // an array of player IDs at the moment something happens for plus/minus purposes
-      activePlayersAtTime,
-      // allows u to order play by plays
-      timestamp: new Date(),
+      teamAScoreAfter: newAScore,
+      teamBScoreAfter: newBScore,
+      activePlayersAtTime: allActivePlayers.map((p) => p.id),
+      timestamp: new Date()
     };
 
-    // Update score if applicable
+    setStatHistory((prev) => [...prev, entry]);
+  };
+
+  /* ---------------------------------------------------------
+     PROCESS NON-FOLLOW-UP ACTION
+  --------------------------------------------------------- */
+  const processImmediateAction = (player, action, points) => {
+    const isTeamA = player.team === "A";
+
+    // Score updates
+    const newAScore = isTeamA ? gameState.teamAScore + (points || 0) : gameState.teamAScore;
+    const newBScore = !isTeamA ? gameState.teamBScore + (points || 0) : gameState.teamBScore;
+
     if (points) {
-      // saves previous value of the game state
-      setGameState(prev => ({ 
+      setGameState((prev) => ({ ...prev, teamAScore: newAScore, teamBScore: newBScore }));
+    }
+
+    // Foul increments
+    if (action === "FOUL") {
+      setGameState((prev) => ({
         ...prev,
-        // Overide what we want to change
-        teamAScore: newTeamAScore,
-        teamBScore: newTeamBScore,
+        teamAFouls: isTeamA ? prev.teamAFouls + 1 : prev.teamAFouls,
+        teamBFouls: !isTeamA ? prev.teamBFouls + 1 : prev.teamBFouls
       }));
     }
 
-    // Update fouls
-    if (action === 'FOUL') {
-      setGameState(prev => ({
-        ...prev,
-        teamAFouls: selectedPlayer.team === 'A' ? prev.teamAFouls + 1 : prev.teamAFouls,
-        teamBFouls: selectedPlayer.team === 'B' ? prev.teamBFouls + 1 : prev.teamBFouls,
-      }));
-    }
+    logStat(player, action, points, newAScore, newBScore);
 
-    // an array of actions that would require follow up
-    const needsFollowUp = ['2PT_MAKE', '3PT_MAKE', '2PT_MISS', '3PT_MISS', 'FT_MISS', 'STEAL'];
-    
-    if (needsFollowUp.includes(action)) {
-      let question = '';
-      let eligiblePlayers = [];
+    showStatus(
+      `${player.name} — ${action.replace("_", " ")} ✓`,
+      statusColor(action)
+    );
+  };
 
-      switch (action) {
-        case '2PT_MAKE':
-        case '3PT_MAKE':
-          question = 'Who assisted?';
-          eligiblePlayers = selectedPlayer.team === 'A' ? activeTeamAPlayers : activeTeamBPlayers;
-          eligiblePlayers = eligiblePlayers.filter(p => p.id !== selectedPlayer.id);
-          break;
-        case '2PT_MISS':
-        case '3PT_MISS':
-        case 'FT_MISS':
-          question = 'Who got the rebound?';
-          eligiblePlayers = allActivePlayers;
-          break;
-        case 'STEAL':
-          question = 'Who was stolen from?';
-          eligiblePlayers = selectedPlayer.team === 'A' ? activeTeamBPlayers : activeTeamAPlayers;
-          break;
-      }
+  /* ---------------------------------------------------------
+     ACTION TRIGGER
+  --------------------------------------------------------- */
+const handleAction = useCallback(
+  (action, points) => {
+    if (!selectedPlayer) return;
 
-      setFollowUpAction({ 
-        // updates something follow up modal
-        type: action.includes('MAKE') ? 'assist' : action.includes('MISS') ? 'rebound' : 'steal', 
-        // If the action includes the word 'MAKE', then the type is 'assist'. If miss type is rebound, else the type is steal
-        originalAction: statAction,
-        // Stores the full original stat so stats can update simultaneously
-        question,
-        // Stores question to update the modal
-        eligiblePlayers,
-        // list of players who can be selected off this modal
+    // Prevent new actions during follow-up
+    if (followUpAction) return;
+
+    // 🔥 Follow-up for STEAL
+    if (action === "STEAL") {
+      const eligible = allActivePlayers.filter(
+        (p) => p.team !== selectedPlayer.team
+      );
+
+      setPendingAction({ action, points });
+      setFollowUpAction({
+        question: "Who lost the ball?",
+        eligiblePlayers: eligible
       });
+
+      return;
     }
 
-    addStatToHistory(statAction);
-    
-    // If the action does not require a follow-up, then show a status message immediately.
-    if (!needsFollowUp.includes(action)) {
-      showStatus(`${selectedPlayer.name} — ${action.replace('_', ' ')} ✅`, getStatusColor(action));
-    }
-  }, 
-  
-  // Rerender component everytime a change in any of these are made
-  [selectedPlayer, activeTeamAPlayers, activeTeamBPlayers, allActivePlayers, showStatus, gameState, addStatToHistory]);
+    // 🔥 Follow-up for MISSES → Who rebounded?
+    if (["2PT_MISS", "3PT_MISS", "FT_MISS"].includes(action)) {
+      const eligible = allActivePlayers;
 
-  const handleFollowUpSelect = useCallback((followUpPlayer) => {
-    if (!followUpAction) return;
+      setPendingAction({ action, points });
+      setFollowUpAction({
+        question: "Who got the rebound?",
+        eligiblePlayers: eligible
+      });
 
-    const updatedAction = { ...followUpAction.originalAction };
-    
-    switch (followUpAction.type) {
-      case 'assist':
-        updatedAction.assistedBy = followUpPlayer.name;
-        break;
-      case 'rebound':
-        updatedAction.reboundedBy = followUpPlayer.name;
-        break;
-      case 'steal':
-        updatedAction.stolenFrom = followUpPlayer.name;
-        break;
+      return;
     }
 
-    setStatHistory(prev => prev.map(stat => 
-      stat.id === updatedAction.id ? updatedAction : stat
-    ));
+    // 🔥 Follow-up for MADE SHOTS → Who made the assist?
+    if (["2PT_MAKE", "3PT_MAKE"].includes(action)) {
+      const eligible = allActivePlayers.filter(
+        (p) => p.team === selectedPlayer.team && p.id !== selectedPlayer.id
+      );
 
-    // Create follow-up action for the secondary player
-    const followUpStatAction = {
-      id: (Date.now() + 1).toString(),
-      playerId: followUpPlayer.id,
-      playerName: followUpPlayer.name,
-      team: followUpPlayer.team,
-      action: followUpAction.type === 'assist' ? 'ASSIST' : 
-              followUpAction.type === 'rebound' ? 'REBOUND' : 
-              'TURNOVER',
-      quarter: gameState.quarter,
-      teamAScoreAfter: updatedAction.teamAScoreAfter,
-      teamBScoreAfter: updatedAction.teamBScoreAfter,
-      activePlayersAtTime: updatedAction.activePlayersAtTime,
-      timestamp: new Date(Date.now() + 1),
+      setPendingAction({ action: "ASSIST", points, madeShot: action });
+      setFollowUpAction({
+        question: "Who made the assist?",
+        eligiblePlayers: eligible
+      });
+
+      return;
+    }
+
+    // Immediate actions (rebounds, fouls, blocks, etc.)
+    processImmediateAction(selectedPlayer, action, points);
+  },
+  [selectedPlayer, followUpAction, allActivePlayers, gameState]
+);
+
+/* ---------------------------------------------------------
+     RESOLVE FOLLOW-UP
+  --------------------------------------------------------- */
+const handleFollowUpSelect = (otherPlayer) => {
+  if (!pendingAction || !selectedPlayer) return;
+
+  const { action, points, madeShot } = pendingAction;
+
+  const isTeamA = selectedPlayer.team === "A";
+  const newAScore = isTeamA ? gameState.teamAScore + (points || 0) : gameState.teamAScore;
+  const newBScore = !isTeamA ? gameState.teamBScore + (points || 0) : gameState.teamBScore;
+
+  // Update score if needed
+  if (points) {
+    setGameState((prev) => ({
+      ...prev,
+      teamAScore: newAScore,
+      teamBScore: newBScore
+    }));
+  }
+
+  /* -------------------- STEAL -------------------- */
+  if (action === "STEAL") {
+    logStat(selectedPlayer, "STEAL", 0, newAScore, newBScore);
+    showStatus(`${selectedPlayer.name} — STEAL ✓`, statusColor("STEAL"));
+
+    logStat(otherPlayer, "TURNOVER", 0, newAScore, newBScore);
+    showStatus(`${otherPlayer.name} — TURNOVER ✓`, statusColor("TURNOVER"));
+  }
+
+  /* -------------------- MISSES → REBOUND -------------------- */
+  if (["2PT_MISS", "3PT_MISS", "FT_MISS"].includes(action)) {
+    logStat(selectedPlayer, action, 0, newAScore, newBScore);
+    showStatus(`${selectedPlayer.name} — MISS ✓`, statusColor(action));
+
+    logStat(otherPlayer, "REBOUND", 0, newAScore, newBScore);
+    showStatus(`${otherPlayer.name} — REBOUND ✓`, statusColor("REBOUND"));
+  }
+
+  /* -------------------- MADE SHOT → ASSIST -------------------- */
+  if (action === "ASSIST") {
+    // scorer (selectedPlayer)
+    logStat(selectedPlayer, madeShot, points, newAScore, newBScore);
+    showStatus(`${selectedPlayer.name} — ${madeShot.replace("_", " ")} ✓`, statusColor(madeShot));
+
+    // assister (otherPlayer)
+    logStat(otherPlayer, "ASSIST", 0, newAScore, newBScore);
+    showStatus(`${otherPlayer.name} — ASSIST ✓`, statusColor("ASSIST"));
+  }
+
+  // Reset follow-up
+  setFollowUpAction(null);
+  setPendingAction(null);
+};
+
+const handleFollowUpSkip = () => {
+  setFollowUpAction(null);
+  setPendingAction(null);
+};
+
+  /* ---------------------------------------------------------
+     SUBSTITUTIONS
+  --------------------------------------------------------- */
+  const handleSubstitution = () => setSubstitutionModal({ isOpen: true });
+
+  const handleSubstitutionSelect = useCallback(
+    (playerOut, playerIn) => {
+      const updateTeam = (teamSetter, teamPlayers) =>
+        teamSetter(
+          teamPlayers.map((p) =>
+            p.id === playerOut.id
+              ? { ...p, isActive: false }
+              : p.id === playerIn.id
+              ? { ...p, isActive: true }
+              : p
+          )
+        );
+
+      playerOut.team === "A"
+        ? updateTeam(setTeamA, teamA)
+        : updateTeam(setTeamB, teamB);
+
+      showStatus(
+        `Sub — ${playerOut.name} out → ${playerIn.name} in`,
+        "bg-blue-600"
+      );
+    },
+    [teamA, teamB]
+  );
+
+  /* ---------------------------------------------------------
+     SAVE GAME (placeholder)
+  --------------------------------------------------------- */
+  const handleSaveExit = () => {
+    const payload = {
+      teamA: { players: teamA },
+      teamB: { players: teamB },
+      settings,
+      statHistory,
+      gameState
     };
 
-    addStatToHistory(followUpStatAction);
+    localStorage.setItem("currentGame", JSON.stringify(payload));
 
-    const original = followUpAction.originalAction;
-    const originalFormatted = original.action.replace(/_/g, ' ');
-    const secondaryAction = followUpAction.type === 'steal' ? 'TURNOVER' : followUpAction.type.toUpperCase();
+    showStatus("Game saved!", "bg-green-700");
+  };
 
-    showStatus(`${original.playerName} — ${originalFormatted} ✅`, getStatusColor(original.action));
-    showStatus(`${followUpPlayer.name} — ${secondaryAction} ✅`, getStatusColor(secondaryAction));
+  /* ---------------------------------------------------------
+     UNDO
+  --------------------------------------------------------- */
+  const handleUndo = () => {
+    if (statHistory.length < 1) return;
 
-    setFollowUpAction(null);
-  }, [followUpAction, showStatus, gameState, addStatToHistory]);
+    setStatHistory((prev) => prev.slice(0, -1));
+    showStatus("Last action undone", "bg-gray-600");
+  };
 
-  const handleFollowUpSkip = useCallback(() => {
-    if (!followUpAction) return;
-
-    const original = followUpAction.originalAction;
-    showStatus(`${original.playerName} — ${original.action.replace('_', ' ')} ✅`, getStatusColor(original.action));
-    setFollowUpAction(null);
-  }, [followUpAction, showStatus]);
-
-  const handleUndo = useCallback(() => {
-    
-  
-    const lastStat = statHistory[statHistory.length - 1];
-    const lastSub = substitutionHistory[substitutionHistory.length - 1];
-    
-    // We should undo the last stat action if, A stat exists, and Either no substitution exists, or The stat happened after the substitution”
-    const shouldUndoStat = lastStat && (!lastSub || lastStat.timestamp > lastSub.timestamp);
-    
-    if (shouldUndoStat) {
-      // Undo last stat action
-      const lastAction = statHistory[statHistory.length - 1];
-      
-      // Reverse score changes
-      if (lastAction.points) {
-        setGameState(prev => ({
-          ...prev,
-          teamAScore: lastAction.team === 'A' ? prev.teamAScore - lastAction.points : prev.teamAScore,
-          teamBScore: lastAction.team === 'B' ? prev.teamBScore - lastAction.points : prev.teamBScore,
-        }));
-      }
-
-      // Reverse foul changes
-      if (lastAction.action === 'FOUL') {
-        setGameState(prev => ({
-          ...prev,
-          teamAFouls: lastAction.team === 'A' ? prev.teamAFouls - 1 : prev.teamAFouls,
-          teamBFouls: lastAction.team === 'B' ? prev.teamBFouls - 1 : prev.teamBFouls,
-        }));
-      }
-
-      // Now the last stat is 1 stat previous
-      setStatHistory(prev => prev.slice(0, -1));
-      // Flash Conifrmation message
-      showStatus('Last action undone');
-    } else if (lastSub) {
-      // Undo last substitution
-      const { team, playerOut, playerIn } = lastSub;
-      
-      if (team === 'A') {
-        setTeamAPlayers(prev => prev.map(p => {
-          if (p.id === playerOut.id) return { ...p, isActive: true };
-          if (p.id === playerIn.id) return { ...p, isActive: false };
-          return p;
-        }));
-      } else {
-        setTeamBPlayers(prev => prev.map(p => {
-          if (p.id === playerOut.id) return { ...p, isActive: true };
-          if (p.id === playerIn.id) return { ...p, isActive: false };
-          return p;
-        }));
-      }
-      
-      setSubstitutionHistory(prev => prev.slice(0, -1));
-      showStatus(`Substitution undone: ${playerOut.name} back in, ${playerIn.name} to bench`);
-    }
-  }, [statHistory, substitutionHistory, showStatus]);
-
-  const handleSubstitution = useCallback(() => {
-    setSubstitutionModal({ isOpen: true });
-  }, []);
-
-  const handleSubstitutionSelect = useCallback((playerOut, playerIn) => {
-    const substitution = {
-      id: Date.now().toString(),
-      team: playerOut.team,
-      playerOut,
-      playerIn,
-      timestamp: new Date(),
-    };
-
-    // Update player rosters
-    if (playerOut.team === 'A') {
-      setTeamAPlayers(prev => prev.map(p => {
-        if (p.id === playerOut.id) return { ...p, isActive: false };
-        if (p.id === playerIn.id) return { ...p, isActive: true };
-        return p;
-      }));
-    } else {
-      setTeamBPlayers(prev => prev.map(p => {
-        if (p.id === playerOut.id) return { ...p, isActive: false };
-        if (p.id === playerIn.id) return { ...p, isActive: true };
-        return p;
-      }));
-    }
-
-    // Clear selected player if they were substituted out
-    if (selectedPlayer?.id === playerOut.id) {
-      setSelectedPlayer(null);
-    }
-
-    setSubstitutionHistory(prev => [...prev, substitution]);
-    showStatus(`Substitution: ${playerOut.name} out, ${playerIn.name} in`);
-  }, [selectedPlayer, showStatus]);
-
-  const handleSaveExit = useCallback(() => {
-    showStatus('Game saved successfully!');
-    // Here you would implement actual save logic
-  }, [showStatus]);
-
-  const canUndo = statHistory.length > 0 || substitutionHistory.length > 0;
+  /* ---------------------------------------------------------
+     RENDER
+  --------------------------------------------------------- */
+  if (!loaded) {
+    return <div className="text-center text-gray-600 p-8">Loading game…</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col lg:flex-row">
-      {/* Left Side - Stat Tracking Interface */}
-      <div className="flex-1 lg:w-1/2 flex flex-col max-h-screen overflow-y-auto scrollbar-hide">
-        {/* Scoreboard */}
-        <Scoreboard 
-        gameState={gameState} 
-        setGameState={setGameState}
-        teamA={teams.A}
-        teamB={teams.B}/>
+      {/* LEFT SIDE */}
+      <div className="flex-1 lg:w-1/2 flex flex-col max-h-screen overflow-y-auto">
+        <Scoreboard
+          gameState={gameState}
+          setGameState={setGameState}
+          teamA={{ name: teamA.name || "Team A", roster: teamA }}
+          teamB={{ name: teamB.name || "Team B", roster: teamB }}
+        />
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col">
-          {/* Players Section */}
-          <PlayerSection
-            teamAPlayers={activeTeamAPlayers}
-            teamBPlayers={activeTeamBPlayers}
-            selectedPlayer={selectedPlayer}
-            onPlayerSelect={handlePlayerSelect}
-          />
+        <PlayerSection
+          teamAPlayers={activeTeamAPlayers}
+          teamBPlayers={activeTeamBPlayers}
+          selectedPlayer={selectedPlayer}
+          onPlayerSelect={handlePlayerSelect}
+        />
 
-          {/* Action Grid */}
-          <ActionGrid
-            onAction={handleAction}
-            // Sets disabled depeneding on if a player is selected or not
-            disabled={!selectedPlayer}
-          />
+        <ActionGrid onAction={handleAction} disabled={!selectedPlayer} />
 
-          {/* Footer */}
-          <Footer
-            onUndo={handleUndo}
-            onSubstitution={handleSubstitution}
-            onSaveExit={handleSaveExit}
-            canUndo={canUndo}
-          />
-        </div>
+        <Footer
+          onUndo={handleUndo}
+          onSubstitution={handleSubstitution}
+          onSaveExit={handleSaveExit}
+          canUndo={statHistory.length > 0}
+        />
       </div>
 
-      {/* Right Side - Stats Panel */}
-      <div className="flex-1 lg:w-1/2 max-h-screen overflow-y-auto scrollbar-hide">
+      {/* RIGHT SIDE */}
+      <div className="flex-1 lg:w-1/2 max-h-screen overflow-y-auto">
         <StatsPanel
           playerStats={playerStats}
           teamAStats={teamAStats}
@@ -444,7 +416,7 @@ function GamePage() {
         />
       </div>
 
-      {/* Modals and Overlays */}
+      {/* MODALS */}
       <FollowUpModal
         followUpAction={followUpAction}
         onPlayerSelect={handleFollowUpSelect}
@@ -453,8 +425,8 @@ function GamePage() {
 
       <SubstitutionModal
         isOpen={substitutionModal.isOpen}
-        teamAPlayers={teamAPlayers}
-        teamBPlayers={teamBPlayers}
+        teamAPlayers={teamA}
+        teamBPlayers={teamB}
         onSubstitute={handleSubstitutionSelect}
         onClose={() => setSubstitutionModal({ isOpen: false })}
       />
@@ -466,5 +438,3 @@ function GamePage() {
     </div>
   );
 }
-
-export default GamePage;
