@@ -1,102 +1,106 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, Trash2 } from "lucide-react";
 
-const DEMO_GAMES = [
-  {
-    id: "1",
-    teamA: "Lakers",
-    teamB: "Celtics",
-    scoreA: 112,
-    scoreB: 108,
-    colorA: "#4f46e5",
-    colorB: "#10b981",
-  },
-  {
-    id: "2",
-    teamA: "Warriors",
-    teamB: "Lakers",
-    scoreA: 118,
-    scoreB: 115,
-    colorA: "#f59e0b",
-    colorB: "#4f46e5",
-  },
-  {
-    id: "3",
-    teamA: "Celtics",
-    teamB: "Warriors",
-    scoreA: 121,
-    scoreB: 110,
-    colorA: "#10b981",
-    colorB: "#f59e0b",
-  },
-];
-
 export default function GameHistoryPage() {
-  const [games, setGames] = useState(DEMO_GAMES);
+  const [games, setGames] = useState([]);
 
-  const handleDelete = (id) => {
+  const loadGames = () => {
+    fetch("http://localhost:5000/api/games")
+      .then((res) => res.json())
+      .then((data) => setGames(data || []))
+      .catch((err) => console.error("Failed to load games:", err));
+  };
+
+  useEffect(() => {
+    loadGames();
+  }, []);
+
+  const deleteGame = (id) => {
     if (!confirm("Delete this game?")) return;
-    setGames(games.filter((g) => g.id !== id));
+
+    fetch(`http://localhost:5000/api/games/${id}`, {
+      method: "DELETE",
+    }).then(() => loadGames());
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-4xl font-bold text-white mb-6">Game History</h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pt-24 px-6 text-white">
+      <div className="max-w-7xl mx-auto py-6">
+        <h1 className="text-4xl font-bold mb-8">Game History</h1>
 
-        {/* TWO COLUMN GRID */}
-        <div className="grid md:grid-cols-2 gap-6">
+        {/* THREE COLUMN GRID */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {games.map((g) => (
             <div
-              key={g.id}
-              className="bg-slate-800 rounded-xl border border-slate-700 p-6 hover:border-slate-500 transition"
+              key={g.GameID}
+              className="bg-slate-800 rounded-xl border border-slate-700 p-6 hover:border-slate-500 transition flex flex-col justify-between"
             >
-              <div className="flex items-center justify-between w-full">
+              {/* TOP: TEAMS & SCORES */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
 
-                {/* LEFT SIDE: TEAMS & SCORES */}
-                <div className="flex items-center gap-6">
-
-                  {/* Team A */}
+                  {/* HOME */}
                   <div className="flex items-center gap-2">
                     <div
                       className="w-3 h-3 rounded"
-                      style={{ backgroundColor: g.colorA }}
+                      style={{ backgroundColor: g.HomeTeamColor }}
                     ></div>
-                    <span className="text-white font-semibold">{g.teamA}</span>
-                    <span className="text-xl font-bold text-white">{g.scoreA}</span>
+
+                    <span className="text-white font-semibold">
+                      {g.HomeTeamName}
+                    </span>
+
+                    <span className="text-xl font-bold">
+                      {g.HomeScore ?? "-"}
+                    </span>
                   </div>
 
-                  {/* VS */}
                   <span className="text-slate-500 text-sm font-medium">vs</span>
 
-                  {/* Team B */}
+                  {/* AWAY */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold text-white">{g.scoreB}</span>
-                    <span className="text-white font-semibold">{g.teamB}</span>
+                    <span className="text-xl font-bold">
+                      {g.AwayScore ?? "-"}
+                    </span>
+
+                    <span className="text-white font-semibold">
+                      {g.AwayTeamName}
+                    </span>
+
                     <div
                       className="w-3 h-3 rounded"
-                      style={{ backgroundColor: g.colorB }}
+                      style={{ backgroundColor: g.AwayTeamColor }}
                     ></div>
                   </div>
                 </div>
+              </div>
 
-                {/* RIGHT SIDE: BUTTONS */}
-                <div className="flex items-center gap-3 ml-4">
-                  <Link to={`/games/${g.id}`}>
-                    <button className="px-3 py-2 border border-slate-600 rounded-lg text-white hover:bg-slate-700 text-sm flex items-center gap-2">
+              {/* BOTTOM: DATE + VIEW + DELETE */}
+              <div className="flex items-center justify-between mt-6">
+
+                {/* DATE */}
+                <p className="text-slate-400 text-sm">
+                  {g.GameDate?.slice(0, 10)}
+                </p>
+
+                {/* BUTTONS */}
+                <div className="flex items-center gap-4">
+                  <Link to={`/games/${g.GameID}`}>
+                    <button className="px-4 py-1.5 border border-slate-600 rounded-lg text-white hover:bg-slate-700 text-sm flex items-center gap-2">
                       <Eye className="w-4 h-4" />
-                      View Game
+                      View
                     </button>
                   </Link>
 
                   <button
-                    onClick={() => handleDelete(g.id)}
-                    className="p-2 text-red-400 hover:bg-slate-700 rounded transition"
+                    onClick={() => deleteGame(g.GameID)}
+                    className="p-2 text-red-400 hover:text-red-600 rounded transition"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
+
               </div>
             </div>
           ))}

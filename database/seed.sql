@@ -9,6 +9,8 @@
 ------------------------------------------------------------
 -- Insert Teams
 ------------------------------------------------------------
+USE StatTracker;
+
 INSERT INTO Teams (TeamName, TeamColor, Wins, Losses, Ties, PointDifferential)
 VALUES
 ('Wildcats', 'Blue', 1, 1, 0, +5),   -- TeamID = 1
