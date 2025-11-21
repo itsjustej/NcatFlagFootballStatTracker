@@ -7,9 +7,9 @@ export default function GameHistoryPage() {
 
   const loadGames = () => {
     fetch("http://localhost:5000/api/games")
-      .then((res) => res.json())
-      .then((data) => setGames(data || []))
-      .catch((err) => console.error("Failed to load games:", err));
+      .then(res => res.json())
+      .then(data => setGames(data))
+      .catch(err => console.error("Failed to load games:", err));
   };
 
   useEffect(() => {
@@ -18,7 +18,6 @@ export default function GameHistoryPage() {
 
   const deleteGame = (id) => {
     if (!confirm("Delete this game?")) return;
-
     fetch(`http://localhost:5000/api/games/${id}`, {
       method: "DELETE",
     }).then(() => loadGames());
@@ -29,65 +28,54 @@ export default function GameHistoryPage() {
       <div className="max-w-7xl mx-auto py-6">
         <h1 className="text-4xl font-bold mb-8">Game History</h1>
 
-        {/* THREE COLUMN GRID */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* 3 or 4 columns? Dynamic grid */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+
           {games.map((g) => (
             <div
               key={g.GameID}
-              className="bg-slate-800 rounded-xl border border-slate-700 p-6 hover:border-slate-500 transition flex flex-col justify-between"
+              className="bg-slate-800 rounded-xl border border-slate-700 p-6 hover:border-slate-500 transition flex flex-col"
             >
-              {/* TOP: TEAMS & SCORES */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
 
-                  {/* HOME */}
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded"
-                      style={{ backgroundColor: g.HomeTeamColor }}
-                    ></div>
+              {/* TOP MATCHUP - full width */}
+              <div className="flex items-center justify-between w-full">
 
-                    <span className="text-white font-semibold">
-                      {g.HomeTeamName}
-                    </span>
+                {/* Home */}
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded"
+                    style={{ backgroundColor: g.HomeTeamColor || "#64748b" }}
+                  ></div>
+                  <span className="text-white font-semibold">{g.HomeTeamName}</span>
+                  <span className="text-xl font-bold">{g.HomeScore ?? "-"}</span>
+                </div>
 
-                    <span className="text-xl font-bold">
-                      {g.HomeScore ?? "-"}
-                    </span>
-                  </div>
+                {/* VS */}
+                <span className="text-slate-500 font-medium text-sm mx-2">vs</span>
 
-                  <span className="text-slate-500 text-sm font-medium">vs</span>
-
-                  {/* AWAY */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold">
-                      {g.AwayScore ?? "-"}
-                    </span>
-
-                    <span className="text-white font-semibold">
-                      {g.AwayTeamName}
-                    </span>
-
-                    <div
-                      className="w-3 h-3 rounded"
-                      style={{ backgroundColor: g.AwayTeamColor }}
-                    ></div>
-                  </div>
+                {/* Away */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-bold">{g.AwayScore ?? "-"}</span>
+                  <span className="text-white font-semibold">{g.AwayTeamName}</span>
+                  <div
+                    className="w-3 h-3 rounded"
+                    style={{ backgroundColor: g.AwayTeamColor || "#64748b" }}
+                  ></div>
                 </div>
               </div>
 
-              {/* BOTTOM: DATE + VIEW + DELETE */}
-              <div className="flex items-center justify-between mt-6">
+              {/* BOTTOM ROW - full inline row */}
+              <div className="flex items-center justify-between mt-4">
 
-                {/* DATE */}
+                {/* Date */}
                 <p className="text-slate-400 text-sm">
                   {g.GameDate?.slice(0, 10)}
                 </p>
 
-                {/* BUTTONS */}
-                <div className="flex items-center gap-4">
+                {/* Buttons */}
+                <div className="flex items-center gap-3">
                   <Link to={`/games/${g.GameID}`}>
-                    <button className="px-4 py-1.5 border border-slate-600 rounded-lg text-white hover:bg-slate-700 text-sm flex items-center gap-2">
+                    <button className="px-3 py-2 border border-slate-600 rounded-lg text-white hover:bg-slate-700 text-sm flex items-center gap-2">
                       <Eye className="w-4 h-4" />
                       View
                     </button>
@@ -95,23 +83,22 @@ export default function GameHistoryPage() {
 
                   <button
                     onClick={() => deleteGame(g.GameID)}
-                    className="p-2 text-red-400 hover:text-red-600 rounded transition"
+                    className="p-2 text-red-400 hover:bg-slate-700 rounded transition"
                   >
-                    <Trash2 className="w-5 h-5" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-
               </div>
             </div>
           ))}
         </div>
 
-        {/* EMPTY STATE */}
         {games.length === 0 && (
           <div className="bg-slate-800 border border-slate-700 rounded-xl p-12 text-center mt-8">
             <p className="text-slate-400 text-lg">No games recorded</p>
           </div>
         )}
+
       </div>
     </div>
   );

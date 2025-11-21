@@ -22,15 +22,33 @@ import {
 
 import { defaultGameState } from "../data/gameDefaults.js";
 
+const FALLBACK_SETTINGS = {
+  quarterLength: 12,
+  startScore: 0,
+  trackPlusMinus: true
+};
+
 export default function GamePage() {
+
   /* ---------------------------------------------------------
      LOAD GAME
   --------------------------------------------------------- */
   const [loaded, setLoaded] = useState(false);
   const [teamA, setTeamA] = useState([]);
   const [teamB, setTeamB] = useState([]);
+  const [teamAMeta, setTeamAMeta] = useState({
+    name: "Team A",
+    color: null,
+    id: null
+  });
+  const [teamBMeta, setTeamBMeta] = useState({
+    name: "Team B",
+    color: null,
+    id: null
+  });
   const [settings, setSettings] = useState(null);
   const [gameState, setGameState] = useState(defaultGameState);
+  const [gameId, setGameId] = useState(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("currentGame");
@@ -42,29 +60,45 @@ export default function GamePage() {
 
     const parsed = JSON.parse(saved);
 
-    setTeamA(
-      parsed.teamA.players.map((p) => ({
-        ...p,
-        team: "A",
-        isActive: p.isActive ?? true
-      }))
-    );
+    const normalizePlayers = (teamData, teamLabel) => {
+      const rawPlayers =
+        Array.isArray(teamData?.players) && teamData.players.length
+          ? teamData.players
+          : Array.isArray(teamData?.Players)
+            ? teamData.Players
+            : [];
 
-    setTeamB(
-      parsed.teamB.players.map((p) => ({
-        ...p,
-        team: "B",
-        isActive: p.isActive ?? true
-      }))
-    );
+      return rawPlayers.map((player) => ({
+        ...player,
+        id: player.id ?? player.PlayerID,
+        name: player.name ?? player.PlayerName,
+        team: teamLabel,
+        isActive: player.isActive ?? true
+      }));
+    };
 
-    setSettings(parsed.settings);
+    setTeamA(normalizePlayers(parsed.teamA, "A"));
+    setTeamB(normalizePlayers(parsed.teamB, "B"));
+    setTeamAMeta({
+      name: parsed.teamA?.TeamName || parsed.teamA?.name || "Team A",
+      color: parsed.teamA?.TeamColor || parsed.teamA?.color || null,
+      id: parsed.teamA?.TeamID ?? parsed.teamA?.id ?? null
+    });
+    setTeamBMeta({
+      name: parsed.teamB?.TeamName || parsed.teamB?.name || "Team B",
+      color: parsed.teamB?.TeamColor || parsed.teamB?.color || null,
+      id: parsed.teamB?.TeamID ?? parsed.teamB?.id ?? null
+    });
+    setGameId(parsed.gameId ?? parsed.GameID ?? null);
+
+    const savedSettings = parsed.settings || FALLBACK_SETTINGS;
+    setSettings(savedSettings);
 
     setGameState({
       ...defaultGameState,
-      teamAScore: parsed.settings.startScore ?? 0,
-      teamBScore: parsed.settings.startScore ?? 0,
-      quarterLength: parsed.settings.quarterLength ?? 12
+      teamAScore: savedSettings.startScore ?? 0,
+      teamBScore: savedSettings.startScore ?? 0,
+      quarterLength: savedSettings.quarterLength ?? 12
     });
 
     setLoaded(true);
@@ -318,6 +352,24 @@ const handleFollowUpSkip = () => {
   --------------------------------------------------------- */
   const handleSubstitution = () => setSubstitutionModal({ isOpen: true });
 
+  const ensureGameStatRow = useCallback(
+    (playerId) => {
+      if (!gameId || !playerId) return;
+
+      fetch("http://localhost:5000/api/game-stats/create-if-missing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameID: Number(gameId),
+          playerID: Number(playerId)
+        })
+      }).catch((err) => {
+        console.error("Failed to ensure game stat row:", err);
+      });
+    },
+    [gameId]
+  );
+
   const handleSubstitutionSelect = useCallback(
     (playerOut, playerIn) => {
       const updateTeam = (teamSetter, teamPlayers) =>
@@ -339,8 +391,10 @@ const handleFollowUpSkip = () => {
         `Sub — ${playerOut.name} out → ${playerIn.name} in`,
         "bg-blue-600"
       );
+
+      ensureGameStatRow(playerIn.id);
     },
-    [teamA, teamB]
+    [teamA, teamB, ensureGameStatRow]
   );
 
   /* ---------------------------------------------------------
@@ -348,8 +402,10 @@ const handleFollowUpSkip = () => {
   --------------------------------------------------------- */
   const handleSaveExit = () => {
     const payload = {
-      teamA: { players: teamA },
-      teamB: { players: teamB },
+      gameId,
+      gameDate: new Date().toISOString(),
+      teamA: { ...teamAMeta, players: teamA },
+      teamB: { ...teamBMeta, players: teamB },
       settings,
       statHistory,
       gameState
@@ -384,8 +440,8 @@ const handleFollowUpSkip = () => {
         <Scoreboard
           gameState={gameState}
           setGameState={setGameState}
-          teamA={{ name: teamA.name || "Team A", roster: teamA }}
-          teamB={{ name: teamB.name || "Team B", roster: teamB }}
+          teamA={teamAMeta}
+          teamB={teamBMeta}
         />
 
         <PlayerSection

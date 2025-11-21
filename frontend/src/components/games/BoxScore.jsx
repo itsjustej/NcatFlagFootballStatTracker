@@ -18,56 +18,42 @@ function BoxScore({ teamA, teamB }) {
               <th className="px-6 py-3 text-left text-slate-300 font-semibold">
                 Player
               </th>
-              <th className="px-4 py-3 text-right text-slate-300 font-semibold">
-                PTS
-              </th>
-              <th className="px-4 py-3 text-right text-slate-300 font-semibold">
-                REB
-              </th>
-              <th className="px-4 py-3 text-right text-slate-300 font-semibold">
-                AST
-              </th>
-              <th className="px-4 py-3 text-right text-slate-300 font-semibold">
-                STL
-              </th>
-              <th className="px-4 py-3 text-right text-slate-300 font-semibold">
-                BLK
-              </th>
-              <th className="px-6 py-3 text-right text-slate-300 font-semibold">
-                FOULS
-              </th>
+              <th className="px-4 py-3 text-right text-slate-300 font-semibold">PTS</th>
+              <th className="px-4 py-3 text-right text-slate-300 font-semibold">REB</th>
+              <th className="px-4 py-3 text-right text-slate-300 font-semibold">AST</th>
+              <th className="px-4 py-3 text-right text-slate-300 font-semibold">STL</th>
+              <th className="px-4 py-3 text-right text-slate-300 font-semibold">BLK</th>
+              <th className="px-6 py-3 text-right text-slate-300 font-semibold">FOULS</th>
             </tr>
           </thead>
 
           <tbody>
             {team.players.map((player) => (
               <tr
-                key={player.number}
+                key={player.PlayerID}
                 className="border-b border-slate-700 hover:bg-slate-700/50 transition"
               >
                 <td className="px-6 py-4">
-                  <div>
-                    <p className="font-semibold text-white">{player.name}</p>
-                    <p className="text-xs text-slate-400">#{player.number}</p>
-                  </div>
+                  <p className="font-semibold text-white">{player.PlayerName}</p>
+                </td>
+
+                <td className="px-4 py-4 text-right font-semibold text-white">
+                  {player.Points}
                 </td>
                 <td className="px-4 py-4 text-right font-semibold text-white">
-                  {player.points}
+                  {player.Rebounds}
                 </td>
                 <td className="px-4 py-4 text-right font-semibold text-white">
-                  {player.rebounds}
+                  {player.Assists}
                 </td>
                 <td className="px-4 py-4 text-right font-semibold text-white">
-                  {player.assists}
+                  {player.Steals}
                 </td>
                 <td className="px-4 py-4 text-right font-semibold text-white">
-                  {player.steals}
-                </td>
-                <td className="px-4 py-4 text-right font-semibold text-white">
-                  {player.blocks}
+                  {player.Blocks}
                 </td>
                 <td className="px-6 py-4 text-right text-slate-400">
-                  {player.fouls}
+                  {player.Fouls}
                 </td>
               </tr>
             ))}

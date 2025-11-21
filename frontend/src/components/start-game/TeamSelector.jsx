@@ -1,5 +1,4 @@
 import React from "react";
-import { ChevronDown } from "lucide-react";
 
 export default function TeamSelector({
   teams,
@@ -8,126 +7,139 @@ export default function TeamSelector({
   onTeamASelect,
   onTeamBSelect,
   onNext,
+  isLoading = false,
 }) {
+  // Convert named colors
+  const normalizeColor = (c) => {
+    if (!c) return "#64748b";
+    const map = {
+      Blue: "#3b82f6",
+      Red: "#ef4444",
+      Green: "#22c55e",
+      Yellow: "#eab308",
+      Purple: "#8b5cf6",
+      Orange: "#f97316",
+    };
+    return map[c] || c;
+  };
+
+  const safePlayers = (team) => {
+    if (!team || !Array.isArray(team.Players)) return [];
+    return team.Players.filter(Boolean); // remove null entries
+  };
+
   return (
-    <div className="space-y-12">
-      {/* 2-COLUMN LAYOUT */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* TEAM A */}
+    <div className="space-y-10">
+      <div className="grid md:grid-cols-2 gap-12">
+        
+        {/* ----------------- TEAM A ----------------- */}
         <div>
-          <h2 className="text-xl font-semibold text-white mb-3">Team A</h2>
+          <h2 className="text-2xl font-bold text-white mb-4">Team A</h2>
 
-          {/* Dropdown */}
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-            <div className="relative">
-              <select
-                className="w-full bg-slate-800 text-white text-lg p-3 rounded-lg border border-slate-700 appearance-none cursor-pointer"
-                value={teamA?.id || ""}
-                onChange={(e) => {
-                  const team = teams.find((t) => t.id === e.target.value);
-                  onTeamASelect(team);
-                }}
+          <select
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white mb-4"
+            value={teamA?.TeamID || ""}
+            onChange={(e) => {
+              const selected = teams.find(
+                (t) => t.TeamID === Number(e.target.value)
+              );
+              onTeamASelect(selected || null);
+            }}
+          >
+            <option value="">Select Team A</option>
+
+            {teams.map((team) => (
+              <option
+                key={team.TeamID}
+                value={team.TeamID}
+                disabled={teamB && teamB.TeamID === team.TeamID}
               >
-                <option value="" disabled>
-                  Select Team A
-                </option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
+                {team.TeamName}
+              </option>
+            ))}
+          </select>
 
-              <ChevronDown className="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-            </div>
-          </div>
-
-          {/* ROSTER PREVIEW */}
+          {/* ROSTER */}
           {teamA && (
-            <div className="mt-4 bg-slate-800 border border-slate-700 rounded-lg p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div
-                  className="w-8 h-8 rounded-md"
-                  style={{ backgroundColor: teamA.color }}
-                />
-                <h3 className="text-lg font-bold text-white">{teamA.name}</h3>
-              </div>
+            <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+              <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+                <span
+                  className="w-3 h-3 rounded"
+                  style={{ backgroundColor: normalizeColor(teamA.TeamColor) }}
+                ></span>
+                {teamA.TeamName}
+              </h3>
 
-              <ul className="text-slate-300 space-y-1">
-                {teamA.players.map((p) => (
-                  <li key={p.id}>
-                    #{p.jerseyNumber} {p.name}
-                  </li>
+              <ul className="text-slate-300 text-sm space-y-1">
+                {safePlayers(teamA).map((p) => (
+                  <li key={p.PlayerID}>• {p.PlayerName}</li>
                 ))}
               </ul>
             </div>
           )}
         </div>
 
-        {/* TEAM B */}
+        {/* ----------------- TEAM B ----------------- */}
         <div>
-          <h2 className="text-xl font-semibold text-white mb-3">Team B</h2>
+          <h2 className="text-2xl font-bold text-white mb-4">Team B</h2>
 
-          {/* Dropdown */}
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-            <div className="relative">
-              <select
-                className="w-full bg-slate-800 text-white text-lg p-3 rounded-lg border border-slate-700 appearance-none cursor-pointer"
-                value={teamB?.id || ""}
-                onChange={(e) => {
-                  const team = teams.find((t) => t.id === e.target.value);
-                  onTeamBSelect(team);
-                }}
+          <select
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white mb-4"
+            value={teamB?.TeamID || ""}
+            onChange={(e) => {
+              const selected = teams.find(
+                (t) => t.TeamID === Number(e.target.value)
+              );
+              onTeamBSelect(selected || null);
+            }}
+          >
+            <option value="">Select Team B</option>
+
+            {teams.map((team) => (
+              <option
+                key={team.TeamID}
+                value={team.TeamID}
+                disabled={teamA && teamA.TeamID === team.TeamID}
               >
-                <option value="" disabled>
-                  Select Team B
-                </option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
+                {team.TeamName}
+              </option>
+            ))}
+          </select>
 
-              <ChevronDown className="w-5 h-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-            </div>
-          </div>
-
-          {/* ROSTER PREVIEW */}
+          {/* ROSTER */}
           {teamB && (
-            <div className="mt-4 bg-slate-800 border border-slate-700 rounded-lg p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div
-                  className="w-8 h-8 rounded-md"
-                  style={{ backgroundColor: teamB.color }}
-                />
-                <h3 className="text-lg font-bold text-white">{teamB.name}</h3>
-              </div>
+            <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+              <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+                <span
+                  className="w-3 h-3 rounded"
+                  style={{ backgroundColor: normalizeColor(teamB.TeamColor) }}
+                ></span>
+                {teamB.TeamName}
+              </h3>
 
-              <ul className="text-slate-300 space-y-1">
-                {teamB.players.map((p) => (
-                  <li key={p.id}>
-                    #{p.jerseyNumber} {p.name}
-                  </li>
+              <ul className="text-slate-300 text-sm space-y-1">
+                {safePlayers(teamB).map((p) => (
+                  <li key={p.PlayerID}>• {p.PlayerName}</li>
                 ))}
               </ul>
             </div>
           )}
         </div>
+
       </div>
 
-      {/* NEXT BUTTON */}
-      <div className="flex justify-end pt-6">
+      {/* Centered Start Button */}
+      <div className="flex justify-center">
         <button
-          disabled={!teamA || !teamB}
           onClick={onNext}
-          className={`px-6 py-3 rounded-lg font-semibold transition ${
-            teamA && teamB
-              ? "bg-orange-600 text-white hover:bg-orange-500"
-              : "bg-slate-700 text-slate-500 cursor-not-allowed"
+          disabled={isLoading}
+          className={`px-6 py-3 rounded-lg transition font-semibold ${
+            isLoading
+              ? "bg-slate-500 text-slate-200 cursor-not-allowed"
+              : "bg-blue-600 text-white hover:bg-blue-700"
           }`}
         >
-          Continue →
+          {isLoading ? "Starting…" : "Start Game"}
         </button>
       </div>
     </div>
