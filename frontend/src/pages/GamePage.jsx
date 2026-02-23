@@ -49,6 +49,7 @@ export default function GamePage() {
   const [settings, setSettings] = useState(null);
   const [gameState, setGameState] = useState(defaultGameState);
   const [gameId, setGameId] = useState(null);
+  const [initialPlayerStats, setInitialPlayerStats] = useState(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("currentGame");
@@ -91,14 +92,60 @@ export default function GamePage() {
     });
     setGameId(parsed.gameId ?? parsed.GameID ?? null);
 
+    // If we continued a game from history, we may have an initial box score
+    // with per-player stats from the database. Normalize that into a map
+    // keyed by player ID so live stats start from those values.
+    if (parsed.initialBoxScore) {
+      const baseStats = {};
+
+      const addTeam = (players, teamLabel) => {
+        (players || []).forEach((p) => {
+          const id = p.number ?? p.PlayerID ?? p.id;
+          if (!id) return;
+          baseStats[id] = {
+            team: teamLabel,
+            points: p.points ?? p.Points ?? 0,
+            // We don't have shooting attempt detail from DB, so keep them at 0.
+            fieldGoalsMade: 0,
+            fieldGoalsAttempted: 0,
+            threePointersMade: 0,
+            threePointersAttempted: 0,
+            freeThrowsMade: 0,
+            freeThrowsAttempted: 0,
+            rebounds: p.rebounds ?? p.Rebounds ?? 0,
+            assists: p.assists ?? p.Assists ?? 0,
+            steals: p.steals ?? p.Steals ?? 0,
+            blocks: p.blocks ?? p.Blocks ?? 0,
+            turnovers: p.turnovers ?? p.Turnovers ?? 0,
+            fouls: p.fouls ?? p.Fouls ?? 0
+          };
+        });
+      };
+
+      addTeam(parsed.initialBoxScore.teamA, "A");
+      addTeam(parsed.initialBoxScore.teamB, "B");
+
+      setInitialPlayerStats(baseStats);
+    }
+
     const savedSettings = parsed.settings || FALLBACK_SETTINGS;
     setSettings(savedSettings);
 
-    setGameState({
+    const baseState = {
       ...defaultGameState,
       teamAScore: savedSettings.startScore ?? 0,
       teamBScore: savedSettings.startScore ?? 0,
       quarterLength: savedSettings.quarterLength ?? 12
+    };
+
+    const initial = parsed.initialState || {};
+
+    setGameState({
+      ...baseState,
+      teamAScore: initial.teamAScore ?? baseState.teamAScore,
+      teamBScore: initial.teamBScore ?? baseState.teamBScore,
+      teamAFouls: initial.teamAFouls ?? baseState.teamAFouls,
+      teamBFouls: initial.teamBFouls ?? baseState.teamBFouls
     });
 
     setLoaded(true);
@@ -128,14 +175,14 @@ export default function GamePage() {
      STATS
   --------------------------------------------------------- */
   const playerStats = useMemo(() => {
-    const base = calculatePlayerStats(allPlayers, statHistory);
+    const base = calculatePlayerStats(allPlayers, statHistory, initialPlayerStats || {});
     const plusMinus = calculatePlusMinus(allPlayers, statHistory);
 
     return base.map((p) => ({
       ...p,
       plusMinus: plusMinus[p.playerId] || 0
     }));
-  }, [allPlayers, statHistory]);
+  }, [allPlayers, statHistory, initialPlayerStats]);
 
   const teamAStats = useMemo(
     () => calculateTeamStats("A", playerStats),
@@ -195,6 +242,23 @@ export default function GamePage() {
     };
 
     setStatHistory((prev) => [...prev, entry]);
+
+    // Persist to backend aggregated stats so DB-backed views (team stats,
+    // league leaders, box scores) stay in sync with the live tracker.
+    if (gameId && player.id) {
+      fetch("http://localhost:5000/api/game-stats/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameID: Number(gameId),
+          playerID: Number(player.id),
+          action,
+          points
+        })
+      }).catch((err) => {
+        console.error("Failed to update game stats:", err);
+      });
+    }
   };
 
   /* ---------------------------------------------------------

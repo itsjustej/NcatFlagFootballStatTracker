@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { Eye, Trash2 } from "lucide-react";
 
 export default function GameHistoryPage() {
@@ -21,6 +20,85 @@ export default function GameHistoryPage() {
     fetch(`http://localhost:5000/api/games/${id}`, {
       method: "DELETE",
     }).then(() => loadGames());
+  };
+
+  const viewInTracker = async (game) => {
+    try {
+      // Load box score so we can reconstruct team rosters
+      const res = await fetch(
+        `http://localhost:5000/api/games/${game.GameID}/boxscore`
+      );
+      if (!res.ok) {
+        console.error("Failed to load box score for tracker view");
+        return;
+      }
+      const box = await res.json();
+
+      const normalizeTeam = (side) => {
+        const isHome = side === "teamA";
+        const players = Array.isArray(box[side]?.players)
+          ? box[side].players
+          : [];
+
+        return {
+          TeamID: isHome ? game.HomeTeamID : game.AwayTeamID,
+          TeamName: box[side]?.name || (isHome ? game.HomeTeamName : game.AwayTeamName),
+          TeamColor: box[side]?.color || (isHome ? game.HomeTeamColor : game.AwayTeamColor),
+          players: players.map((p) => ({
+            id: p.number,
+            name: p.name
+          }))
+        };
+      };
+
+      // Derive current team scores and fouls from the existing box score
+      const initialScoreA = (box.teamA?.players || []).reduce(
+        (sum, p) => sum + (p.points || 0),
+        0
+      );
+      const initialScoreB = (box.teamB?.players || []).reduce(
+        (sum, p) => sum + (p.points || 0),
+        0
+      );
+      const initialFoulsA = (box.teamA?.players || []).reduce(
+        (sum, p) => sum + (p.fouls || 0),
+        0
+      );
+      const initialFoulsB = (box.teamB?.players || []).reduce(
+        (sum, p) => sum + (p.fouls || 0),
+        0
+      );
+
+      const gameData = {
+        gameId: game.GameID,
+        gameDate: game.GameDate,
+        teamA: normalizeTeam("teamA"),
+        teamB: normalizeTeam("teamB"),
+        // Reuse the same default settings shape used when starting a game
+        settings: {
+          quarterLength: 12,
+          startScore: 0,
+          trackPlusMinus: true
+        },
+        initialState: {
+          teamAScore: initialScoreA,
+          teamBScore: initialScoreB,
+          teamAFouls: initialFoulsA,
+          teamBFouls: initialFoulsB
+        },
+        // Full per-player box score so the live tracker can start from DB stats
+        initialBoxScore: {
+          teamA: box.teamA?.players || [],
+          teamB: box.teamB?.players || []
+        },
+        startedAt: new Date().toISOString()
+      };
+
+      localStorage.setItem("currentGame", JSON.stringify(gameData));
+      window.location.href = "/game";
+    } catch (err) {
+      console.error("Failed to open game in tracker:", err);
+    }
   };
 
   return (
@@ -74,12 +152,13 @@ export default function GameHistoryPage() {
 
                 {/* Buttons */}
                 <div className="flex items-center gap-3">
-                  <Link to={`/games/${g.GameID}`}>
-                    <button className="px-3 py-2 border border-slate-600 rounded-lg text-white hover:bg-slate-700 text-sm flex items-center gap-2">
-                      <Eye className="w-4 h-4" />
-                      View
-                    </button>
-                  </Link>
+                  <button
+                    onClick={() => viewInTracker(g)}
+                    className="px-3 py-2 border border-slate-600 rounded-lg text-white hover:bg-slate-700 text-sm flex items-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" />
+                    View
+                  </button>
 
                   <button
                     onClick={() => deleteGame(g.GameID)}

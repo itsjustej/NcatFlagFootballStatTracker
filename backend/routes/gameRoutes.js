@@ -1,9 +1,12 @@
 import express from "express";
-import { getAllGames } from "../controllers/gameController.js";
+import { getAllGames, createGame, deleteGame } from "../controllers/gameController.js";
+import { getBoxScore } from "../routes/gameController.js";
 
 const router = express.Router();
 
-router.get("/", getAllGames);           // List all games
-// router.delete("/:id", deleteGame);      // Delete a game
+router.get("/", getAllGames);
+router.post("/", createGame);
+router.get("/:id/boxscore", getBoxScore);
+router.delete("/:id", deleteGame);
 
 export default router;

@@ -37,9 +37,15 @@ export const updateGameStats = async (req, res) => {
     const { gameID, playerID, action, points } = req.body;
 
     const fieldMap = {
-      "2PT_MAKE": { field: "Points", add: points || 2 },
-      "3PT_MAKE": { field: "Points", add: points || 3 },
-      "FT_MAKE": { field: "Points", add: points || 1 },
+      // Scoring + shooting splits
+      "2PT_MAKE": { points: points || 2, fgm: 1, fga: 1 },
+      "2PT_MISS": { fga: 1 },
+      "3PT_MAKE": { points: points || 3, fgm: 1, fga: 1, threePm: 1, threePa: 1 },
+      "3PT_MISS": { fga: 1, threePa: 1 },
+      "FT_MAKE": { points: points || 1, ftm: 1, fta: 1 },
+      "FT_MISS": { fta: 1 },
+
+      // Other counting stats
       "ASSIST": { field: "Assists", add: 1 },
       "REBOUND": { field: "Rebounds", add: 1 },
       "STEAL": { field: "Steals", add: 1 },
@@ -51,11 +57,55 @@ export const updateGameStats = async (req, res) => {
     const update = fieldMap[action];
     if (!update) return res.json({ message: "No stat change" });
 
-    await db.query(
-      `UPDATE GameStats SET ${update.field} = ${update.field} + ?
-       WHERE GameID = ? AND PlayerID = ?`,
-      [update.add, gameID, playerID]
-    );
+    // Build dynamic SQL for multiple fields at once
+    const sets = [];
+    const params = [];
+
+    if (update.points) {
+      sets.push("Points = Points + ?");
+      params.push(update.points);
+    }
+    if (update.fgm) {
+      sets.push("FGM = FGM + ?");
+      params.push(update.fgm);
+    }
+    if (update.fga) {
+      sets.push("FGA = FGA + ?");
+      params.push(update.fga);
+    }
+    if (update.threePm) {
+      sets.push("ThreePM = ThreePM + ?");
+      params.push(update.threePm);
+    }
+    if (update.threePa) {
+      sets.push("ThreePA = ThreePA + ?");
+      params.push(update.threePa);
+    }
+    if (update.ftm) {
+      sets.push("FTM = FTM + ?");
+      params.push(update.ftm);
+    }
+    if (update.fta) {
+      sets.push("FTA = FTA + ?");
+      params.push(update.fta);
+    }
+    if (update.field) {
+      sets.push(`${update.field} = ${update.field} + ?`);
+      params.push(update.add);
+    }
+
+    if (sets.length === 0) {
+      return res.json({ message: "No stat change" });
+    }
+
+    const sql = `
+      UPDATE GameStats 
+      SET ${sets.join(", ")}
+      WHERE GameID = ? AND PlayerID = ?
+    `;
+    params.push(gameID, playerID);
+
+    await db.query(sql, params);
 
     res.json({ message: "Stat updated" });
   } catch (err) {

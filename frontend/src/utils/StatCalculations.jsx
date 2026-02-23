@@ -1,24 +1,28 @@
-export const calculatePlayerStats = (players, statHistory) => {
+export const calculatePlayerStats = (players, statHistory, baseStatsByPlayerId = {}) => {
   return players.map((player) => {
     const playerActions = statHistory.filter((stat) => stat.playerId === player.id);
+
+    // If we have initial DB stats for this player (from a continued game),
+    // start from those; otherwise start from zero.
+    const base = baseStatsByPlayerId[player.id] || {};
 
     const stats = {
       playerId: player.id,
       playerName: player.name,
       team: player.team,
-      points: 0,
-      fieldGoalsMade: 0,
-      fieldGoalsAttempted: 0,
-      threePointersMade: 0,
-      threePointersAttempted: 0,
-      freeThrowsMade: 0,
-      freeThrowsAttempted: 0,
-      rebounds: 0,
-      assists: 0,
-      steals: 0,
-      blocks: 0,
-      turnovers: 0,
-      fouls: 0,
+      points: base.points || 0,
+      fieldGoalsMade: base.fieldGoalsMade || 0,
+      fieldGoalsAttempted: base.fieldGoalsAttempted || 0,
+      threePointersMade: base.threePointersMade || 0,
+      threePointersAttempted: base.threePointersAttempted || 0,
+      freeThrowsMade: base.freeThrowsMade || 0,
+      freeThrowsAttempted: base.freeThrowsAttempted || 0,
+      rebounds: base.rebounds || 0,
+      assists: base.assists || 0,
+      steals: base.steals || 0,
+      blocks: base.blocks || 0,
+      turnovers: base.turnovers || 0,
+      fouls: base.fouls || 0,
       plusMinus: 0,
     };
 
