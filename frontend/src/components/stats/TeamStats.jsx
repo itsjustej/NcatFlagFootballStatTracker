@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   LineChart,
   Line,
@@ -11,66 +11,7 @@ import {
 } from "recharts";
 import { ChevronDown } from "lucide-react";
 
-// ---------------- DEMO DATA ---------------- //
-
-const DEMO_TEAMS = [
-  { id: "1", name: "Lakers" },
-  { id: "2", name: "Celtics" },
-  { id: "3", name: "Warriors" },
-];
-
-const DEMO_TEAM_STATS = {
-  "1": {
-    games: 10,
-    wins: 6,
-    losses: 4,
-    ppg: 112.5,
-    rpg: 45.3,
-    apg: 28.1,
-    spg: 8.2,
-    bpg: 5.1,
-    tpg: 14.4,
-    fgp: 47.2,
-    threepp: 35.8,
-    ftp: 78.5,
-    pointsAcrossGames: [110, 102, 118, 120, 115, 130, 125, 118, 111, 128],
-    pointsAgainstGames: [101, 98, 115, 103, 107, 129, 121, 112, 109, 120],
-  },
-
-  "2": {
-    games: 10,
-    wins: 8,
-    losses: 2,
-    ppg: 115.3,
-    rpg: 46.8,
-    apg: 26.5,
-    spg: 8.9,
-    bpg: 5.8,
-    tpg: 12.1,
-    fgp: 48.1,
-    threepp: 37.2,
-    ftp: 79.1,
-    pointsAcrossGames: [118, 114, 120, 113, 119, 132, 129, 121, 110, 135],
-    pointsAgainstGames: [101, 100, 122, 110, 105, 130, 120, 111, 104, 129],
-  },
-
-  "3": {
-    games: 10,
-    wins: 7,
-    losses: 3,
-    ppg: 118.2,
-    rpg: 42.1,
-    apg: 30.2,
-    spg: 7.5,
-    bpg: 4.9,
-    tpg: 13.1,
-    fgp: 49.5,
-    threepp: 38.5,
-    ftp: 80.2,
-    pointsAcrossGames: [121, 119, 128, 115, 117, 140, 132, 126, 118, 134],
-    pointsAgainstGames: [108, 112, 119, 109, 101, 138, 124, 121, 120, 131],
-  },
-};
+// This component now uses real stats from the backend
 
 // ---------------- DONUT FIXED ---------------- //
 
@@ -113,21 +54,71 @@ function StatCard({ label, value, color }) {
 // ---------------- MAIN COMPONENT ---------------- //
 
 export default function TeamStats() {
-  const [selectedTeam, setSelectedTeam] = useState("1");
-  const stats = DEMO_TEAM_STATS[selectedTeam];
+  const [teams, setTeams] = useState([]);
+  const [teamId, setTeamId] = useState("");
+  const [teamStats, setTeamStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [statsError, setStatsError] = useState(null);
+
+  // Match PlayerStats: load teams from API for dropdown
+  useEffect(() => {
+    fetch("http://localhost:5000/api/teams")
+      .then((res) => res.json())
+      .then((data) => {
+        setTeams(data);
+      })
+      .catch((err) => console.error("Failed loading teams:", err));
+  }, []);
+
+  // Load team stats when a team is selected
+  useEffect(() => {
+    if (!teamId) {
+      setTeamStats(null);
+      return;
+    }
+
+    setLoadingStats(true);
+    setStatsError(null);
+
+    fetch(`http://localhost:5000/api/teams/stats/${teamId}`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("Failed to load team stats");
+        }
+        return res.json();
+      })
+      .then((data) => {
+        setTeamStats(data);
+      })
+      .catch((err) => {
+        console.error("Failed loading team stats:", err);
+        setStatsError(err.message || "Failed to load team stats");
+      })
+      .finally(() => setLoadingStats(false));
+  }, [teamId]);
+
+  const stats = teamStats;
 
   // Build line chart data
   const chartData = useMemo(() => {
+    if (!stats) return [];
+    if (!Array.isArray(stats.pointsAcrossGames)) return [];
+
     return stats.pointsAcrossGames.map((pf, i) => ({
       game: `G${i + 1}`,
       pf,
-      pa: stats.pointsAgainstGames[i],
     }));
   }, [stats]);
 
   // 🚀 Compute dynamic Y-axis domain snapping to 20-point increments
   const { minY, maxY } = useMemo(() => {
-    const allValues = [...stats.pointsAcrossGames, ...stats.pointsAgainstGames];
+    if (!stats) return { minY: 0, maxY: 0 };
+
+    if (!Array.isArray(stats.pointsAcrossGames) || stats.pointsAcrossGames.length === 0) {
+      return { minY: 0, maxY: 0 };
+    }
+
+    const allValues = [...stats.pointsAcrossGames];
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
 
@@ -152,13 +143,15 @@ export default function TeamStats() {
 
         <div className="relative inline-block w-full max-w-xs">
           <select
-            value={selectedTeam}
-            onChange={(e) => setSelectedTeam(e.target.value)}
+            value={teamId}
+            onChange={(e) => setTeamId(e.target.value)}
             className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white appearance-none"
           >
-            {DEMO_TEAMS.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
+            <option value="">-- Select a Team --</option>
+
+            {teams.map((t) => (
+              <option key={t.TeamID} value={t.TeamID}>
+                {t.TeamName}
               </option>
             ))}
           </select>
@@ -167,59 +160,77 @@ export default function TeamStats() {
         </div>
       </div>
 
-      {/* Top Row Stats */}
-      <div className="grid md:grid-cols-6 gap-4">
-        <StatCard label="PPG" value={stats.ppg} color="text-orange-500" />
-        <StatCard label="RPG" value={stats.rpg} color="text-blue-400" />
-        <StatCard label="APG" value={stats.apg} color="text-green-400" />
-        <StatCard label="SPG" value={stats.spg} color="text-purple-400" />
-        <StatCard label="BPG" value={stats.bpg} color="text-yellow-400" />
-        <StatCard label="TPG" value={stats.tpg} color="text-red-400" />
-      </div>
+      {/* No team selected */}
+      {!teamId && (
+        <p className="text-slate-400">Choose a team to view team stats.</p>
+      )}
 
-      {/* Donut Charts */}
-      <div className="grid md:grid-cols-3 gap-6">
-        <Donut title="FG%" value={stats.fgp} color="#6366f1" />
-        <Donut title="3PT%" value={stats.threepp} color="#22c55e" />
-        <Donut title="FT%" value={stats.ftp} color="#f59e0b" />
-      </div>
+      {/* Loading stats */}
+      {teamId && loadingStats && (
+        <p className="text-slate-400">Loading team stats…</p>
+      )}
 
-      {/* Line Chart */}
-      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-        <h3 className="text-lg text-white font-bold mb-4">Points Across Season</h3>
+      {/* Stats error */}
+      {teamId && !loadingStats && statsError && (
+        <p className="text-red-400">Error: {statsError}</p>
+      )}
 
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
-            <XAxis dataKey="game" stroke="#94a3b8" hide={true} />
+      {/* Team selected but no stats yet */}
+      {teamId && !loadingStats && !statsError && !stats && (
+        <p className="text-slate-400">
+          No stats available yet for this team.
+        </p>
+      )}
 
-            <YAxis
-              stroke="#94a3b8"
-              domain={[minY, maxY]}
-              tick={{ fill: "white" }}
-            />
+      {/* Show stats only when we have demo data for that team */}
+      {stats && (
+        <>
+          {/* Top Row Stats */}
+          <div className="grid md:grid-cols-6 gap-4">
+            <StatCard label="PPG" value={stats.ppg} color="text-orange-500" />
+            <StatCard label="RPG" value={stats.rpg} color="text-blue-400" />
+            <StatCard label="APG" value={stats.apg} color="text-green-400" />
+            <StatCard label="SPG" value={stats.spg} color="text-purple-400" />
+            <StatCard label="BPG" value={stats.bpg} color="text-yellow-400" />
+            <StatCard label="TPG" value={stats.tpg} color="text-red-400" />
+          </div>
 
-            <Legend wrapperStyle={{ color: "white" }} />
+          {/* Donut Charts */}
+          <div className="grid md:grid-cols-3 gap-6">
+            <Donut title="FG%" value={stats.fgp} color="#6366f1" />
+            <Donut title="3PT%" value={stats.threepp} color="#22c55e" />
+            <Donut title="FT%" value={stats.ftp} color="#f59e0b" />
+          </div>
 
-            <Line
-              type="monotone"
-              dataKey="pf"
-              stroke="#f59e0b"
-              strokeWidth={3}
-              dot={{ r: 5 }}
-              name="Points For"
-            />
+          {/* Line Chart */}
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+            <h3 className="text-lg text-white font-bold mb-4">Team Points Across Games</h3>
 
-            <Line
-              type="monotone"
-              dataKey="pa"
-              stroke="#3b82f6"
-              strokeWidth={3}
-              dot={{ r: 5 }}
-              name="Points Against"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}>
+                <XAxis dataKey="game" stroke="#94a3b8" hide={true} />
+
+                <YAxis
+                  stroke="#94a3b8"
+                  domain={[minY, maxY]}
+                  tick={{ fill: "white" }}
+                />
+
+                <Legend wrapperStyle={{ color: "white" }} />
+
+                <Line
+                  type="monotone"
+                  dataKey="pf"
+                  stroke="#f59e0b"
+                  strokeWidth={3}
+                  dot={{ r: 5 }}
+                  name="Points Per Game"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
     </div>
   );
 }
