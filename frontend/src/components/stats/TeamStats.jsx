@@ -99,14 +99,19 @@ export default function TeamStats() {
 
   const stats = teamStats;
 
-  // Build line chart data
+  // Build line chart data (team vs opponent points)
   const chartData = useMemo(() => {
     if (!stats) return [];
     if (!Array.isArray(stats.pointsAcrossGames)) return [];
 
+    const against = Array.isArray(stats.pointsAgainstGames)
+      ? stats.pointsAgainstGames
+      : [];
+
     return stats.pointsAcrossGames.map((pf, i) => ({
       game: `G${i + 1}`,
       pf,
+      pa: against[i] ?? 0,
     }));
   }, [stats]);
 
@@ -118,7 +123,11 @@ export default function TeamStats() {
       return { minY: 0, maxY: 0 };
     }
 
-    const allValues = [...stats.pointsAcrossGames];
+    const against = Array.isArray(stats.pointsAgainstGames)
+      ? stats.pointsAgainstGames
+      : [];
+
+    const allValues = [...stats.pointsAcrossGames, ...against];
     const min = Math.min(...allValues);
     const max = Math.max(...allValues);
 
@@ -204,7 +213,7 @@ export default function TeamStats() {
 
           {/* Line Chart */}
           <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-            <h3 className="text-lg text-white font-bold mb-4">Team Points Across Games</h3>
+            <h3 className="text-lg text-white font-bold mb-4">Points Across Games</h3>
 
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={chartData}>
@@ -224,7 +233,16 @@ export default function TeamStats() {
                   stroke="#f59e0b"
                   strokeWidth={3}
                   dot={{ r: 5 }}
-                  name="Points Per Game"
+                  name="Team Points"
+                />
+
+                <Line
+                  type="monotone"
+                  dataKey="pa"
+                  stroke="#3b82f6"
+                  strokeWidth={3}
+                  dot={{ r: 5 }}
+                  name="Opponent Points"
                 />
               </LineChart>
             </ResponsiveContainer>

@@ -244,22 +244,36 @@ export const getTeamStats = async (req, res) => {
         ? (agg.totalFTM / agg.totalFTA) * 100
         : 0;
 
-    // Simple points-per-game trend for the line chart
+    // Points-per-game trend for the line chart (team vs opponents)
     const [gameRows] = await db.query(
       `
       SELECT
-        gs.GameID,
-        SUM(gs.Points) AS teamPoints
-      FROM Players p
-      JOIN GameStats gs ON p.PlayerID = gs.PlayerID
-      WHERE p.TeamID = ?
-      GROUP BY gs.GameID
-      ORDER BY gs.GameID;
+        t.GameID,
+        t.teamPoints,
+        (g.totalPoints - t.teamPoints) AS opponentPoints
+      FROM (
+        SELECT
+          gs.GameID,
+          SUM(gs.Points) AS teamPoints
+        FROM Players p
+        JOIN GameStats gs ON p.PlayerID = gs.PlayerID
+        WHERE p.TeamID = ?
+        GROUP BY gs.GameID
+      ) AS t
+      JOIN (
+        SELECT
+          GameID,
+          SUM(Points) AS totalPoints
+        FROM GameStats
+        GROUP BY GameID
+      ) AS g ON g.GameID = t.GameID
+      ORDER BY t.GameID;
       `,
       [teamId]
     );
 
     const pointsAcrossGames = gameRows.map((g) => g.teamPoints || 0);
+    const pointsAgainstGames = gameRows.map((g) => g.opponentPoints || 0);
 
     res.json({
       teamId: team.TeamID,
@@ -277,7 +291,8 @@ export const getTeamStats = async (req, res) => {
       fgp,
       threepp,
       ftp,
-      pointsAcrossGames
+      pointsAcrossGames,
+      pointsAgainstGames
     });
   } catch (err) {
     console.error("Error fetching team stats:", err);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo } from "react";
 
 // Safe formatter
 const fmt = (val, digits = 1) =>
@@ -35,46 +35,27 @@ function LeaderCard({ title, statKey, leaders, isRatio = false }) {
   );
 }
 
-export default function LeagueLeaders() {
-  const [leaders, setLeaders] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function LeagueLeaders({ data }) {
+  const leaders = useMemo(() => {
+    if (!Array.isArray(data)) return [];
 
-  useEffect(() => {
-    fetch("http://localhost:5000/api/league-leaders")
-      .then((res) => res.json())
-      .then((data) => {
-        // 🔥 Convert all SQL string results into numbers
-        const normalized = data.map((p) => ({
-          ...p,
-          PPG: Number(p.PPG),
-          RPG: Number(p.RPG),
-          APG: Number(p.APG),
-          SPG: Number(p.SPG),
-          BPG: Number(p.BPG),
-          TOPG: Number(p.TOPG),
-        }));
+    // Convert SQL string results into numbers
+    const normalized = data.map((p) => ({
+      ...p,
+      PPG: Number(p.PPG),
+      RPG: Number(p.RPG),
+      APG: Number(p.APG),
+      SPG: Number(p.SPG),
+      BPG: Number(p.BPG),
+      TOPG: Number(p.TOPG),
+    }));
 
-        // 🔥 Add AST/TOV ratio
-        const withRatio = normalized.map((p) => ({
-          ...p,
-          AstToRatio: p.TOPG === 0 ? p.APG : p.APG / p.TOPG,
-        }));
-
-        setLeaders(withRatio);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Failed to load league leaders:", err);
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading)
-    return (
-      <p className="text-slate-400 text-center py-6">
-        Loading league leaders…
-      </p>
-    );
+    // Add AST/TOV ratio
+    return normalized.map((p) => ({
+      ...p,
+      AstToRatio: p.TOPG === 0 ? p.APG : p.APG / p.TOPG,
+    }));
+  }, [data]);
 
   if (!leaders.length)
     return (
