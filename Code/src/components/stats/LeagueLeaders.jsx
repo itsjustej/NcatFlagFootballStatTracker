@@ -494,7 +494,7 @@ export default function LeagueLeaders() {
       {view === "offense" && (
         <div>
           <SectionHeader title="Team Leaders — Offense" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <TeamLeaderCard title="Points Per Game"     teams={teamStats} valueKey="ppg" />
             <TeamLeaderCard title="Passing Yards / Game"teams={teamStats} valueKey="passYpg" />
             <TeamLeaderCard title="Rushing Yards / Game"teams={teamStats} valueKey="rushYpg" />
@@ -503,14 +503,14 @@ export default function LeagueLeaders() {
             <TeamLeaderCard title="Completion %"        teams={teamStats} valueKey="completionPct"   suffix="%" />
             <TeamLeaderCard title="Success Rate"        teams={teamStats} valueKey="successFor"      suffix="%" />
             <TeamLeaderCard title="Explosive Plays (20+)" teams={teamStats} valueKey="explosivePlays" digits={0} />
-            <TeamLeaderCard title="Red Zone Success"    teams={teamStats} valueKey="redZonePct" suffix="%" minKey="redZoneAttempts" ratioKeys={{ num: 'redZoneScores', den: 'redZoneAttempts' }} />
           </div>
 
           <p className="text-slate-500 text-xs mb-4 uppercase tracking-wide">Conversions</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <TeamLeaderCard title="1-Point %" teams={teamStats} valueKey="conv1Pct" suffix="%" />
             <TeamLeaderCard title="2-Point %" teams={teamStats} valueKey="conv2Pct" suffix="%" />
             <TeamLeaderCard title="3-Point %" teams={teamStats} valueKey="conv3Pct" suffix="%" />
+            <TeamLeaderCard title="Red Zone Success" teams={teamStats} valueKey="redZonePct" suffix="%" minKey="redZoneAttempts" ratioKeys={{ num: 'redZoneScores', den: 'redZoneAttempts' }} />
           </div>
         </div>
       )}

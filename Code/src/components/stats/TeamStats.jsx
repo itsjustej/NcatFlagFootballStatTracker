@@ -447,7 +447,6 @@ export default function TeamStats() {
               <StatRow label="Passing TDs"           value={stats.passingTDs}          rank={rank('passingTDs')}        total={numTeams} />
               <StatRow label="Rushing TDs"           value={stats.rushingTDs}          rank={rank('rushingTDs')}        total={numTeams} />
               <StatRow label="Interceptions thrown"  value={stats.interceptionsThrown} rank={rank('interceptionsThrown', true)} total={numTeams} lowerIsBetter />
-              <StatRow label="Red zone success"      value={stats.redZoneAttempts > 0 ? `${stats.redZoneScores}/${stats.redZoneAttempts} (${stats.redZonePct}%)` : '—'} rank={stats.redZoneAttempts > 0 ? rank('redZonePct') : null} total={numTeams} isPercentage={stats.redZoneAttempts > 0} pctValue={stats.redZonePct} />
               <StatRow label="TFLs allowed"          value={stats.tflsAllowed}         rank={rank('tflsAllowed', true)} total={numTeams} lowerIsBetter />
             </div>
 
@@ -472,7 +471,7 @@ export default function TeamStats() {
           </div>
 
           <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-            <h2 className="text-white font-bold tracking-wide mb-4">3RD &amp; 4TH DOWN</h2>
+            <h2 className="text-white font-bold tracking-wide mb-4">Situational Conversions</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <DownConversionCard label="3rd Down Conversion" attempts={stats.thirdDownAttempts}  conversions={stats.thirdDownConversions}  rank={stats.thirdDownAttempts  > 0 ? rank('thirdDownPct')  : null} total={numTeams} color="text-yellow-400" hint="A conversion is a 1st down gained or a score" />
               <DownConversionCard label="4th Down Conversion" attempts={stats.fourthDownAttempts} conversions={stats.fourthDownConversions} rank={stats.fourthDownAttempts > 0 ? rank('fourthDownPct') : null} total={numTeams} color="text-orange-400" hint="A conversion is a 1st down gained or a score" />
