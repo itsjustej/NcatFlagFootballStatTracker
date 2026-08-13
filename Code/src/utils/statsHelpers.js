@@ -172,21 +172,35 @@ export function computeOffenseSuccessRate(plays, getHomeTeamId, getOpeningHar = 
   return (successes / eligible.length) * 100;
 }
 
-export const EXPLOSIVE_PLAY_MIN_YARDS = 20;
+export const EXPLOSIVE_PASS_MIN_YARDS = 20;
+export const EXPLOSIVE_RUSH_MIN_YARDS = 10;
+/** @deprecated use EXPLOSIVE_PASS_MIN_YARDS */
+export const EXPLOSIVE_PLAY_MIN_YARDS = EXPLOSIVE_PASS_MIN_YARDS;
 
-export function isExplosiveYards(yards) {
-  return yards >= EXPLOSIVE_PLAY_MIN_YARDS;
+export function isExplosivePassYards(yards) {
+  return yards >= EXPLOSIVE_PASS_MIN_YARDS;
 }
 
-/** Scrimmage pass completion or rush with 20+ yards gained. */
+export function isExplosiveRushYards(yards) {
+  return yards >= EXPLOSIVE_RUSH_MIN_YARDS;
+}
+
+/** Pass/reception threshold (20); rush threshold (10) when playType is 'rush'. */
+export function isExplosiveYards(yards, playType = 'pass') {
+  return playType === 'rush' ? isExplosiveRushYards(yards) : isExplosivePassYards(yards);
+}
+
+/** Scrimmage pass completion (20+ yds) or rush (10+ yds). */
 export function isExplosivePlay(play, homeTeamId, homeAttacksRight = true) {
   if (!isSuccessRatePlay(play)) return false;
+  const yards = yardsGainedForPlay(play, homeTeamId, homeAttacksRight);
   if (play.play_type === 'pass') {
-    if (!isPassCompletionOutcome(play.outcome)) return false;
-  } else if (play.play_type !== 'rush') {
-    return false;
+    return isPassCompletionOutcome(play.outcome) && isExplosivePassYards(yards);
   }
-  return isExplosiveYards(yardsGainedForPlay(play, homeTeamId, homeAttacksRight));
+  if (play.play_type === 'rush') {
+    return isExplosiveRushYards(yards);
+  }
+  return false;
 }
 
 export function countExplosivePlays(plays, getHomeTeamId, getHomeAttacksRight = () => true) {

@@ -161,36 +161,51 @@ export default function TeamsPage() {
     ));
   };
 
-  if (!currentLeague) return <div className="min-h-screen bg-slate-900 pt-24 px-6 text-white">Loading...</div>;
+  if (!currentLeague) {
+    return (
+      <div className="min-h-screen bg-slate-900 pt-24 px-6">
+        <p className="text-slate-400 text-center animate-pulse">Loading...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-[100dvh] bg-slate-900/95 text-white pt-4 sm:pt-6 px-4 sm:px-6 pb-8">
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 sm:mb-10">
-        <div>
-          <h1 className="text-3xl sm:text-5xl font-bold">Manage Teams</h1>
-          <p className="text-slate-400 mt-2 text-base sm:text-lg">
-            {currentLeague.name} — Create teams, manage rosters, and configure players
+    <div className="min-h-[100dvh] bg-slate-900 text-white pt-4 sm:pt-5 px-4 pb-8">
+      <div className="max-w-6xl mx-auto space-y-6">
+        <header>
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">Manage Teams</h1>
+          <p className="text-slate-400 text-sm sm:text-base">
+            Create teams, manage rosters, and configure players for {currentLeague.name}.
           </p>
-        </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-4 py-3 bg-blue-700 hover:bg-blue-800 rounded-lg flex items-center justify-center gap-2 text-white font-semibold min-h-[44px] shrink-0"
-        >
-          <Plus className="w-5 h-5" />
-          New Team
-        </button>
-      </div>
+        </header>
 
-      <div className="max-w-6xl mx-auto">
-        <TeamList
-          teams={teams}
-          canDelete={canDelete}
-          onEdit={setEditingTeam}
-          onRequestDelete={canDelete ? setConfirmDelete : undefined}
-          onAddPlayer={handleAddPlayer}
-          onRemovePlayer={handleRemovePlayer}
-          onUpdatePlayer={handleUpdatePlayer}
-        />
+        <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 border-b border-slate-700">
+            <div>
+              <h2 className="text-2xl font-bold text-white shrink-0">Teams</h2>
+              <p className="text-slate-400 text-sm mt-0.5">{teams.length} team{teams.length !== 1 ? 's' : ''} in league</p>
+            </div>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center gap-2 text-white text-sm font-semibold min-h-[44px] shrink-0 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            >
+              <Plus className="w-4 h-4" />
+              New Team
+            </button>
+          </div>
+
+          <div className="p-4">
+            <TeamList
+              teams={teams}
+              canDelete={canDelete}
+              onEdit={setEditingTeam}
+              onRequestDelete={canDelete ? setConfirmDelete : undefined}
+              onAddPlayer={handleAddPlayer}
+              onRemovePlayer={handleRemovePlayer}
+              onUpdatePlayer={handleUpdatePlayer}
+            />
+          </div>
+        </div>
       </div>
 
       {confirmDelete && canDelete && (

@@ -45,7 +45,7 @@ function PlayerMultiStatCard({ title, players, primaryKey, primaryLabel, primary
   const sorted = [...filtered].sort((a, b) => b[primaryKey] - a[primaryKey]).slice(0, 10);
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden flex flex-col">
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
       <div className="flex items-center px-4 py-3 border-b border-slate-700">
         <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide flex-1">{title}</h3>
         <div className="flex items-center gap-4 text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
@@ -86,7 +86,7 @@ function PlayerLeaderCard({ title, players, valueKey, valueLabel, digits = 0, su
   const sorted = [...filtered].sort((a, b) => b[valueKey] - a[valueKey]).slice(0, 10);
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden flex flex-col">
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
       <div className="flex items-center px-4 py-3 border-b border-slate-700">
         <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide flex-1">{title}</h3>
         <div className="flex items-center gap-4 text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
@@ -129,7 +129,7 @@ function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lower
     lowerIsBetter ? a[valueKey] - b[valueKey] : b[valueKey] - a[valueKey]
   );
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-5 flex flex-col">
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-5 flex flex-col">
       <h3 className="text-sm font-bold text-white mb-3 uppercase tracking-wide">{title}</h3>
       <div className="space-y-2">
         {sorted.map((t, i) => (
@@ -156,10 +156,7 @@ function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lower
 
 function SectionHeader({ title }) {
   return (
-    <div className="flex items-center gap-3 mb-4">
-      <h2 className="text-xl font-bold text-white">{title}</h2>
-      <div className="flex-1 h-px bg-slate-700" />
-    </div>
+    <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-4">{title}</h3>
   );
 }
 
@@ -171,12 +168,12 @@ const VIEWS = [
 
 function ViewToggle({ view, setView }) {
   return (
-    <div className="flex gap-2 mb-8 bg-slate-800 border border-slate-700 rounded-lg p-1 w-fit">
+    <div className="flex gap-1 bg-slate-900 border border-slate-600 rounded-lg p-1 w-full sm:w-fit">
       {VIEWS.map(v => (
         <button
           key={v.key}
           onClick={() => setView(v.key)}
-          className={`px-4 py-2 rounded-md text-sm font-bold uppercase tracking-wide transition-colors ${
+          className={`flex-1 sm:flex-none px-3 py-2 rounded-md text-xs sm:text-sm font-bold uppercase tracking-wide transition-colors ${
             view === v.key
               ? "bg-blue-600 text-white"
               : "text-slate-400 hover:text-white hover:bg-slate-700"
@@ -422,12 +419,28 @@ export default function LeagueLeaders() {
     fetchAll();
   }, [currentLeague]);
 
-  if (loading) return <p className="text-slate-400">Loading league leaders...</p>;
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+          <div className="px-4 py-4 border-b border-slate-700">
+            <h2 className="text-2xl font-bold text-white">League Leaders</h2>
+          </div>
+          <p className="px-4 py-8 text-slate-400 text-center animate-pulse">Loading league leaders...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-10">
-      <ViewToggle view={view} setView={setView} />
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 border-b border-slate-700">
+          <h2 className="text-2xl font-bold text-white shrink-0">League Leaders</h2>
+          <ViewToggle view={view} setView={setView} />
+        </div>
 
+        <div className="p-4 space-y-8">
       {view === "players" && (
   <div>
     <SectionHeader title="Player Leaders" />
@@ -502,7 +515,7 @@ export default function LeagueLeaders() {
             <TeamLeaderCard title="Yards Per Play"      teams={teamStats} valueKey="yardsPerPlay" />
             <TeamLeaderCard title="Completion %"        teams={teamStats} valueKey="completionPct"   suffix="%" />
             <TeamLeaderCard title="Success Rate"        teams={teamStats} valueKey="successFor"      suffix="%" />
-            <TeamLeaderCard title="Explosive Plays (20+)" teams={teamStats} valueKey="explosivePlays" digits={0} />
+            <TeamLeaderCard title="Explosive Plays" teams={teamStats} valueKey="explosivePlays" digits={0} />
           </div>
 
           <p className="text-slate-500 text-xs mb-4 uppercase tracking-wide">Conversions</p>
@@ -531,6 +544,8 @@ export default function LeagueLeaders() {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

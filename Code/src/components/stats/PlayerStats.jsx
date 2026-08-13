@@ -36,9 +36,11 @@ export default function PlayerStats() {
     return sortAsc ? av - bv : bv - av;
   });
 
-  const SortTh = ({ label, colKey, className = "" }) => (
+  const SortTh = ({ label, colKey, className = "", sticky = false }) => (
     <th
-      className={`px-4 py-3 cursor-pointer hover:text-white select-none whitespace-nowrap ${sortKey === colKey ? 'text-blue-400' : 'text-slate-300'} ${className}`}
+      className={`px-2 py-2.5 cursor-pointer hover:text-white select-none whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide ${
+        sortKey === colKey ? 'text-blue-400' : 'text-slate-400'
+      } ${sticky ? 'sticky left-0 z-20 bg-slate-800 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.65)]' : ''} ${className}`}
       onClick={() => handleSort(colKey)}
     >
       {label} {sortKey === colKey ? (sortAsc ? '↑' : '↓') : ''}
@@ -46,10 +48,15 @@ export default function PlayerStats() {
   );
 
   const GroupHeader = ({ label, cols, className = "" }) => (
-    <th colSpan={cols} className={`px-4 py-2 text-xs font-bold uppercase tracking-widest text-center ${className}`}>
+    <th colSpan={cols} className={`px-2 py-2 text-[10px] font-bold uppercase tracking-widest text-center ${className}`}>
       {label}
     </th>
   );
+
+  const stickyPlayerCell = (idx) =>
+    `sticky left-0 z-10 whitespace-nowrap font-medium text-white shadow-[4px_0_10px_-4px_rgba(0,0,0,0.65)] ${
+      idx % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800'
+    }`;
 
   useEffect(() => {
     if (!currentLeague) return;
@@ -112,7 +119,7 @@ export default function PlayerStats() {
         const interceptionsThrown= passerData.filter(p => isInterceptionOutcome(p.outcome)).length;
         const completionPct      = passAttempts > 0 ? (passCompletions / passAttempts) * 100 : 0;
         const passExplosive      = passerData
-          .filter(p => p.play_type === 'pass' && isPassCompletionOutcome(p.outcome) && isExplosiveYards(yg(p)))
+          .filter(p => p.play_type === 'pass' && isPassCompletionOutcome(p.outcome) && isExplosiveYards(yg(p), 'pass'))
           .length;
 
         // Rushing
@@ -120,7 +127,7 @@ export default function PlayerStats() {
         const rushingYards = rusherData.reduce((s, p) => s + yg(p), 0);
         const rushingTDs   = rusherData.filter(p => p.outcome === 'td').length;
         const yardsPerCarry= carries > 0 ? rushingYards / carries : 0;
-        const rushExplosive = rusherData.filter(p => isExplosiveYards(yg(p))).length;
+        const rushExplosive = rusherData.filter(p => isExplosiveYards(yg(p), 'rush')).length;
 
         // Receiving
         const receptions         = receiverData.filter(p => isReceivingOutcome(p.outcome)).length;
@@ -128,7 +135,7 @@ export default function PlayerStats() {
         const receivingTDs      = receiverData.filter(p => p.outcome === 'td').length;
         const yardsPerReception = receptions > 0 ? receivingYards / receptions : 0;
         const recExplosive = receiverData
-          .filter(p => isReceivingOutcome(p.outcome) && isExplosiveYards(yg(p)))
+          .filter(p => isReceivingOutcome(p.outcome) && isExplosiveYards(yg(p), 'pass'))
           .length;
 
         // Defense — TFL includes backward passes too
@@ -167,106 +174,125 @@ export default function PlayerStats() {
   }, [teamId]);
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">Player Statistics</h2>
-
-      <div className="relative inline-block w-full max-w-xs">
-        <select className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white appearance-none"
-          value={teamId} onChange={e => setTeamId(e.target.value)}>
-          <option value="">Select a team</option>
-          {teams.map(t => <option key={t.team_id} value={t.team_id}>{t.name}</option>)}
-        </select>
-        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-      </div>
-
-      {!teamId && <p className="text-slate-400">Choose a team to view player stats.</p>}
-      {loading  && <p className="text-slate-400 animate-pulse">Loading player stats...</p>}
-      {teamId && !loading && players.length === 0 && <p className="text-slate-400">No stats available for this team.</p>}
-
-      {!loading && players.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-slate-700">
-          <table className="w-full text-left text-sm border-collapse">
-            <thead>
-              <tr className="bg-slate-900 border-b border-slate-700">
-                <th colSpan={2} />
-                <GroupHeader label="Passing"     cols={5} className="text-blue-400 border-l border-slate-600" />
-                <GroupHeader label="Rushing"     cols={5} className="text-green-400 border-l border-slate-600" />
-                <GroupHeader label="Receiving"   cols={5} className="text-yellow-400 border-l border-slate-600" />
-                <GroupHeader label="Defense"     cols={3} className="text-red-400 border-l border-slate-600" />
-                <GroupHeader label="Conversions" cols={6} className="text-orange-400 border-l border-slate-600" />
-                <GroupHeader label="Per Game"    cols={3} className="text-purple-400 border-l border-slate-600" />
-              </tr>
-              <tr className="bg-slate-800 text-xs uppercase tracking-wide">
-                <SortTh label="Player"     colKey="name"           className="sticky left-0 bg-slate-800 min-w-[140px]" />
-                <SortTh label="GP"         colKey="gamesPlayed"    className="min-w-[50px]" />
-                <SortTh label="Pass Yds"   colKey="passingYards"   className="border-l border-slate-600 min-w-[90px]" />
-                <SortTh label="Comp %"     colKey="completionPct"  className="min-w-[130px]" />
-                <SortTh label="Pass TDs"   colKey="passingTDs"     className="min-w-[90px]" />
-                <SortTh label="20+"        colKey="passExplosive"  className="min-w-[60px]" />
-                <SortTh label="INT Thr"    colKey="interceptionsThrown" className="min-w-[80px]" />
-                <SortTh label="Rush Yds"   colKey="rushingYards"   className="border-l border-slate-600 min-w-[90px]" />
-                <SortTh label="Carries"    colKey="carries"        className="min-w-[80px]" />
-                <SortTh label="Rush TDs"   colKey="rushingTDs"     className="min-w-[90px]" />
-                <SortTh label="20+"        colKey="rushExplosive"  className="min-w-[60px]" />
-                <SortTh label="Yds/Car"    colKey="yardsPerCarry"  className="min-w-[80px]" />
-                <SortTh label="Rec Yds"    colKey="receivingYards" className="border-l border-slate-600 min-w-[90px]" />
-                <SortTh label="Catches"    colKey="receptions"     className="min-w-[80px]" />
-                <SortTh label="Rec TDs"    colKey="receivingTDs"   className="min-w-[80px]" />
-                <SortTh label="20+"        colKey="recExplosive"   className="min-w-[60px]" />
-                <SortTh label="Yds/Rec"    colKey="yardsPerReception" className="min-w-[80px]" />
-                <SortTh label="INTs"       colKey="interceptions"  className="border-l border-slate-600 min-w-[60px]" />
-                <SortTh label="FP"         colKey="flagPulls"      className="min-w-[60px]" />
-                <SortTh label="FPL"        colKey="flagPullsForLoss" className="min-w-[60px]" />
-                <SortTh label="1pt Thr"    colKey="conv1Thrown"    className="border-l border-slate-600 min-w-[80px]" />
-                <SortTh label="1pt Cau"    colKey="conv1Caught"    className="min-w-[80px]" />
-                <SortTh label="2pt Thr"    colKey="conv2Thrown"    className="min-w-[80px]" />
-                <SortTh label="2pt Cau"    colKey="conv2Caught"    className="min-w-[80px]" />
-                <SortTh label="3pt Thr"    colKey="conv3Thrown"    className="min-w-[80px]" />
-                <SortTh label="3pt Cau"    colKey="conv3Caught"    className="min-w-[80px]" />
-                <SortTh label="Pass Yds/G" colKey="passYpg"        className="border-l border-slate-600 min-w-[100px]" />
-                <SortTh label="Rush Yds/G" colKey="rushYpg"        className="min-w-[100px]" />
-                <SortTh label="Rec Yds/G"  colKey="recYpg"         className="min-w-[100px]" />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedPlayers.map((p, idx) => (
-                <tr key={p.player_id}
-                  className={`border-b border-slate-700 hover:bg-slate-700/40 transition ${idx % 2 === 0 ? 'bg-slate-800/20' : ''}`}>
-                  <td className="px-4 py-3 text-white font-medium sticky left-0 bg-slate-900 whitespace-nowrap">{p.name}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.gamesPlayed}</td>
-                  <td className="px-4 py-3 text-slate-300 border-l border-slate-700">{p.passingYards}</td>
-                  <td className="px-4 py-3 text-slate-300">{fmt(p.completionPct)}%<span className="text-slate-500 text-xs ml-1">({p.passCompletions}/{p.passAttempts})</span></td>
-                  <td className="px-4 py-3 text-slate-300">{p.passingTDs}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.passExplosive}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.interceptionsThrown}</td>
-                  <td className="px-4 py-3 text-slate-300 border-l border-slate-700">{p.rushingYards}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.carries}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.rushingTDs}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.rushExplosive}</td>
-                  <td className="px-4 py-3 text-slate-300">{fmt(p.yardsPerCarry)}</td>
-                  <td className="px-4 py-3 text-slate-300 border-l border-slate-700">{p.receivingYards}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.receptions}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.receivingTDs}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.recExplosive}</td>
-                  <td className="px-4 py-3 text-slate-300">{fmt(p.yardsPerReception)}</td>
-                  <td className="px-4 py-3 text-slate-300 border-l border-slate-700">{p.interceptions}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.flagPulls}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.flagPullsForLoss}</td>
-                  <td className="px-4 py-3 text-slate-300 border-l border-slate-700">{p.conv1Thrown}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.conv1Caught}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.conv2Thrown}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.conv2Caught}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.conv3Thrown}</td>
-                  <td className="px-4 py-3 text-slate-300">{p.conv3Caught}</td>
-                  <td className="px-4 py-3 text-slate-300 border-l border-slate-700">{fmt(p.passYpg)}</td>
-                  <td className="px-4 py-3 text-slate-300">{fmt(p.rushYpg)}</td>
-                  <td className="px-4 py-3 text-slate-300">{fmt(p.recYpg)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 border-b border-slate-700">
+          <h2 className="text-2xl font-bold text-white shrink-0">Player Statistics</h2>
+          <div className="relative w-full sm:w-auto sm:min-w-[220px] shrink-0">
+            <select
+              className="w-full px-4 py-2.5 pr-10 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              value={teamId}
+              onChange={e => setTeamId(e.target.value)}
+            >
+              <option value="">Select a team</option>
+              {teams.map(t => <option key={t.team_id} value={t.team_id}>{t.name}</option>)}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+          </div>
         </div>
-      )}
+
+        {!teamId && (
+          <p className="px-4 py-8 text-slate-400 text-center">Choose a team to view player stats.</p>
+        )}
+        {loading && (
+          <p className="px-4 py-8 text-slate-400 text-center animate-pulse">Loading player stats...</p>
+        )}
+        {teamId && !loading && players.length === 0 && (
+          <p className="px-4 py-8 text-slate-400 text-center">No stats available for this team.</p>
+        )}
+
+        {!loading && players.length > 0 && (
+          <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch]">
+            <table className="w-max min-w-full text-left text-sm border-collapse">
+              <thead className="sticky top-0 z-30">
+                <tr className="bg-slate-900 border-b border-slate-700">
+                  <th colSpan={2} className="sticky left-0 z-40 bg-slate-900 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.65)]" />
+                  <GroupHeader label="Passing"     cols={5} className="text-blue-400 border-l border-slate-600" />
+                  <GroupHeader label="Rushing"     cols={5} className="text-green-400 border-l border-slate-600" />
+                  <GroupHeader label="Receiving"   cols={5} className="text-yellow-400 border-l border-slate-600" />
+                  <GroupHeader label="Defense"     cols={3} className="text-red-400 border-l border-slate-600" />
+                  <GroupHeader label="Conversions" cols={6} className="text-orange-400 border-l border-slate-600" />
+                  <GroupHeader label="Per Game"    cols={3} className="text-purple-400 border-l border-slate-600" />
+                </tr>
+                <tr className="bg-slate-800 border-b border-slate-700">
+                  <SortTh label="Player"     colKey="name"           sticky className="min-w-[130px] pl-3" />
+                  <SortTh label="GP"         colKey="gamesPlayed"    className="min-w-[44px] text-center" />
+                  <SortTh label="Pass Yds"   colKey="passingYards"   className="border-l border-slate-600 min-w-[72px] text-center" />
+                  <SortTh label="Comp %"     colKey="completionPct"  className="min-w-[110px] text-center" />
+                  <SortTh label="Pass TDs"   colKey="passingTDs"     className="min-w-[72px] text-center" />
+                  <SortTh label="Expl."      colKey="passExplosive"  className="min-w-[52px] text-center" />
+                  <SortTh label="INT Thr"    colKey="interceptionsThrown" className="min-w-[68px] text-center" />
+                  <SortTh label="Rush Yds"   colKey="rushingYards"   className="border-l border-slate-600 min-w-[72px] text-center" />
+                  <SortTh label="Carries"    colKey="carries"        className="min-w-[64px] text-center" />
+                  <SortTh label="Rush TDs"   colKey="rushingTDs"     className="min-w-[72px] text-center" />
+                  <SortTh label="Expl."      colKey="rushExplosive"  className="min-w-[52px] text-center" />
+                  <SortTh label="Yds/Car"    colKey="yardsPerCarry"  className="min-w-[68px] text-center" />
+                  <SortTh label="Rec Yds"    colKey="receivingYards" className="border-l border-slate-600 min-w-[72px] text-center" />
+                  <SortTh label="Catches"    colKey="receptions"     className="min-w-[64px] text-center" />
+                  <SortTh label="Rec TDs"    colKey="receivingTDs"   className="min-w-[68px] text-center" />
+                  <SortTh label="Expl."      colKey="recExplosive"   className="min-w-[52px] text-center" />
+                  <SortTh label="Yds/Rec"    colKey="yardsPerReception" className="min-w-[68px] text-center" />
+                  <SortTh label="INTs"       colKey="interceptions"  className="border-l border-slate-600 min-w-[52px] text-center" />
+                  <SortTh label="FP"         colKey="flagPulls"      className="min-w-[44px] text-center" />
+                  <SortTh label="FPL"        colKey="flagPullsForLoss" className="min-w-[44px] text-center" />
+                  <SortTh label="1pt Thr"    colKey="conv1Thrown"    className="border-l border-slate-600 min-w-[64px] text-center" />
+                  <SortTh label="1pt Cau"    colKey="conv1Caught"    className="min-w-[64px] text-center" />
+                  <SortTh label="2pt Thr"    colKey="conv2Thrown"    className="min-w-[64px] text-center" />
+                  <SortTh label="2pt Cau"    colKey="conv2Caught"    className="min-w-[64px] text-center" />
+                  <SortTh label="3pt Thr"    colKey="conv3Thrown"    className="min-w-[64px] text-center" />
+                  <SortTh label="3pt Cau"    colKey="conv3Caught"    className="min-w-[64px] text-center" />
+                  <SortTh label="Pass Yds/G" colKey="passYpg"        className="border-l border-slate-600 min-w-[84px] text-center" />
+                  <SortTh label="Rush Yds/G" colKey="rushYpg"        className="min-w-[84px] text-center" />
+                  <SortTh label="Rec Yds/G"  colKey="recYpg"         className="min-w-[84px] text-center pr-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedPlayers.map((p, idx) => (
+                  <tr
+                    key={p.player_id}
+                    className={`border-b border-slate-700/80 hover:bg-slate-700/30 transition-colors ${
+                      idx % 2 === 0 ? 'bg-slate-900/70' : 'bg-slate-800/50'
+                    }`}
+                  >
+                    <td className={`px-3 py-2 ${stickyPlayerCell(idx)}`}>{p.name}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.gamesPlayed}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.passingYards}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">
+                      {fmt(p.completionPct)}%
+                      <span className="text-slate-500 text-[10px] ml-1">({p.passCompletions}/{p.passAttempts})</span>
+                    </td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.passingTDs}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.passExplosive}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.interceptionsThrown}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.rushingYards}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.carries}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.rushingTDs}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.rushExplosive}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{fmt(p.yardsPerCarry)}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.receivingYards}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.receptions}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.receivingTDs}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.recExplosive}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{fmt(p.yardsPerReception)}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.interceptions}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.flagPulls}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.flagPullsForLoss}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.conv1Thrown}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conv1Caught}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conv2Thrown}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conv2Caught}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conv3Thrown}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conv3Caught}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{fmt(p.passYpg)}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{fmt(p.rushYpg)}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums pr-3">{fmt(p.recYpg)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

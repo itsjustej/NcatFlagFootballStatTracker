@@ -28,15 +28,15 @@ export default function TeamCard({
   };
 
   return (
-    <div className="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden shadow-md">
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden">
       {/* Top header */}
-      <div className="p-4 sm:p-6 border-b border-slate-700">
+      <div className="px-4 py-4 border-b border-slate-700/80">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0 pr-1">
-            <h3 className="text-lg sm:text-2xl font-bold break-words leading-tight">
+            <h3 className="text-lg font-bold text-white break-words leading-tight">
               {team.name}
             </h3>
-            <span className="inline-flex mt-1.5 whitespace-nowrap bg-blue-800 text-blue-200 text-xs sm:text-sm font-semibold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full">
+            <span className="inline-flex mt-1.5 whitespace-nowrap bg-blue-900/60 text-blue-200 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-blue-800/50">
               {team.players.length} players
             </span>
           </div>
@@ -63,15 +63,15 @@ export default function TeamCard({
       </div>
 
       {/* Players */}
-      <div className="p-6 bg-slate-900/40">
+      <div className="p-4">
         {team.players.length === 0 ? (
-          <p className="text-slate-400 mb-4">No players yet</p>
+          <p className="text-slate-400 text-sm mb-4 text-center py-2">No players yet</p>
         ) : (
-          <div className="space-y-3 mb-4 max-h-[280px] overflow-y-auto pr-1">
+          <div className="space-y-2 mb-4 max-h-[280px] overflow-y-auto overscroll-y-contain scroll-smooth pr-1">
             {team.players.map((player) => (
               <div
                 key={player.id}
-                className="flex items-center justify-between bg-slate-800 p-3 rounded-lg"
+                className="flex items-center justify-between bg-slate-800/80 border border-slate-700/60 p-3 rounded-lg hover:bg-slate-800 transition-colors"
               >
                 {editingPlayer?.id === player.id ? (
                   <input
@@ -82,7 +82,7 @@ export default function TeamCard({
                     autoFocus
                   />
                 ) : (
-                  <p className="font-medium">{player.name}</p>
+                  <p className="font-medium text-white text-sm">{player.name}</p>
                 )}
 
                 <div className="flex gap-2">
@@ -124,7 +124,7 @@ export default function TeamCard({
         {!showAddPlayer && (
           <button
             onClick={() => setShowAddPlayer(true)}
-            className="w-full flex items-center justify-center gap-2 py-2 text-slate-300 hover:text-blue-400 transition border-t border-slate-700 pt-4"
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-slate-400 hover:text-blue-400 transition border-t border-slate-700/80 pt-4 text-sm"
           >
             <Plus className="w-4 h-4" />
             Add Player
@@ -132,9 +132,9 @@ export default function TeamCard({
         )}
 
         {showAddPlayer && (
-          <div className="border-t border-slate-700 pt-4 space-y-3">
+          <div className="border-t border-slate-700/80 pt-4 space-y-3">
             <input
-              className="w-full bg-slate-800 px-3 py-2 rounded border border-slate-700 text-white"
+              className="w-full bg-slate-900 px-3 py-2.5 rounded-lg border border-slate-600 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
               placeholder="Player name"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
@@ -142,13 +142,13 @@ export default function TeamCard({
             <div className="flex gap-2">
               <button
                 onClick={handleAddPlayer}
-                className="flex-1 bg-blue-700 hover:bg-blue-800 py-2 rounded text-white"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 py-2.5 rounded-lg text-white text-sm font-semibold transition-colors"
               >
                 Add
               </button>
               <button
                 onClick={() => setShowAddPlayer(false)}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 py-2 rounded"
+                className="flex-1 bg-slate-700 hover:bg-slate-600 py-2.5 rounded-lg text-sm transition-colors"
               >
                 Cancel
               </button>

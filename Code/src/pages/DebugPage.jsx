@@ -144,13 +144,13 @@ function computePlayerStats(playersData, homeTeamId, plays, participants, games)
     const passTDs   = passerData.filter(p => p.play_type === "pass" && p.outcome === "td").length;
     const intThrown = passerData.filter(p => isInterceptionOutcome(p.outcome)).length;
     const passExplosive = passerData
-      .filter(p => p.play_type === "pass" && isPassCompletionOutcome(p.outcome) && isExplosiveYards(yg(p)))
+      .filter(p => p.play_type === "pass" && isPassCompletionOutcome(p.outcome) && isExplosiveYards(yg(p), "pass"))
       .length;
 
     const carries   = rusherData.length;
     const rushYards = rusherData.reduce((s, p) => s + yg(p), 0);
     const rushTDs   = rusherData.filter(p => p.outcome === "td").length;
-    const rushExplosive = rusherData.filter(p => isExplosiveYards(yg(p))).length;
+    const rushExplosive = rusherData.filter(p => isExplosiveYards(yg(p), "rush")).length;
 
     const recs     = receiverData.filter(p => isReceivingOutcome(p.outcome)).length;
     const recYards = receiverData
@@ -158,7 +158,7 @@ function computePlayerStats(playersData, homeTeamId, plays, participants, games)
       .reduce((s, p) => s + yg(p), 0);
     const recTDs   = receiverData.filter(p => p.outcome === "td").length;
     const recExplosive = receiverData
-      .filter(p => isReceivingOutcome(p.outcome) && isExplosiveYards(yg(p)))
+      .filter(p => isReceivingOutcome(p.outcome) && isExplosiveYards(yg(p), "pass"))
       .length;
 
     const intCaught = countPlayerInterceptions(pid, participants, plays);
@@ -421,16 +421,16 @@ export default function DebugPage() {
                 <th className="px-2 py-2 text-blue-400 text-center">Pass Yds</th>
                 <th className="px-2 py-2 text-blue-400 text-center">Comp/Att</th>
                 <th className="px-2 py-2 text-blue-400 text-center">Pass TD</th>
-                <th className="px-2 py-2 text-blue-400 text-center">20+</th>
+                <th className="px-2 py-2 text-blue-400 text-center">Expl.</th>
                 <th className="px-2 py-2 text-blue-400 text-center">INT Thr</th>
                 <th className="px-2 py-2 text-green-400 text-center border-l border-slate-700">Rush Yds</th>
                 <th className="px-2 py-2 text-green-400 text-center">Car</th>
                 <th className="px-2 py-2 text-green-400 text-center">Rush TD</th>
-                <th className="px-2 py-2 text-green-400 text-center">20+</th>
+                <th className="px-2 py-2 text-green-400 text-center">Expl.</th>
                 <th className="px-2 py-2 text-yellow-400 text-center border-l border-slate-700">Rec Yds</th>
                 <th className="px-2 py-2 text-yellow-400 text-center">Rec</th>
                 <th className="px-2 py-2 text-yellow-400 text-center">Rec TD</th>
-                <th className="px-2 py-2 text-yellow-400 text-center">20+</th>
+                <th className="px-2 py-2 text-yellow-400 text-center">Expl.</th>
                 <th className="px-2 py-2 text-red-400 text-center border-l border-slate-700">INT</th>
                 <th className="px-2 py-2 text-red-400 text-center">FP</th>
                 <th className="px-2 py-2 text-red-400 text-center">TFL</th>

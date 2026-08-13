@@ -48,7 +48,7 @@ function StatRow({ label, value, rank, total, isPercentage, pctValue, lowerIsBet
 function ConversionBar({ label, attempts, completions, rank, total }) {
   const pct = attempts > 0 ? ((completions / attempts) * 100).toFixed(1) : 0;
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-5">
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-5">
       <div className="flex items-center justify-between mb-2">
         <span className="text-slate-400 text-xs">{label}</span>
         <span className="text-slate-400 text-xs">#{rank} of {total}</span>
@@ -67,7 +67,7 @@ function ConversionBar({ label, attempts, completions, rank, total }) {
 // ---------------- RECORD CARD ---------------- //
 function RecordCard({ label, value, color }) {
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 text-center">
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-6 text-center">
       <p className={`text-4xl font-bold ${color}`}>{value}</p>
       <p className="text-slate-400 text-sm mt-1">{label}</p>
     </div>
@@ -79,7 +79,7 @@ function DownConversionCard({ label, attempts, conversions, rank, total, color, 
   const pct = attempts > 0 ? ((conversions / attempts) * 100).toFixed(1) : '—';
   const barWidth = attempts > 0 ? (conversions / attempts) * 100 : 0;
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-5">
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-5">
       <div className="flex items-center justify-between mb-3">
         <span className={`text-sm font-bold ${color}`}>{label}</span>
         {rank != null && <span className="text-slate-400 text-xs">#{rank} of {total}</span>}
@@ -402,39 +402,47 @@ export default function TeamStats() {
   }, [stats]);
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Team Statistics</h1>
-          <p className="text-slate-400 mt-1">Season-wide stats, charts, and conversion data</p>
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 border-b border-slate-700">
+          <div>
+            <h2 className="text-2xl font-bold text-white shrink-0">Team Statistics</h2>
+            <p className="text-slate-400 text-sm mt-0.5">Season-wide stats, charts, and conversion data</p>
+          </div>
+          <div className="relative w-full sm:w-auto sm:min-w-[220px] shrink-0">
+            <select
+              value={teamId}
+              onChange={e => setTeamId(e.target.value)}
+              className="w-full px-4 py-2.5 pr-10 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            >
+              <option value="">Select a team</option>
+              {teams.map(t => <option key={t.team_id} value={t.team_id}>{t.name}</option>)}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+          </div>
         </div>
-        <div className="relative">
-          <select value={teamId} onChange={e => setTeamId(e.target.value)}
-            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white appearance-none pr-10">
-            <option value="">Select a team</option>
-            {teams.map(t => <option key={t.team_id} value={t.team_id}>{t.name}</option>)}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-        </div>
-      </div>
 
-      {loading   && <p className="text-slate-400">Loading stats...</p>}
-      {!teamId   && !loading && <p className="text-slate-400">Select a team to view stats.</p>}
+        {loading && (
+          <p className="px-4 py-8 text-slate-400 text-center animate-pulse">Loading stats...</p>
+        )}
+        {!teamId && !loading && (
+          <p className="px-4 py-8 text-slate-400 text-center">Select a team to view stats.</p>
+        )}
 
-      {stats && (
-        <>
-          <div className="grid grid-cols-4 gap-4">
+        {stats && (
+          <div className="p-4 space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <RecordCard label="WINS"   value={stats.wins}          color="text-green-400" />
             <RecordCard label="LOSSES" value={stats.losses}        color="text-red-400" />
             <RecordCard label="TIES"   value={stats.ties}          color="text-yellow-400" />
             <RecordCard label="WIN %"  value={`${stats.winPct}%`} color="text-blue-400" />
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-4 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-5 h-5 text-blue-400" />
-                <h2 className="text-white font-bold tracking-wide">OFFENSE</h2>
+                <h3 className="text-white font-bold tracking-wide">OFFENSE</h3>
               </div>
               <StatRow label="Points per game"       value={stats.ppg}                 rank={rank('ppg')}               total={numTeams} />
               <StatRow label="Passing yards / game"  value={stats.passYpg}             rank={rank('passYpg')}           total={numTeams} />
@@ -442,7 +450,7 @@ export default function TeamStats() {
               <StatRow label="Total yards / game"    value={stats.totalYpg}            rank={rank('totalYpg')}          total={numTeams} />
               <StatRow label="Yards per play"        value={stats.yardsPerPlay}        rank={rank('yardsPerPlay')}      total={numTeams} />
               <StatRow label="Success rate"          value={`${stats.successFor}%`}    rank={rank('successFor')}        total={numTeams} isPercentage pctValue={stats.successFor} />
-              <StatRow label="Explosive plays (20+)" value={stats.explosivePlays}      rank={rank('explosivePlays')}     total={numTeams} />
+              <StatRow label="Explosive plays" value={stats.explosivePlays}      rank={rank('explosivePlays')}     total={numTeams} />
               <StatRow label="Completion %"          value={`${stats.completionPct}%`} rank={rank('completionPct')}     total={numTeams} isPercentage pctValue={stats.completionPct} />
               <StatRow label="Passing TDs"           value={stats.passingTDs}          rank={rank('passingTDs')}        total={numTeams} />
               <StatRow label="Rushing TDs"           value={stats.rushingTDs}          rank={rank('rushingTDs')}        total={numTeams} />
@@ -450,10 +458,10 @@ export default function TeamStats() {
               <StatRow label="TFLs allowed"          value={stats.tflsAllowed}         rank={rank('tflsAllowed', true)} total={numTeams} lowerIsBetter />
             </div>
 
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+            <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-4 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Shield className="w-5 h-5 text-red-400" />
-                <h2 className="text-white font-bold tracking-wide">DEFENSE</h2>
+                <h3 className="text-white font-bold tracking-wide">DEFENSE</h3>
               </div>
               <StatRow label="Points against / game"      value={stats.papg}                   rank={rank('papg', true)}               total={numTeams} lowerIsBetter />
               <StatRow label="Pass yards against / game"  value={stats.passYpgAgainst}         rank={rank('passYpgAgainst', true)}     total={numTeams} lowerIsBetter />
@@ -470,8 +478,8 @@ export default function TeamStats() {
               </div>
           </div>
 
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-            <h2 className="text-white font-bold tracking-wide mb-4">Situational Conversions</h2>
+          <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-4 sm:p-6">
+            <h3 className="text-white font-bold tracking-wide mb-4">Situational Conversions</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <DownConversionCard label="3rd Down Conversion" attempts={stats.thirdDownAttempts}  conversions={stats.thirdDownConversions}  rank={stats.thirdDownAttempts  > 0 ? rank('thirdDownPct')  : null} total={numTeams} color="text-yellow-400" hint="A conversion is a 1st down gained or a score" />
               <DownConversionCard label="4th Down Conversion" attempts={stats.fourthDownAttempts} conversions={stats.fourthDownConversions} rank={stats.fourthDownAttempts > 0 ? rank('fourthDownPct') : null} total={numTeams} color="text-orange-400" hint="A conversion is a 1st down gained or a score" />
@@ -479,10 +487,10 @@ export default function TeamStats() {
             </div>
           </div>
 
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+          <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-4 sm:p-6">
             <div className="flex items-center gap-2 mb-4">
               <RefreshCw className="w-5 h-5 text-green-400" />
-              <h2 className="text-white font-bold tracking-wide">CONVERSIONS</h2>
+              <h3 className="text-white font-bold tracking-wide">CONVERSIONS</h3>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <ConversionBar label="1-POINT" attempts={stats.conv1Attempts} completions={stats.conv1Made} rank={rank('conv1Pct')} total={numTeams} />
@@ -491,10 +499,11 @@ export default function TeamStats() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-4 sm:p-6">
               <h3 className="text-white font-bold mb-4">POINTS PER GAME</h3>
-              <ResponsiveContainer width="100%" height={250}>
+              <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch]">
+              <ResponsiveContainer width="100%" height={250} minWidth={280}>
                 <LineChart data={pointsChartData}>
                   <XAxis dataKey="game" stroke="#94a3b8" />
                   <YAxis stroke="#94a3b8" tick={{ fill: "white" }} />
@@ -504,10 +513,12 @@ export default function TeamStats() {
                   <Line type="monotone" dataKey="Points Against" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
+              </div>
             </div>
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+            <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-4 sm:p-6">
               <h3 className="text-white font-bold mb-4">YARDS PER GAME</h3>
-              <ResponsiveContainer width="100%" height={250}>
+              <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch]">
+              <ResponsiveContainer width="100%" height={250} minWidth={280}>
                 <LineChart data={yardsChartData}>
                   <XAxis dataKey="game" stroke="#94a3b8" />
                   <YAxis stroke="#94a3b8" tick={{ fill: "white" }} />
@@ -517,10 +528,12 @@ export default function TeamStats() {
                   <Line type="monotone" dataKey="Yards Against" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
+              </div>
             </div>
           </div>
-        </>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

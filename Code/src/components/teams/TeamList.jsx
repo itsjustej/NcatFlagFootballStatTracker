@@ -12,14 +12,14 @@ export default function TeamList({
 }) {
   if (teams.length === 0) {
     return (
-      <div className="text-center py-12 text-slate-400 text-lg">
+      <p className="text-slate-400 text-center py-8">
         No teams created yet. Create your first team to get started.
-      </div>
+      </p>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {teams.map((team) => (
         <TeamCard
           key={team.id}
