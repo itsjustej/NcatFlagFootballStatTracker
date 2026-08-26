@@ -35,7 +35,7 @@ export default function SettingsPage() {
   const roleLabel = user?.role === "admin" ? "Admin" : "Worker";
 
   return (
-    <div className="min-h-[100dvh] bg-slate-900 text-white pt-4 sm:pt-5 px-4 pb-8">
+    <div className="bg-slate-900 text-white pt-4 sm:pt-5 px-4 pb-8">
       <div className="max-w-6xl mx-auto space-y-6">
         <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
 import TeamSelector from "../components/start-game/TeamSelector";
@@ -129,9 +129,12 @@ export default function StartGamePage() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pt-5">
-      <div className="max-w-5xl mx-auto px-4 py-6 sm:py-10">
-        <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">Start New Game</h1>
+    <div className="bg-slate-900 pt-4 sm:pt-5 px-4 pb-8">
+      <div className="max-w-5xl mx-auto">
+        <Link to="/" className="text-slate-400 text-sm hover:text-white transition-colors">
+          ← Games
+        </Link>
+        <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2 mt-3">Start New Game</h1>
         <p className="text-slate-400 mb-8">
           {currentLeague
             ? `${currentLeague.name} — Select teams and assign jersey numbers.`

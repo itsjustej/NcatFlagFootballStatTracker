@@ -58,24 +58,13 @@ export default function FieldSpot({
   return (
     <div className="select-none">
       <div
-        className={`relative w-full cursor-crosshair overflow-hidden rounded-xl shadow-lg shadow-black/30 border border-green-900/40 ${
+        className={`relative w-full cursor-crosshair overflow-hidden rounded-xl border border-green-950 ${
           pulse ? 'field-pulse' : ''
         }`}
         style={{ height: '8.5rem' }}
         onClick={handleClick}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-green-700 via-green-800 to-green-900" />
-
-        {[0, 2, 4, 6].map((i) => (
-          <div
-            key={i}
-            className="absolute top-0 bottom-0 bg-white/[0.05]"
-            style={{
-              left:  `${END_ZONE_PCT + (i * 10 / 80) * FIELD_PCT}%`,
-              width: `${(10 / 80) * FIELD_PCT}%`,
-            }}
-          />
-        ))}
+        <div className="absolute inset-0 bg-[#14532d]" />
 
         {/* First-down chain zone */}
         {chainWidth > 0.5 && (
@@ -84,7 +73,7 @@ export default function FieldSpot({
             style={{
               left:       `${chainLeft}%`,
               width:      `${chainWidth}%`,
-              background: 'rgba(250, 204, 21, 0.08)',
+              background: 'rgba(250, 204, 21, 0.04)',
             }}
           />
         )}
@@ -138,7 +127,7 @@ export default function FieldSpot({
 
         <div
           className="absolute top-0 bottom-0 border-l-[3px] border-blue-400 z-10"
-          style={{ left: `${scrimmPct}%`, boxShadow: '1px 0 8px rgba(96,165,250,0.4)' }}
+          style={{ left: `${scrimmPct}%` }}
         />
 
         {/* Ball at scrimmage */}

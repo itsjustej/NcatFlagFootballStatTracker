@@ -213,13 +213,15 @@ export default function PlayByPlay({ log, homeName, awayName, gs, latestDriveId 
         <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">
           Play by Play
         </span>
-        <button
-          type="button"
-          onClick={() => { navigate('/'); clearGame(); }}
-          className="text-[10px] font-bold text-slate-400 hover:text-white border border-slate-600 hover:border-slate-400 px-2 py-1 rounded transition-colors"
-        >
-          Save & Exit
-        </button>
+        {gs && (
+          <button
+            type="button"
+            onClick={() => { navigate('/'); clearGame(); }}
+            className="text-[10px] font-bold text-slate-400 hover:text-white border border-slate-600 hover:border-slate-400 px-2 py-1 rounded transition-colors"
+          >
+            Save & Exit
+          </button>
+        )}
       </div>
 
       {gs && <CurrentPlayPreview gs={gs} homeName={homeName} awayName={awayName} />}

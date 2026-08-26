@@ -20,11 +20,11 @@ function PlayerChip({ player, selected, accentColor, onClick }) {
 
         height:      60,
 
-        background:  selected ? accentColor : 'rgba(255,255,255,0.05)',
+        background:  selected ? accentColor : '#1e293b',
 
         borderColor: selected ? accentColor : 'rgba(255,255,255,0.12)',
 
-        boxShadow:   selected ? `0 0 16px ${accentColor}55` : 'none',
+        boxShadow:   selected ? `0 0 0 1px ${accentColor}` : 'none',
 
       }}
 

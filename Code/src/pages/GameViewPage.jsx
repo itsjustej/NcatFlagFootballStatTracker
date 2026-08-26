@@ -1,8 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Play, Trash2 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import PlayByPlay from "../components/game/PlayByPlay";
-import { yardsGainedForPlay } from "../utils/statsHelpers";
+import GameBoxScore from "../components/game/GameBoxScore";
+import { ConfirmDeleteDialog } from "../components/teams/ConfirmDeleteDialog";
+import { useLeague } from "../context/LeagueContext";
+import { useAuth } from "../auth/AuthContext";
+import { deleteGameById } from "../utils/deleteGame";
+import {
+  yardsGainedForPlay,
+  computeTeamBoxStats,
+  computePlayerBoxStats,
+} from "../utils/statsHelpers";
 
 // ── Outcome → driveResult mapping (inverse of useSavePlay) ───────────────────
 const OUTCOME_TO_DRIVE_RESULT = {
@@ -90,8 +100,29 @@ async function fetchGameData(gameId) {
     .eq('game_id', gameId)
     .order('play_id', { ascending: true });
 
+  const { data: rosterPlayers } = await supabase
+    .from('Player')
+    .select('player_id, name, team_id')
+    .in('team_id', [homeTeamId, gameRow.away.team_id]);
+
+  const emptyBox = {
+    homeName,
+    awayName,
+    log: [],
+    finalHome: 0,
+    finalAway: 0,
+    homeStats: computeTeamBoxStats(homeTeamId, [], homeTeamId, homeAttacksRight),
+    awayStats: computeTeamBoxStats(gameRow.away.team_id, [], homeTeamId, homeAttacksRight),
+    homePlayers: (rosterPlayers || [])
+      .filter((p) => p.team_id === homeTeamId)
+      .map((p) => computePlayerBoxStats(p, [], [], homeTeamId, homeAttacksRight)),
+    awayPlayers: (rosterPlayers || [])
+      .filter((p) => p.team_id === gameRow.away.team_id)
+      .map((p) => computePlayerBoxStats(p, [], [], homeTeamId, homeAttacksRight)),
+  };
+
   if (playsErr) throw playsErr;
-  if (!plays.length) return { homeName, awayName, log: [], finalHome: 0, finalAway: 0 };
+  if (!plays?.length) return emptyBox;
 
   // 3. All participants for these plays with player names
   const playIds = plays.map(p => p.play_id);
@@ -100,6 +131,7 @@ async function fetchGameData(gameId) {
     .select(`
       play_id,
       role,
+      player_id,
       player:Player(player_id, name)
     `)
     .in('play_id', playIds);
@@ -193,6 +225,20 @@ async function fetchGameData(gameId) {
   });
 
   const last = log[log.length - 1];
+  const awayTeamId = gameRow.away.team_id;
+  const homeStats = computeTeamBoxStats(homeTeamId, plays, homeTeamId, homeAttacksRight);
+  const awayStats = computeTeamBoxStats(awayTeamId, plays, homeTeamId, homeAttacksRight);
+  const statParticipants = (parts || []).map((p) => ({
+    play_id: p.play_id,
+    role: p.role,
+    player_id: p.player_id,
+  }));
+  const homePlayers = (rosterPlayers || [])
+    .filter((p) => p.team_id === homeTeamId)
+    .map((p) => computePlayerBoxStats(p, plays, statParticipants, homeTeamId, homeAttacksRight));
+  const awayPlayers = (rosterPlayers || [])
+    .filter((p) => p.team_id === awayTeamId)
+    .map((p) => computePlayerBoxStats(p, plays, statParticipants, homeTeamId, homeAttacksRight));
 
   return {
     homeName,
@@ -200,15 +246,23 @@ async function fetchGameData(gameId) {
     log,
     finalHome: last?.homeScore ?? 0,
     finalAway: last?.awayScore ?? 0,
+    homeStats,
+    awayStats,
+    homePlayers,
+    awayPlayers,
   };
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function GameViewPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { startGame, clearGame, currentGameId } = useLeague();
+  const { canDelete } = useAuth();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     fetchGameData(Number(id))
@@ -229,18 +283,56 @@ export default function GameViewPage() {
     </div>
   );
 
-  const { homeName, awayName, log, finalHome, finalAway } = data;
+  const { homeName, awayName, log, finalHome, finalAway, homeStats, awayStats, homePlayers, awayPlayers } = data;
+
+  const handleResume = () => {
+    startGame(Number(id));
+    navigate('/game');
+  };
+
+  const handleDelete = async () => {
+    if (!canDelete) return;
+    try {
+      await deleteGameById(Number(id));
+      if (currentGameId === Number(id)) clearGame();
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      setConfirmDelete(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pt-20">
-      <div className="max-w-3xl mx-auto px-4 py-8 flex flex-col gap-6">
+    <div className="bg-slate-900 text-white pt-4 sm:pt-5 px-4 pb-8">
+      <div className="max-w-5xl mx-auto flex flex-col gap-6">
 
-        {/* Back */}
-        <Link to="/games" className="text-slate-400 text-sm hover:text-white transition-colors">
-          ← Back to History
-        </Link>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Link to="/" className="text-slate-400 text-sm hover:text-white transition-colors shrink-0">
+              ← Back to Games
+            </Link>
+          <div className="flex items-center gap-2">
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="inline-flex items-center justify-center w-11 h-11 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-950/50 border border-slate-700 hover:border-red-500/40 transition-colors"
+                aria-label="Delete game"
+                title="Delete game"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleResume}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] bg-blue-600 hover:bg-blue-700 rounded-lg text-white text-sm font-semibold transition-colors"
+            >
+              <Play className="w-4 h-4" />
+              Resume game
+            </button>
+          </div>
+        </div>
 
-        {/* Score header */}
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
           <div className="grid grid-cols-3 items-center gap-4">
             <div className="text-center">
@@ -248,7 +340,7 @@ export default function GameViewPage() {
               <p className="text-5xl font-black text-white tabular-nums">{finalHome}</p>
             </div>
             <div className="text-center">
-              <p className="text-slate-500 text-xs uppercase tracking-widest">Final</p>
+              <p className="text-slate-500 text-xs uppercase tracking-widest">{log.length ? 'Score' : 'Kickoff'}</p>
             </div>
             <div className="text-center">
               <p className="text-[11px] font-black uppercase tracking-widest text-[#C9A84C] mb-1">{awayName}</p>
@@ -257,12 +349,27 @@ export default function GameViewPage() {
           </div>
         </div>
 
-        {/* Play by play */}
-        <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden" style={{ minHeight: 400 }}>
+        <GameBoxScore
+          homeName={homeName}
+          awayName={awayName}
+          homeStats={homeStats}
+          awayStats={awayStats}
+          homePlayers={homePlayers}
+          awayPlayers={awayPlayers}
+        />
+
+        <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden" style={{ minHeight: 280 }}>
           <PlayByPlay log={log} homeName={homeName} awayName={awayName} />
         </div>
 
       </div>
+
+      {confirmDelete && canDelete && (
+        <ConfirmDeleteDialog
+          onConfirm={handleDelete}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

@@ -163,14 +163,14 @@ export default function TeamsPage() {
 
   if (!currentLeague) {
     return (
-      <div className="min-h-screen bg-slate-900 pt-24 px-6">
+      <div className="bg-slate-900 pt-4 sm:pt-5 px-6">
         <p className="text-slate-400 text-center animate-pulse">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[100dvh] bg-slate-900 text-white pt-4 sm:pt-5 px-4 pb-8">
+    <div className="bg-slate-900 text-white pt-4 sm:pt-5 px-4 pb-8">
       <div className="max-w-6xl mx-auto space-y-6">
         <header>
           <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">Manage Teams</h1>

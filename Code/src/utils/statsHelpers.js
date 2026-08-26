@@ -290,3 +290,104 @@ export function computeRedZoneStats(teamId, teamGames, plays, getHomeTeamId, get
   const redZonePct = redZoneAttempts > 0 ? (redZoneScores / redZoneAttempts) * 100 : 0;
   return { redZoneAttempts, redZoneScores, redZonePct };
 }
+
+/** Single-game team totals for the recap box score. */
+export function computeTeamBoxStats(teamId, plays, homeTeamId, homeAttacksRight = true) {
+  const yg = (p) => yardsGainedForPlay(p, homeTeamId, homeAttacksRight);
+  const converted = (p) => isConverted(p, homeTeamId, homeAttacksRight);
+
+  const offPlays = (plays || []).filter(
+    (p) => p.offense_team == teamId && !p.is_conversion && p.play_type !== 'penalty',
+  );
+  const passPlays = offPlays.filter((p) => p.play_type === 'pass');
+  const rushPlays = offPlays.filter((p) => p.play_type === 'rush');
+  const thirdDownPlays = offPlays.filter((p) => p.down === 3);
+
+  const passYards = passPlays
+    .filter((p) => isPassCompletionOutcome(p.outcome))
+    .reduce((s, p) => s + yg(p), 0);
+  const rushYards = rushPlays.reduce((s, p) => s + yg(p), 0);
+  const passAttempts = passPlays.length;
+  const passCompletions = countPassCompletions(passPlays);
+
+  return {
+    passYards,
+    rushYards,
+    totalYards: passYards + rushYards,
+    passAttempts,
+    passCompletions,
+    completionPct: passAttempts > 0 ? (passCompletions / passAttempts) * 100 : 0,
+    passingTDs: passPlays.filter((p) => p.outcome === 'td').length,
+    rushingTDs: rushPlays.filter((p) => p.outcome === 'td').length,
+    interceptionsThrown: passPlays.filter((p) => isInterceptionOutcome(p.outcome)).length,
+    thirdDownConversions: thirdDownPlays.filter(converted).length,
+    thirdDownAttempts: thirdDownPlays.length,
+    successRate: computeOffenseSuccessRate(offPlays, () => homeTeamId, () => homeAttacksRight),
+    explosivePlays: countExplosivePlays(offPlays, () => homeTeamId, () => homeAttacksRight),
+  };
+}
+
+/** Single-game player line for the recap box score. */
+export function computePlayerBoxStats(player, plays, participants, homeTeamId, homeAttacksRight = true) {
+  const pid = player.player_id;
+  const byRole = (role) =>
+    (participants || [])
+      .filter((p) => p.player_id === pid && p.role === role)
+      .map((p) => p.play_id);
+  const getPlays = (ids) => (plays || []).filter((p) => ids.includes(p.play_id));
+  const yg = (p) => yardsGainedForPlay(p, homeTeamId, homeAttacksRight);
+
+  const passerIds = byRole('passer');
+  const rusherIds = byRole('rusher');
+  const receiverIds = byRole('receiver');
+  const defenderIds = byRole('defender');
+
+  const passerData = getPlays(passerIds).filter((p) => !p.is_conversion && p.play_type !== 'penalty');
+  const rusherData = getPlays(rusherIds).filter((p) => !p.is_conversion && p.play_type !== 'penalty');
+  const receiverData = getPlays(receiverIds).filter((p) => !p.is_conversion && p.play_type !== 'penalty');
+  const defenderData = getPlays(defenderIds).filter((p) => !p.is_conversion && p.play_type !== 'penalty');
+
+  const passAttempts = passerData.filter((p) => p.play_type === 'pass').length;
+  const passCompletions = countPassCompletions(passerData.filter((p) => p.play_type === 'pass'));
+  const passingYards = passerData
+    .filter((p) => p.play_type === 'pass' && isPassCompletionOutcome(p.outcome))
+    .reduce((s, p) => s + yg(p), 0);
+  const passingTDs = passerData.filter((p) => p.play_type === 'pass' && p.outcome === 'td').length;
+  const interceptionsThrown = passerData.filter((p) => isInterceptionOutcome(p.outcome)).length;
+
+  const carries = rusherData.length;
+  const rushingYards = rusherData.reduce((s, p) => s + yg(p), 0);
+  const rushingTDs = rusherData.filter((p) => p.outcome === 'td').length;
+
+  const receptions = receiverData.filter((p) => isReceivingOutcome(p.outcome)).length;
+  const receivingYards = receiverData
+    .filter((p) => isReceivingOutcome(p.outcome))
+    .reduce((s, p) => s + yg(p), 0);
+  const receivingTDs = receiverData.filter((p) => p.outcome === 'td').length;
+
+  const interceptions = countPlayerInterceptions(pid, participants, plays);
+  const flagPulls = defenderData.length;
+
+  const hasStats =
+    passAttempts + carries + receptions + interceptions + flagPulls + passingYards + rushingYards + receivingYards > 0;
+
+  return {
+    player_id: pid,
+    name: player.name,
+    team_id: player.team_id,
+    passAttempts,
+    passCompletions,
+    passingYards,
+    passingTDs,
+    interceptionsThrown,
+    carries,
+    rushingYards,
+    rushingTDs,
+    receptions,
+    receivingYards,
+    receivingTDs,
+    interceptions,
+    flagPulls,
+    hasStats,
+  };
+}

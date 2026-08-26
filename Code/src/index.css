@@ -7,7 +7,7 @@ html {
 }
 
 body {
-  @apply bg-gray-200 m-0 min-h-[100dvh];
+  @apply bg-slate-900 m-0 min-h-[100dvh];
 }
 
 ::-webkit-scrollbar {
@@ -29,13 +29,13 @@ body {
 }
 
 @keyframes step-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-  50%       { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+  0%, 100% { border-color: rgb(71 85 105); }
+  50%       { border-color: rgb(59 130 246); }
 }
 
 @keyframes field-pulse {
-  0%, 100% { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(59, 130, 246, 0.35); }
-  50%       { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 4px rgba(59, 130, 246, 0.15); }
+  0%, 100% { border-color: rgb(5 46 22); }
+  50%       { border-color: rgb(59 130 246); }
 }
 
 @keyframes score-flash {
@@ -89,5 +89,5 @@ body {
 }
 
 .card-panel {
-  @apply rounded-xl border border-slate-700/50 bg-slate-800/40 p-4;
+  @apply rounded-xl border border-slate-700 bg-slate-800 p-4;
 }

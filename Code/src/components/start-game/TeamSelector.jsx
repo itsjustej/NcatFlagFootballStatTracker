@@ -43,7 +43,7 @@ function FieldPreview({ homeName, awayName, homeAttacksRight }) {
 
   return (
     <div className="relative w-full h-14 rounded-lg overflow-hidden border border-slate-600">
-      <div className="absolute inset-0 bg-gradient-to-b from-green-800 to-green-900" />
+      <div className="absolute inset-0 bg-[#14532d]" />
       <div
         className="absolute top-0 bottom-0 left-0 w-[12%] flex items-center justify-center"
         style={{ background: leftColor }}
@@ -63,6 +63,41 @@ function FieldPreview({ homeName, awayName, homeAttacksRight }) {
           {rightName || 'Right'}
         </span>
       </div>
+    </div>
+  );
+}
+
+function TeamPickGrid({ teams, selectedId, disabledId, onSelect, accent = "blue" }) {
+  const selectedCls = accent === "gold"
+    ? "border-[#C9A84C] bg-[#C9A84C]/15 text-white"
+    : "border-blue-500 bg-blue-600/20 text-white";
+
+  return (
+    <div className="grid grid-cols-2 gap-2 mb-4">
+      {teams.map((team) => {
+        const selected = selectedId === team.team_id;
+        const taken = disabledId === team.team_id;
+        return (
+          <button
+            key={team.team_id}
+            type="button"
+            disabled={taken}
+            onClick={() => onSelect(selected ? null : team)}
+            className={`text-left px-3 py-3 rounded-lg border min-h-[44px] transition ${
+              taken
+                ? "border-slate-800 bg-slate-900/40 text-slate-600 cursor-not-allowed"
+                : selected
+                  ? selectedCls
+                  : "border-slate-600 bg-slate-800 text-slate-200 hover:border-slate-400"
+            }`}
+          >
+            <span className="block font-semibold truncate">{team.name}</span>
+            <span className={`block text-xs mt-0.5 ${selected ? "text-white/70" : "text-slate-500"}`}>
+              {team.players.length} player{team.players.length !== 1 ? "s" : ""}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -95,25 +130,13 @@ export default function TeamSelector({
         {/* HOME TEAM */}
         <div>
           <h2 className="text-2xl font-bold text-white mb-4">Home Team</h2>
-          <select
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white mb-4"
-            value={teamA?.team_id || ""}
-            onChange={e => {
-              const selected = teams.find(t => t.team_id === Number(e.target.value));
-              onTeamASelect(selected || null);
-            }}
-          >
-            <option value="">Select Home Team</option>
-            {teams.map(team => (
-              <option
-                key={team.team_id}
-                value={team.team_id}
-                disabled={teamB?.team_id === team.team_id}
-              >
-                {team.name}
-              </option>
-            ))}
-          </select>
+          <TeamPickGrid
+            teams={teams}
+            selectedId={teamA?.team_id}
+            disabledId={teamB?.team_id}
+            onSelect={onTeamASelect}
+            accent="blue"
+          />
 
           {teamA && (
             <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
@@ -140,25 +163,13 @@ export default function TeamSelector({
         {/* AWAY TEAM */}
         <div>
           <h2 className="text-2xl font-bold text-white mb-4">Away Team</h2>
-          <select
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white mb-4"
-            value={teamB?.team_id || ""}
-            onChange={e => {
-              const selected = teams.find(t => t.team_id === Number(e.target.value));
-              onTeamBSelect(selected || null);
-            }}
-          >
-            <option value="">Select Away Team</option>
-            {teams.map(team => (
-              <option
-                key={team.team_id}
-                value={team.team_id}
-                disabled={teamA?.team_id === team.team_id}
-              >
-                {team.name}
-              </option>
-            ))}
-          </select>
+          <TeamPickGrid
+            teams={teams}
+            selectedId={teamB?.team_id}
+            disabledId={teamA?.team_id}
+            onSelect={onTeamBSelect}
+            accent="gold"
+          />
 
           {teamB && (
             <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">

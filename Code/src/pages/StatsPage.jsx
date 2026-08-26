@@ -17,7 +17,7 @@ export default function StatsPage() {
   });
 
   return (
-    <div className={`min-h-[100dvh] bg-slate-900 pt-4 sm:pt-5 px-4 transition-[padding] duration-300 ${
+    <div className={`bg-slate-900 pt-4 sm:pt-5 px-4 transition-[padding] duration-300 ${
       standingsExpanded ? "pb-28 sm:pb-24" : "pb-20"
     }`}>
       <div className="max-w-6xl mx-auto space-y-6 sm:space-y-10">

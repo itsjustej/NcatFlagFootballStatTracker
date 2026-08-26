@@ -303,6 +303,7 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
     playPhase:        conversionPending ? 'conversion' : 'idle',
     playType:         null,
     selectedReceiver: null,
+    lastPasser:       { home: null, away: null },
     penaltyTeam:      null,
     driveId:          currentDriveId,
     log,

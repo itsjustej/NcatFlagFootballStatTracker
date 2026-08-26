@@ -4,12 +4,16 @@ import { Menu, X } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 
 const NAV_LINKS = [
-  { to: "/", label: "Home" },
-  { to: "/games", label: "Game History" },
+  { to: "/", label: "Games" },
   { to: "/stats", label: "Stats" },
   { to: "/teams", label: "Teams" },
   { to: "/settings", label: "Settings" },
 ];
+
+function isNavActive(pathname, to) {
+  if (to === "/") return pathname === "/" || pathname.startsWith("/games");
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -40,7 +44,7 @@ export default function Navbar() {
               key={to}
               to={to}
               className={`text-sm font-medium transition whitespace-nowrap ${
-                location.pathname === to || (to !== "/" && location.pathname.startsWith(to))
+                isNavActive(location.pathname, to)
                   ? "text-blue-400"
                   : "text-white hover:text-blue-400"
               }`}
@@ -74,7 +78,7 @@ export default function Navbar() {
                 to={to}
                 onClick={() => setOpen(false)}
                 className={`px-3 py-3 rounded-lg text-base font-medium min-h-[44px] flex items-center ${
-                  location.pathname === to || (to !== "/" && location.pathname.startsWith(to))
+                  isNavActive(location.pathname, to)
                     ? "bg-blue-600/20 text-blue-400"
                     : "text-white hover:bg-slate-800"
                 }`}

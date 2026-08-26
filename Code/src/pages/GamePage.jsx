@@ -33,24 +33,47 @@ function addPlay(log, entry) {
   return [...log, { ...entry, id: makeId(), playNumber: log.length + 1 }];
 }
 
+function snapshotLastPasser(s) {
+  const prev = s.lastPasser ?? { home: null, away: null };
+  if (s.playType === 'pass' && s.selectedOffender) {
+    return { ...prev, [s.possession]: s.selectedOffender };
+  }
+  return prev;
+}
+
+function restorePasserFields(lastPasser, possession) {
+  const passer = lastPasser?.[possession] ?? null;
+  return {
+    lastPasser,
+    selectedOffender: passer,
+    playPhase: passer ? 'play-type' : 'idle',
+    playType: null,
+    selectedReceiver: null,
+    selectedDefender: null,
+    newSpot: null,
+  };
+}
+
 function afterPossessionFlip(s, newYard, newPossession) {
   const fdTarget = firstDownYard(newYard, newPossession, s.homeAttacksRight);
   const distance = attacksIncreasing(newPossession, s.homeAttacksRight)
     ? fdTarget - newYard
     : newYard - fdTarget;
+  const lastPasser = snapshotLastPasser(s);
   return {
     possession: newPossession, yardLine: newYard, down: 1, distance, fdTarget,
-    newSpot: null, playType: null,
-    selectedOffender: null, selectedDefender: null, selectedReceiver: null,
-    playPhase: 'idle', driveId: s.driveId + 1,
+    driveId: s.driveId + 1,
+    ...restorePasserFields(lastPasser, newPossession),
   };
 }
 
 /** Enter post-TD conversion — clear play loop selections so QB isn't locked in. */
 function enterConversionPhase(s, updates) {
+  const lastPasser = snapshotLastPasser(s);
   return {
     ...s,
     ...updates,
+    lastPasser,
     newSpot: null,
     playType: null,
     selectedOffender: null,
@@ -61,12 +84,13 @@ function enterConversionPhase(s, updates) {
 }
 
 function afterNormalPlay(s, newYard, firstDownCrossed, newDown) {
+  const lastPasser = snapshotLastPasser(s);
   if (firstDownCrossed) {
     const fdTarget = firstDownYard(newYard, s.possession, s.homeAttacksRight);
     const distance = attacksIncreasing(s.possession, s.homeAttacksRight)
       ? fdTarget - newYard
       : newYard - fdTarget;
-    return { yardLine: newYard, down: 1, distance, fdTarget, newSpot: null, playType: null, selectedOffender: null, selectedDefender: null, selectedReceiver: null, playPhase: 'idle' };
+    return { yardLine: newYard, down: 1, distance, fdTarget, ...restorePasserFields(lastPasser, s.possession) };
   }
   if (newDown > 4) {
     const newPoss = s.possession === 'home' ? 'away' : 'home';
@@ -76,7 +100,7 @@ function afterNormalPlay(s, newYard, firstDownCrossed, newDown) {
   const distance = attacksIncreasing(s.possession, s.homeAttacksRight)
     ? fdTarget - newYard
     : newYard - fdTarget;
-  return { yardLine: newYard, down: newDown, distance, fdTarget, newSpot: null, playType: null, selectedOffender: null, selectedDefender: null, selectedReceiver: null, playPhase: 'idle' };
+  return { yardLine: newYard, down: newDown, distance, fdTarget, ...restorePasserFields(lastPasser, s.possession) };
 }
 
 function baseEntry(s) {
@@ -263,13 +287,8 @@ export default function GamePage() {
             : yardLine - firstDownYard(yardLine, secondHalfPoss, flippedDirection),
           down: 1,
           fdTarget: firstDownYard(yardLine, secondHalfPoss, flippedDirection),
-          newSpot: null,
-          playType: null,
-          selectedOffender: null,
-          selectedDefender: null,
-          selectedReceiver: null,
-          playPhase: 'idle',
           driveId: s.driveId + 1,
+          ...restorePasserFields(s.lastPasser ?? { home: null, away: null }, secondHalfPoss),
         };
       }
 
@@ -286,12 +305,7 @@ export default function GamePage() {
           distance: distanceToFirst(yardLine, openingPoss, openingHar),
           down: 1,
           fdTarget: firstDownYard(yardLine, openingPoss, openingHar),
-          newSpot: null,
-          playType: null,
-          selectedOffender: null,
-          selectedDefender: null,
-          selectedReceiver: null,
-          playPhase: 'idle',
+          ...restorePasserFields(s.lastPasser ?? { home: null, away: null }, openingPoss),
         };
       }
 
@@ -537,15 +551,7 @@ export default function GamePage() {
       const driveResult = newDown > 4 ? 'Turnover on Downs' : undefined;
       const _outcome    = newDown > 4 ? 'turnover_on_downs' : 'incomplete';
       const entry = { ...baseEntry(s), description: `${offFirst} throws incompletion`, yardsGained: 0, homeScore: s.homeScore, awayScore: s.awayScore, driveResult, _playType: 'pass', _outcome, _passer, _defender };
-      if (newDown > 4) {
-        const newPoss = s.possession === 'home' ? 'away' : 'home';
-        return { ...s, ...afterPossessionFlip(s, s.yardLine, newPoss), log: addPlay(s.log, entry) };
-      }
-      const fd       = s.fdTarget ?? firstDownYard(s.yardLine, s.possession, s.homeAttacksRight);
-      const distance = attacksIncreasing(s.possession, s.homeAttacksRight)
-        ? fd - s.yardLine
-        : s.yardLine - fd;
-      return { ...s, down: newDown, distance, newSpot: null, playType: null, selectedOffender: null, selectedDefender: null, selectedReceiver: null, playPhase: 'idle', log: addPlay(s.log, entry) };
+      return { ...s, ...afterNormalPlay(s, s.yardLine, false, newDown), log: addPlay(s.log, entry) };
     });
   }, []);
 
@@ -598,7 +604,7 @@ export default function GamePage() {
         ? advanceDown ? ' (auto first down)' : ''
         : advanceDown ? ' (loss of down)' : ' (replay down)';
       const entry = { ...baseEntry(s), description: `Penalty on ${penaltyTeamName}${suffix}`, yardsGained: yds, homeScore: s.homeScore, awayScore: s.awayScore, driveResult, _playType: 'penalty', _outcome };
-      const reset = { penaltyTeam: null, newSpot: null, playType: null, selectedOffender: null, selectedDefender: null, playPhase: 'idle' };
+      const reset = { penaltyTeam: null, ...restorePasserFields(snapshotLastPasser(s), s.possession) };
 
       if (newDown > 4) {
         const newPoss = s.possession === 'home' ? 'away' : 'home';
@@ -725,7 +731,7 @@ export default function GamePage() {
 
       <div className="flex-1 min-w-0 flex flex-col relative">
         {/* Sticky field + step bar */}
-        <div className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shrink-0">
+        <div className="sticky top-0 z-20 bg-slate-900 border-b border-slate-800 shrink-0">
           <PlayStepBar gs={gs} convStep={convStep} pulseStep={pulseStep} />
           <div className="px-4 py-3">
             <FieldSpot

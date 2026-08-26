@@ -114,6 +114,7 @@ export function useGame(gameId) {
           playPhase:          'idle',
           playType:           null,
           selectedReceiver:   null,
+          lastPasser:         { home: null, away: null },
           penaltyTeam:        null,
           driveId:            1,
           fdTarget:           firstDownYard(startYard, openingPossession, homeAttacksRight),
