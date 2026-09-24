@@ -68,6 +68,10 @@ export default function LoginPage() {
             Continue
           </button>
         </form>
+
+        <p className="text-slate-400 text-sm text-center mt-5">
+          To view stats, type <span className="text-white font-medium">social</span> into the username.
+        </p>
       </div>
     </div>
   );

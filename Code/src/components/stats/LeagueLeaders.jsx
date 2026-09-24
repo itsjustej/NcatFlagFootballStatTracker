@@ -29,7 +29,7 @@ function PlayerAvatar({ name }) {
     .slice(0, 2)
     .toUpperCase();
   return (
-    <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-200 shrink-0">
+    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-600 flex items-center justify-center text-[10px] sm:text-xs font-bold text-slate-200 shrink-0">
       {initials}
     </div>
   );
@@ -46,33 +46,38 @@ function PlayerMultiStatCard({ title, players, primaryKey, primaryLabel, primary
 
   return (
     <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
-      <div className="flex items-center px-4 py-3 border-b border-slate-700">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide flex-1">{title}</h3>
-        <div className="flex items-center gap-4 text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
+      <div className="flex items-center justify-between gap-3 px-3 sm:px-4 py-3 border-b border-slate-700">
+        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0">{title}</h3>
+        <div className="flex items-center gap-3 sm:gap-4 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
           {secondary.map(s => (
-            <span key={s.key} className="w-12 text-right">{s.label}</span>
+            <span key={s.key} className="hidden sm:block w-12 text-right">{s.label}</span>
           ))}
-          <span className="w-14 text-right">{primaryLabel}</span>
+          <span className="w-12 sm:w-14 text-right">{primaryLabel}</span>
         </div>
       </div>
       <div className="overflow-y-auto" style={{ maxHeight: ROW_HEIGHT * VISIBLE_ROWS }}>
-        {sorted.map((p, i) => (
-          <div key={p.player_id} className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
+        {sorted.map((p) => (
+          <div key={p.player_id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
             <PlayerAvatar name={p.name} />
             <div className="flex-1 min-w-0">
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wide">{p.team_abbr || p.team_name}</p>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
               <p className="text-slate-100 text-sm font-semibold truncate">{p.name}</p>
+              {secondary.length > 0 && (
+                <p className="sm:hidden text-[11px] text-slate-400 truncate">
+                  {secondary.map(s => `${s.label} ${fmt(p[s.key], s.digits ?? 0)}${s.suffix || ''}`).join(' · ')}
+                </p>
+              )}
             </div>
-            <div className="flex items-center gap-4 shrink-0">
+            <div className="hidden sm:flex items-center gap-4 shrink-0">
               {secondary.map(s => (
-                <span key={s.key} className="w-12 text-right text-slate-300 text-sm">
+                <span key={s.key} className="w-12 text-right text-slate-300 text-sm tabular-nums">
                   {fmt(p[s.key], s.digits ?? 0)}{s.suffix || ''}
                 </span>
               ))}
-              <span className="w-14 text-right text-white font-bold text-sm">
-                {fmt(p[primaryKey], primaryDigits)}
-              </span>
             </div>
+            <span className="w-12 sm:w-14 text-right text-white font-bold text-sm tabular-nums shrink-0">
+              {fmt(p[primaryKey], primaryDigits)}
+            </span>
           </div>
         ))}
         {sorted.length === 0 && <p className="text-slate-500 text-sm px-4 py-3">No data</p>}
@@ -87,33 +92,38 @@ function PlayerLeaderCard({ title, players, valueKey, valueLabel, digits = 0, su
 
   return (
     <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
-      <div className="flex items-center px-4 py-3 border-b border-slate-700">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide flex-1">{title}</h3>
-        <div className="flex items-center gap-4 text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
+      <div className="flex items-center justify-between gap-3 px-3 sm:px-4 py-3 border-b border-slate-700">
+        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0">{title}</h3>
+        <div className="flex items-center gap-3 sm:gap-4 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
           {secondary.map(s => (
-            <span key={s.key} className="w-12 text-right">{s.label}</span>
+            <span key={s.key} className="hidden sm:block w-12 text-right">{s.label}</span>
           ))}
-          <span className="w-14 text-right">{valueLabel}</span>
+          <span className="w-12 sm:w-14 text-right">{valueLabel}</span>
         </div>
       </div>
       <div className="overflow-y-auto" style={{ maxHeight: ROW_HEIGHT * VISIBLE_ROWS }}>
-        {sorted.map((p, i) => (
-          <div key={p.player_id} className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
+        {sorted.map((p) => (
+          <div key={p.player_id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
             <PlayerAvatar name={p.name} />
             <div className="flex-1 min-w-0">
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wide">{p.team_abbr || p.team_name}</p>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
               <p className="text-slate-100 text-sm font-semibold truncate">{p.name}</p>
+              {secondary.length > 0 && (
+                <p className="sm:hidden text-[11px] text-slate-400 truncate">
+                  {secondary.map(s => `${s.label} ${fmt(p[s.key], s.digits ?? 0)}${s.suffix || ''}`).join(' · ')}
+                </p>
+              )}
             </div>
-            <div className="flex items-center gap-4 shrink-0">
+            <div className="hidden sm:flex items-center gap-4 shrink-0">
               {secondary.map(s => (
-                <span key={s.key} className="w-12 text-right text-slate-300 text-sm">
+                <span key={s.key} className="w-12 text-right text-slate-300 text-sm tabular-nums">
                   {fmt(p[s.key], s.digits ?? 0)}{s.suffix || ''}
                 </span>
               ))}
-              <span className="w-14 text-right text-white font-bold text-sm">
-                {fmt(p[valueKey], digits)}{suffix}
-              </span>
             </div>
+            <span className="w-12 sm:w-14 text-right text-white font-bold text-sm tabular-nums shrink-0">
+              {fmt(p[valueKey], digits)}{suffix}
+            </span>
           </div>
         ))}
         {sorted.length === 0 && <p className="text-slate-500 text-sm px-4 py-3">No data</p>}
@@ -533,7 +543,7 @@ export default function LeagueLeaders() {
           </div>
 
           <p className="text-slate-500 text-xs mb-4 uppercase tracking-wide">Conversions</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <TeamLeaderCard title="1-Point %" teams={teamStats} valueKey="conv1Pct" suffix="%" />
             <TeamLeaderCard title="2-Point %" teams={teamStats} valueKey="conv2Pct" suffix="%" />
             <TeamLeaderCard title="3-Point %" teams={teamStats} valueKey="conv3Pct" suffix="%" />

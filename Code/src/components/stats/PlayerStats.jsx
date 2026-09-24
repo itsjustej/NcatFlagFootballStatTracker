@@ -53,8 +53,9 @@ export default function PlayerStats() {
     </th>
   );
 
+  const playerCol = "w-[9.5rem] min-w-[9.5rem] max-w-[9.5rem] box-border";
   const stickyPlayerCell = (idx) =>
-    `sticky left-0 z-10 whitespace-nowrap font-medium text-white shadow-[4px_0_10px_-4px_rgba(0,0,0,0.65)] ${
+    `sticky left-0 z-10 whitespace-nowrap font-medium text-white shadow-[4px_0_10px_-4px_rgba(0,0,0,0.65)] ${playerCol} ${
       idx % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800'
     }`;
 
@@ -213,9 +214,9 @@ export default function PlayerStats() {
         {!loading && players.length > 0 && (
           <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch]">
             <table className="w-max min-w-full text-left text-sm border-collapse">
-              <thead className="sticky top-0 z-30">
+              <thead>
                 <tr className="bg-slate-900 border-b border-slate-700">
-                  <th colSpan={2} className="sticky left-0 z-40 bg-slate-900 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.65)]" />
+                  <th colSpan={2} className="bg-slate-900" />
                   <GroupHeader label="Passing"     cols={5} className="text-blue-400 border-l border-slate-600" />
                   <GroupHeader label="Rushing"     cols={5} className="text-green-400 border-l border-slate-600" />
                   <GroupHeader label="Receiving"   cols={6} className="text-yellow-400 border-l border-slate-600" />
@@ -223,7 +224,7 @@ export default function PlayerStats() {
                   <GroupHeader label="Per Game"    cols={4} className="text-purple-400 border-l border-slate-600" />
                 </tr>
                 <tr className="bg-slate-800 border-b border-slate-700">
-                  <SortTh label="Player"     colKey="name"           sticky className="min-w-[130px] pl-3" />
+                  <SortTh label="Player"     colKey="name"           sticky className={`${playerCol} pl-3`} />
                   <SortTh label="GP"         colKey="gamesPlayed"    className="min-w-[44px] text-center" />
                   <SortTh label="Pass Yds"   colKey="passingYards"   className="border-l border-slate-600 min-w-[72px] text-center" />
                   <SortTh label="Comp %"     colKey="completionPct"  className="min-w-[110px] text-center" />
