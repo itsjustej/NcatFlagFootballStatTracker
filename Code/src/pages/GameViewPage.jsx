@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Play, Trash2 } from "lucide-react";
+import { BarChart3, List, Play, Trash2, Users } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import PlayByPlay from "../components/game/PlayByPlay";
 import GameBoxScore from "../components/game/GameBoxScore";
@@ -13,6 +13,8 @@ import {
   computeTeamBoxStats,
   computePlayerBoxStats,
 } from "../utils/statsHelpers";
+import { playerFirstName } from "../utils/playerName";
+import { playPeriod } from "../gameLogic";
 
 // ── Outcome → driveResult mapping (inverse of useSavePlay) ───────────────────
 const OUTCOME_TO_DRIVE_RESULT = {
@@ -26,19 +28,19 @@ const OUTCOME_TO_DRIVE_RESULT = {
 };
 
 // ── Build a human-readable description from a play row + participants ─────────
-function buildDescription(play, participants, homeTeamId, homeAttacksRight) {
+function buildDescription(play, participants, homeTeamId, homeAttacksRight, hasFortyYard) {
   const passer   = participants.find(p => p.role === 'passer');
   const receiver = participants.find(p => p.role === 'receiver');
   const rusher   = participants.find(p => p.role === 'rusher');
   const defender = participants.find(p => p.role === 'defender');
 
-  const passerName   = passer?.player_name?.split(' ')[0]   ?? 'QB';
-  const receiverName = receiver?.player_name?.split(' ')[0] ?? 'Receiver';
-  const rusherName   = rusher?.player_name?.split(' ')[0]   ?? 'Runner';
-  const defName      = defender?.player_name?.split(' ')[0];
+  const passerName   = playerFirstName(passer?.player_name, 'QB');
+  const receiverName = playerFirstName(receiver?.player_name, 'Receiver');
+  const rusherName   = playerFirstName(rusher?.player_name, 'Runner');
+  const defName      = playerFirstName(defender?.player_name);
   const tackleStr    = defName ? ` (tackled by ${defName})` : '';
 
-  const yards = yardsGainedForPlay(play, homeTeamId, homeAttacksRight);
+  const yards = yardsGainedForPlay(play, homeTeamId, homeAttacksRight, hasFortyYard);
 
   switch (play.outcome) {
     case 'td':
@@ -80,6 +82,7 @@ async function fetchGameData(gameId) {
     .select(`
       game_id,
       home_attacks_right,
+      has_forty_yard,
       home:Team!home_team(team_id, name),
       away:Team!away_team(team_id, name)
     `)
@@ -92,6 +95,7 @@ async function fetchGameData(gameId) {
   const awayName    = gameRow.away.name;
   const homeTeamId  = gameRow.home.team_id;
   const homeAttacksRight = gameRow.home_attacks_right !== false;
+  const hasFortyYard = gameRow.has_forty_yard !== false;
 
   // 2. All plays for this game ordered by play_id
   const { data: plays, error: playsErr } = await supabase
@@ -111,14 +115,15 @@ async function fetchGameData(gameId) {
     log: [],
     finalHome: 0,
     finalAway: 0,
-    homeStats: computeTeamBoxStats(homeTeamId, [], homeTeamId, homeAttacksRight),
-    awayStats: computeTeamBoxStats(gameRow.away.team_id, [], homeTeamId, homeAttacksRight),
+    periodScores: scoresByPeriod([]),
+    homeStats: computeTeamBoxStats(homeTeamId, [], homeTeamId, homeAttacksRight, hasFortyYard),
+    awayStats: computeTeamBoxStats(gameRow.away.team_id, [], homeTeamId, homeAttacksRight, hasFortyYard),
     homePlayers: (rosterPlayers || [])
       .filter((p) => p.team_id === homeTeamId)
-      .map((p) => computePlayerBoxStats(p, [], [], homeTeamId, homeAttacksRight)),
+      .map((p) => computePlayerBoxStats(p, [], [], homeTeamId, homeAttacksRight, hasFortyYard)),
     awayPlayers: (rosterPlayers || [])
       .filter((p) => p.team_id === gameRow.away.team_id)
-      .map((p) => computePlayerBoxStats(p, [], [], homeTeamId, homeAttacksRight)),
+      .map((p) => computePlayerBoxStats(p, [], [], homeTeamId, homeAttacksRight, hasFortyYard)),
   };
 
   if (playsErr) throw playsErr;
@@ -190,11 +195,13 @@ async function fetchGameData(gameId) {
       else               awayScore += play.conv_points ?? 0;
     }
 
-    // Drive tracking
-    if (lastPossession !== null && possession !== lastPossession) driveId++;
+    // Drive tracking — a new half starts a new drive even if the same team has the ball
+    const prevPlay = plays[i - 1];
+    const halfChanged = prevPlay && playPeriod(play) !== playPeriod(prevPlay) && !play.is_conversion && !prevPlay.is_conversion;
+    if (lastPossession !== null && (possession !== lastPossession || halfChanged)) driveId++;
     lastPossession = possession;
 
-    const yardsGained = yardsGainedForPlay(play, homeTeamId, homeAttacksRight);
+    const yardsGained = yardsGainedForPlay(play, homeTeamId, homeAttacksRight, hasFortyYard);
 
     // driveResult only on final play of a drive (possession change or end)
     const nextPlay       = plays[i + 1];
@@ -202,19 +209,19 @@ async function fetchGameData(gameId) {
       ? (nextPlay.offense_team === homeTeamId ? 'home' : 'away')
       : null;
     const isDriveEnd     = !nextPlay || nextPossession !== possession;
-    const driveResult    = isDriveEnd
-      ? (OUTCOME_TO_DRIVE_RESULT[play.outcome] ?? undefined)
+    const nextHalfChanged = nextPlay && playPeriod(play) !== playPeriod(nextPlay) && !play.is_conversion && !nextPlay.is_conversion;
+    const driveResult    = isDriveEnd || nextHalfChanged
+      ? (OUTCOME_TO_DRIVE_RESULT[play.outcome] ?? (nextHalfChanged ? 'End of Half' : undefined))
       : undefined;
 
     return {
       id:              String(play.play_id),
       playNumber:      i + 1,
-      half:            play.first_half ? 1 : 2,
+      half:            playPeriod(play),
       down:            play.down,
       distance:        play.distance,
       yardLine:        play.yard_line,
-      clock:           play.game_clock,
-      description:     buildDescription(play, participants, homeTeamId, homeAttacksRight),
+      description:     buildDescription(play, participants, homeTeamId, homeAttacksRight, hasFortyYard),
       yardsGained,
       homeScore,
       awayScore,
@@ -226,8 +233,8 @@ async function fetchGameData(gameId) {
 
   const last = log[log.length - 1];
   const awayTeamId = gameRow.away.team_id;
-  const homeStats = computeTeamBoxStats(homeTeamId, plays, homeTeamId, homeAttacksRight);
-  const awayStats = computeTeamBoxStats(awayTeamId, plays, homeTeamId, homeAttacksRight);
+  const homeStats = computeTeamBoxStats(homeTeamId, plays, homeTeamId, homeAttacksRight, hasFortyYard);
+  const awayStats = computeTeamBoxStats(awayTeamId, plays, homeTeamId, homeAttacksRight, hasFortyYard);
   const statParticipants = (parts || []).map((p) => ({
     play_id: p.play_id,
     role: p.role,
@@ -235,10 +242,10 @@ async function fetchGameData(gameId) {
   }));
   const homePlayers = (rosterPlayers || [])
     .filter((p) => p.team_id === homeTeamId)
-    .map((p) => computePlayerBoxStats(p, plays, statParticipants, homeTeamId, homeAttacksRight));
+    .map((p) => computePlayerBoxStats(p, plays, statParticipants, homeTeamId, homeAttacksRight, hasFortyYard));
   const awayPlayers = (rosterPlayers || [])
     .filter((p) => p.team_id === awayTeamId)
-    .map((p) => computePlayerBoxStats(p, plays, statParticipants, homeTeamId, homeAttacksRight));
+    .map((p) => computePlayerBoxStats(p, plays, statParticipants, homeTeamId, homeAttacksRight, hasFortyYard));
 
   return {
     homeName,
@@ -246,6 +253,7 @@ async function fetchGameData(gameId) {
     log,
     finalHome: last?.homeScore ?? 0,
     finalAway: last?.awayScore ?? 0,
+    periodScores: scoresByPeriod(log),
     homeStats,
     awayStats,
     homePlayers,
@@ -253,16 +261,41 @@ async function fetchGameData(gameId) {
   };
 }
 
+const PERIODS = [
+  { id: 1, label: '1st' },
+  { id: 2, label: '2nd' },
+  { id: 3, label: 'OT' },
+];
+
+/** Points scored in each half, plus overtime when the game reached it. */
+function scoresByPeriod(log) {
+  let prevHome = 0;
+  let prevAway = 0;
+  const rows = PERIODS.map((period) => {
+    const plays = log.filter((entry) => entry.half === period.id);
+    if (!plays.length) return { ...period, home: null, away: null, played: false };
+    const last = plays[plays.length - 1];
+    const home = last.homeScore - prevHome;
+    const away = last.awayScore - prevAway;
+    prevHome = last.homeScore;
+    prevAway = last.awayScore;
+    return { ...period, home, away, played: true };
+  });
+  const reachedOt = rows.some((row) => row.id === 3 && row.played);
+  return rows.filter((row) => row.id !== 3 || reachedOt);
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function GameViewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { startGame, clearGame, currentGameId } = useLeague();
-  const { canDelete } = useAuth();
+  const { canDelete, canTrackGames } = useAuth();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [tab, setTab] = useState("plays");
 
   useEffect(() => {
     fetchGameData(Number(id))
@@ -283,7 +316,7 @@ export default function GameViewPage() {
     </div>
   );
 
-  const { homeName, awayName, log, finalHome, finalAway, homeStats, awayStats, homePlayers, awayPlayers } = data;
+  const { homeName, awayName, log, finalHome, finalAway, periodScores, homeStats, awayStats, homePlayers, awayPlayers } = data;
 
   const handleResume = () => {
     startGame(Number(id));
@@ -303,8 +336,8 @@ export default function GameViewPage() {
   };
 
   return (
-    <div className="bg-slate-900 text-white pt-4 sm:pt-5 px-4 pb-8">
-      <div className="max-w-5xl mx-auto flex flex-col gap-6">
+    <div className="bg-slate-900 text-white h-[calc(100dvh-4.75rem)] overflow-hidden pt-4 sm:pt-5 px-4 pb-4">
+      <div className="max-w-5xl mx-auto h-full flex flex-col gap-4">
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Link to="/" className="text-slate-400 text-sm hover:text-white transition-colors shrink-0">
@@ -322,14 +355,16 @@ export default function GameViewPage() {
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            <button
-              type="button"
-              onClick={handleResume}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] bg-blue-600 hover:bg-blue-700 rounded-lg text-white text-sm font-semibold transition-colors"
-            >
-              <Play className="w-4 h-4" />
-              Resume game
-            </button>
+            {canTrackGames && (
+              <button
+                type="button"
+                onClick={handleResume}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] bg-blue-600 hover:bg-blue-700 rounded-lg text-white text-sm font-semibold transition-colors"
+              >
+                <Play className="w-4 h-4" />
+                Resume game
+              </button>
+            )}
           </div>
         </div>
 
@@ -339,8 +374,31 @@ export default function GameViewPage() {
               <p className="text-[11px] font-black uppercase tracking-widest text-[#3b82f6] mb-1">{homeName}</p>
               <p className="text-5xl font-black text-white tabular-nums">{finalHome}</p>
             </div>
-            <div className="text-center">
-              <p className="text-slate-500 text-xs uppercase tracking-widest">{log.length ? 'Score' : 'Kickoff'}</p>
+            <div className="flex justify-center">
+              {log.length ? (
+                <div
+                  className="grid items-center gap-x-3 gap-y-1 text-center"
+                  style={{ gridTemplateColumns: `repeat(${periodScores.length}, minmax(1.75rem, auto))` }}
+                >
+                  {periodScores.map((period) => (
+                    <p key={period.id} className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      {period.label}
+                    </p>
+                  ))}
+                  {periodScores.map((period) => (
+                    <p key={`home-${period.id}`} className="text-sm font-black tabular-nums text-[#3b82f6]">
+                      {period.played ? period.home : '–'}
+                    </p>
+                  ))}
+                  {periodScores.map((period) => (
+                    <p key={`away-${period.id}`} className="text-sm font-black tabular-nums text-[#C9A84C]">
+                      {period.played ? period.away : '–'}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-500 text-xs uppercase tracking-widest">Kickoff</p>
+              )}
             </div>
             <div className="text-center">
               <p className="text-[11px] font-black uppercase tracking-widest text-[#C9A84C] mb-1">{awayName}</p>
@@ -349,17 +407,42 @@ export default function GameViewPage() {
           </div>
         </div>
 
-        <GameBoxScore
-          homeName={homeName}
-          awayName={awayName}
-          homeStats={homeStats}
-          awayStats={awayStats}
-          homePlayers={homePlayers}
-          awayPlayers={awayPlayers}
-        />
+        <div className="flex bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden shrink-0">
+          <ViewTab label="Plays" icon={List} active={tab === "plays"} onClick={() => setTab("plays")} />
+          <ViewTab label="Team" icon={BarChart3} active={tab === "team"} onClick={() => setTab("team")} />
+          <ViewTab label="Players" icon={Users} active={tab === "players"} onClick={() => setTab("players")} />
+        </div>
 
-        <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden" style={{ minHeight: 280 }}>
-          <PlayByPlay log={log} homeName={homeName} awayName={awayName} />
+        <div className="flex-1 min-h-0 bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+          {tab === "plays" && (
+            <PlayByPlay log={log} homeName={homeName} awayName={awayName} />
+          )}
+          {tab === "team" && (
+            <div className="h-full overflow-y-auto">
+              <GameBoxScore
+                view="team"
+                homeName={homeName}
+                awayName={awayName}
+                homeStats={homeStats}
+                awayStats={awayStats}
+                homePlayers={homePlayers}
+                awayPlayers={awayPlayers}
+              />
+            </div>
+          )}
+          {tab === "players" && (
+            <div className="h-full overflow-y-auto">
+              <GameBoxScore
+                view="players"
+                homeName={homeName}
+                awayName={awayName}
+                homeStats={homeStats}
+                awayStats={awayStats}
+                homePlayers={homePlayers}
+                awayPlayers={awayPlayers}
+              />
+            </div>
+          )}
         </div>
 
       </div>
@@ -371,5 +454,20 @@ export default function GameViewPage() {
         />
       )}
     </div>
+  );
+}
+
+function ViewTab({ label, icon: Icon, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 flex items-center justify-center gap-2 py-3 px-2 text-sm font-medium transition min-h-[44px] ${
+        active ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-700"
+      }`}
+    >
+      <Icon className="w-4 h-4 shrink-0" />
+      {label}
+    </button>
   );
 }

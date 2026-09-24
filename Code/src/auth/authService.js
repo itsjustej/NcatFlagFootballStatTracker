@@ -1,9 +1,10 @@
 export const ROLES = {
   ADMIN: 'admin',
   WORKER: 'worker',
+  SOCIAL: 'social',
 };
 
-const VALID_USERNAMES = new Set(['admin', 'worker']);
+const VALID_USERNAMES = new Set(['admin', 'worker', 'social']);
 
 export function login(username) {
   const normalized = username.trim().toLowerCase();
@@ -25,7 +26,7 @@ export function getStoredAuth() {
   if (!localStorage.getItem('authToken')) return null;
 
   const role = localStorage.getItem('userRole');
-  if (role !== ROLES.ADMIN && role !== ROLES.WORKER) return null;
+  if (role !== ROLES.ADMIN && role !== ROLES.WORKER && role !== ROLES.SOCIAL) return null;
 
   return {
     username: localStorage.getItem('username') ?? role,

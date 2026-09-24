@@ -1,4 +1,9 @@
 import React from "react";
+import {
+  fieldLength,
+  fieldMarkerLabel,
+  fieldMarkerYards,
+} from '../../gameLogic';
 
 function JerseyInput({ value, onChange }) {
   return (
@@ -33,31 +38,43 @@ function PlayerRosterRow({ player, jersey, onJerseyChange }) {
   );
 }
 
-function FieldPreview({ homeName, awayName, homeAttacksRight }) {
+function FieldPreview({ homeName, awayName, homeAttacksRight, hasFortyYard }) {
   const leftTeamKey  = homeAttacksRight ? 'away' : 'home';
   const rightTeamKey = homeAttacksRight ? 'home' : 'away';
   const leftName     = leftTeamKey === 'home' ? homeName : awayName;
   const rightName    = rightTeamKey === 'home' ? homeName : awayName;
   const leftColor    = leftTeamKey === 'home' ? 'rgba(0,75,135,0.75)' : 'rgba(201,168,76,0.75)';
   const rightColor   = rightTeamKey === 'home' ? 'rgba(0,75,135,0.75)' : 'rgba(201,168,76,0.75)';
+  const ezPct = 12;
+  const fieldPct = 100 - ezPct * 2;
+  const length = fieldLength(hasFortyYard);
+  const markerYards = fieldMarkerYards(hasFortyYard);
 
   return (
     <div className="relative w-full h-14 rounded-lg overflow-hidden border border-slate-600">
       <div className="absolute inset-0 bg-[#14532d]" />
       <div
-        className="absolute top-0 bottom-0 left-0 w-[12%] flex items-center justify-center"
-        style={{ background: leftColor }}
+        className="absolute top-0 bottom-0 left-0 flex items-center justify-center"
+        style={{ width: `${ezPct}%`, background: leftColor }}
       >
         <span className="text-[8px] font-black text-white/80 uppercase tracking-wider text-center px-0.5 leading-tight">
           {leftName || 'Left'}
         </span>
       </div>
-      <div className="absolute inset-y-0 left-[12%] right-[12%] flex items-center justify-center">
-        <span className="text-[9px] text-white/30 font-bold tracking-widest">40</span>
-      </div>
+      {markerYards.map((y) => {
+        const left = ezPct + (y / length) * fieldPct;
+        return (
+          <div key={y} className="absolute top-0 bottom-0" style={{ left: `${left}%` }}>
+            <div className="absolute top-0 bottom-0 border-l border-white/25" />
+            <span className="absolute text-[9px] text-white/40 font-bold tracking-widest" style={{ top: 4, left: 3 }}>
+              {fieldMarkerLabel(y, hasFortyYard)}
+            </span>
+          </div>
+        );
+      })}
       <div
-        className="absolute top-0 bottom-0 right-0 w-[12%] flex items-center justify-center"
-        style={{ background: rightColor }}
+        className="absolute top-0 bottom-0 right-0 flex items-center justify-center"
+        style={{ width: `${ezPct}%`, background: rightColor }}
       >
         <span className="text-[8px] font-black text-white/80 uppercase tracking-wider text-center px-0.5 leading-tight">
           {rightName || 'Right'}
@@ -110,12 +127,14 @@ export default function TeamSelector({
   jerseyMapB,
   openingPossession,
   homeAttacksRight,
+  hasFortyYard,
   onTeamASelect,
   onTeamBSelect,
   onJerseyChangeA,
   onJerseyChangeB,
   onOpeningPossessionChange,
   onHomeAttacksRightChange,
+  onHasFortyYardChange,
   onNext,
   isLoading = false,
 }) {
@@ -229,7 +248,7 @@ export default function TeamSelector({
             <label className="block text-slate-300 text-sm font-medium mb-3">
               Field direction (team name marks the end zone they attack)
             </label>
-            <div className="grid sm:grid-cols-2 gap-3 mb-4">
+            <div className="grid sm:grid-cols-2 gap-3">
               {[
                 { value: true,  label: 'Home attacks right', sub: `${teamA?.name ?? 'Home'} end zone on the right →` },
                 { value: false, label: 'Home attacks left',  sub: `← ${teamA?.name ?? 'Home'} end zone on the left` },
@@ -249,10 +268,37 @@ export default function TeamSelector({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-300 text-sm font-medium mb-3">
+              Field markings
+            </label>
+            <div className="grid sm:grid-cols-2 gap-3 mb-4">
+              {[
+                { value: true,  label: '20s and 40', sub: '80-yard field — first downs at both 20s, the 40, and the goal lines' },
+                { value: false, label: '20s only',   sub: '60-yard field — first downs at the 20s and goal lines (midfield is the 30)' },
+              ].map(({ value, label, sub }) => (
+                <button
+                  key={String(value)}
+                  type="button"
+                  onClick={() => onHasFortyYardChange(value)}
+                  className={`text-left px-4 py-3 rounded-lg border transition ${
+                    hasFortyYard === value
+                      ? 'border-blue-500 bg-blue-600/20 text-white'
+                      : 'border-slate-600 bg-slate-900/50 text-slate-300 hover:border-slate-500'
+                  }`}
+                >
+                  <span className="block font-semibold">{label}</span>
+                  <span className="block text-xs text-slate-400 mt-0.5">{sub}</span>
+                </button>
+              ))}
+            </div>
             <FieldPreview
               homeName={teamA?.name}
               awayName={teamB?.name}
               homeAttacksRight={homeAttacksRight}
+              hasFortyYard={hasFortyYard}
             />
           </div>
         </div>

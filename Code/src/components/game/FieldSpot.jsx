@@ -3,19 +3,22 @@ import {
   teamAttackingToward,
   yardLabel as fieldYardLabel,
   yardsGained,
+  fieldMarkerYards,
+  fieldMarkerLabel,
+  fieldLength,
 } from '../../gameLogic';
 import { possessionColor, TEAM_COLORS } from '../../constants/teamColors';
 
 const END_ZONE_PCT = 10;
 const FIELD_PCT = 80;
 
-function yardToPct(yard) {
-  return END_ZONE_PCT + (yard / 80) * FIELD_PCT;
+function yardToPct(yard, length) {
+  return END_ZONE_PCT + (yard / length) * FIELD_PCT;
 }
 
-function pctToYard(pct) {
+function pctToYard(pct, length) {
   const adjusted = (pct - END_ZONE_PCT) / FIELD_PCT;
-  return Math.max(-9, Math.min(89, Math.round(adjusted * 80)));
+  return Math.max(-9, Math.min(length + 9, Math.round(adjusted * length)));
 }
 
 export default function FieldSpot({
@@ -23,6 +26,7 @@ export default function FieldSpot({
   distance,
   possession,
   homeAttacksRight = true,
+  hasFortyYard = true,
   newSpot,
   onSpot,
   homeName,
@@ -37,18 +41,19 @@ export default function FieldSpot({
   const leftColor    = leftTeamKey === 'home' ? TEAM_COLORS.home.bg : TEAM_COLORS.away.bg;
   const rightColor   = rightTeamKey === 'home' ? TEAM_COLORS.home.bg : TEAM_COLORS.away.bg;
   const increasing   = attacksIncreasing(possession, homeAttacksRight);
+  const length       = fieldLength(hasFortyYard);
   const firstDown    = increasing ? yardLine + distance : yardLine - distance;
 
   function handleClick(e) {
     if (disabled) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = ((e.clientX - rect.left) / rect.width) * 100;
-    onSpot(pctToYard(pct));
+    onSpot(pctToYard(pct, length));
   }
 
-  const scrimmPct    = yardToPct(yardLine);
-  const firstDownPct = yardToPct(firstDown);
-  const spotPct      = newSpot !== null ? yardToPct(newSpot) : null;
+  const scrimmPct    = yardToPct(yardLine, length);
+  const firstDownPct = yardToPct(firstDown, length);
+  const spotPct      = newSpot !== null ? yardToPct(newSpot, length) : null;
   const spotColor    = possessionColor(possession);
   const spotDelta    = newSpot !== null ? yardsGained(yardLine, newSpot, possession, homeAttacksRight) : 0;
 
@@ -102,9 +107,9 @@ export default function FieldSpot({
           </span>
         </div>
 
-        {[20, 40, 60].map((y) => {
-          const pct   = yardToPct(y);
-          const label = y === 40 ? '40' : '20';
+        {fieldMarkerYards(hasFortyYard).map((y) => {
+          const pct   = yardToPct(y, length);
+          const label = fieldMarkerLabel(y, hasFortyYard);
           return (
             <div key={y} className="absolute top-0 bottom-0" style={{ left: `${pct}%` }}>
               <div className="absolute top-0 bottom-0 border-l border-white/25" />
@@ -115,10 +120,12 @@ export default function FieldSpot({
           );
         })}
 
-        <div
-          className="absolute top-0 bottom-0 border-l-2 border-white/35"
-          style={{ left: `${yardToPct(40)}%` }}
-        />
+        {hasFortyYard !== false && (
+          <div
+            className="absolute top-0 bottom-0 border-l-2 border-white/35"
+            style={{ left: `${yardToPct(40, length)}%` }}
+          />
+        )}
 
         <div
           className="absolute top-0 bottom-0 border-l-2 border-dashed border-yellow-400 z-10"
@@ -161,14 +168,14 @@ export default function FieldSpot({
         <span className="text-[10px] text-slate-500 font-medium">{leftName}</span>
         {newSpot !== null ? (
           <span className="text-[11px] font-semibold text-white">
-            {fieldYardLabel(newSpot, possession, homeAttacksRight)}
+            {fieldYardLabel(newSpot, possession, homeAttacksRight, hasFortyYard)}
             <span className={`font-normal ml-1 ${spotDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
               ({spotDelta > 0 ? '+' : ''}{spotDelta} yds)
             </span>
           </span>
         ) : (
           <span className="text-[11px] text-slate-400">
-            {fieldYardLabel(yardLine, possession, homeAttacksRight)}
+            {fieldYardLabel(yardLine, possession, homeAttacksRight, hasFortyYard)}
             <span className="text-blue-400/80 ml-1 font-medium">— tap to spot</span>
           </span>
         )}

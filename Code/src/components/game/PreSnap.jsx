@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { possessionColor } from "../../constants/teamColors";
+import { playerFirstName } from "../../utils/playerName";
 
 function JerseyEditor({ currentNumber, onSave, onCancel }) {
   const [val, setVal] = useState(currentNumber != null ? String(currentNumber) : "");
@@ -25,6 +26,7 @@ function JerseyEditor({ currentNumber, onSave, onCancel }) {
       min={0}
       max={99}
       value={val}
+      onClick={e => e.stopPropagation()}
       onChange={e => setVal(e.target.value)}
       onBlur={() => {
         const n = val.trim() === "" ? null : parseInt(val);
@@ -38,37 +40,78 @@ function JerseyEditor({ currentNumber, onSave, onCancel }) {
   );
 }
 
+const DOUBLE_TAP_MS = 350;
+
 function PlayerBtn({ player, selected, accentColor, onClick, onJerseyUpdate, compact }) {
   const [editing, setEditing] = useState(false);
+  const lastTapRef = useRef(0);
+
+  function saveJersey(n) {
+    setEditing(false);
+    if (n !== player.number) onJerseyUpdate(parseInt(player.id), n);
+  }
+
+  function handleTap(e) {
+    e.stopPropagation();
+    if (editing) return;
+    const now = Date.now();
+    if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+      lastTapRef.current = 0;
+      setEditing(true);
+      return;
+    }
+    lastTapRef.current = now;
+    if (!compact) onClick?.();
+  }
+
+  const jerseyLabel = player.number != null ? `#${player.number}` : '—';
+  const jerseyEditor = (
+    <JerseyEditor
+      currentNumber={player.number}
+      onSave={saveJersey}
+      onCancel={() => setEditing(false)}
+    />
+  );
 
   if (compact) {
     return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition-all"
+      <div
+        className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold"
         style={{
           background:  `${accentColor}22`,
           borderColor: accentColor,
           color:       '#fff',
         }}
       >
-        <span style={{ color: accentColor }}>
-          {player.number != null ? `#${player.number}` : '—'}
-        </span>
-        {player.name.split(' ')[0]}
-        <span className="text-slate-500 font-normal">×</span>
-      </button>
+        {editing ? jerseyEditor : (
+          <button
+            type="button"
+            onClick={handleTap}
+            title="Double-tap to edit jersey #"
+            className="flex items-center gap-2 min-h-[28px] touch-manipulation"
+          >
+            <span style={{ color: accentColor }}>{jerseyLabel}</span>
+            {playerFirstName(player.name)}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+          className="text-slate-500 font-normal touch-manipulation"
+          aria-label="Clear selection"
+        >
+          ×
+        </button>
+      </div>
     );
   }
 
   return (
     <button
       type="button"
-      onClick={onClick}
-      onDoubleClick={(e) => { e.stopPropagation(); setEditing(true); }}
-      title="Double-click to edit jersey #"
-      className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl border transition-all duration-150 active:scale-95 cursor-pointer select-none hover:border-white/20"
+      onClick={handleTap}
+      title="Double-tap to edit jersey #"
+      className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl border transition-all duration-150 active:scale-95 cursor-pointer select-none hover:border-white/20 touch-manipulation"
       style={{
         width:       72,
         height:      60,
@@ -77,24 +120,18 @@ function PlayerBtn({ player, selected, accentColor, onClick, onJerseyUpdate, com
         boxShadow:   selected ? `0 0 0 1px ${accentColor}` : 'none',
       }}
     >
-      <div className="flex items-center justify-center mb-0.5" style={{ height: 18 }}>
-        {editing ? (
-          <JerseyEditor
-            currentNumber={player.number}
-            onSave={(n) => { setEditing(false); if (n !== player.number) onJerseyUpdate(parseInt(player.id), n); }}
-            onCancel={() => setEditing(false)}
-          />
-        ) : (
+      <div className="flex items-center justify-center mb-0.5" style={{ height: 18 }} onClick={e => editing && e.stopPropagation()}>
+        {editing ? jerseyEditor : (
           <span
             className="text-[10px] font-semibold leading-none"
             style={{ color: selected ? 'rgba(255,255,255,0.65)' : accentColor }}
           >
-            {player.number != null ? `#${player.number}` : '—'}
+            {jerseyLabel}
           </span>
         )}
       </div>
       <span className="text-[12px] font-bold text-white leading-tight text-center px-1">
-        {player.name.split(' ')[0]}
+        {playerFirstName(player.name)}
       </span>
     </button>
   );
@@ -142,20 +179,18 @@ export default function PreSnap({
             </span>
           )}
         </div>
-        {!selectedOffender && (
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {offensePlayers.map(p => (
-              <PlayerBtn
-                key={p.id}
-                player={p}
-                selected={false}
-                accentColor={offColor}
-                onClick={() => onSelectOffender(p)}
-                onJerseyUpdate={onJerseyUpdate}
-              />
-            ))}
-          </div>
-        )}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {offensePlayers.map(p => (
+            <PlayerBtn
+              key={p.id}
+              player={p}
+              selected={selectedOffender?.id === p.id}
+              accentColor={offColor}
+              onClick={() => onSelectOffender(p)}
+              onJerseyUpdate={onJerseyUpdate}
+            />
+          ))}
+        </div>
       </div>
 
       <div
@@ -170,7 +205,7 @@ export default function PreSnap({
           </span>
           {selectedDefender ? (
             <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
-              #{selectedDefender.number} {selectedDefender.name.split(' ')[0]}
+              #{selectedDefender.number} {playerFirstName(selectedDefender.name)}
             </span>
           ) : (
             <span className="ml-auto text-[10px] text-slate-500 italic">Optional</span>

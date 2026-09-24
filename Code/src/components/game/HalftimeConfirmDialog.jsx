@@ -18,7 +18,7 @@ export default function HalftimeConfirmDialog({
           Start 2nd Half?
         </h2>
         <p className="text-slate-300 text-sm mb-4">
-          This will reset the clock to 20:00 and apply halftime changes:
+          This will apply halftime changes:
         </p>
         <ul className="text-sm text-slate-400 space-y-2 mb-6 list-disc list-inside">
           <li>

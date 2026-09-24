@@ -17,6 +17,7 @@ export default function StartGamePage() {
   const [isStarting, setIsStarting]     = useState(false);
   const [openingPossession, setOpeningPossession] = useState("home");
   const [homeAttacksRight, setHomeAttacksRight]   = useState(true);
+  const [hasFortyYard, setHasFortyYard]           = useState(true);
 
   useEffect(() => {
     if (!currentLeague) return;
@@ -88,6 +89,7 @@ export default function StartGamePage() {
           away_team:            teamB.team_id,
           opening_possession:   openingPossession,
           home_attacks_right:   homeAttacksRight,
+          has_forty_yard:       hasFortyYard,
         }])
         .select()
         .single();
@@ -155,12 +157,14 @@ export default function StartGamePage() {
           jerseyMapB={jerseyMapB}
           openingPossession={openingPossession}
           homeAttacksRight={homeAttacksRight}
+          hasFortyYard={hasFortyYard}
           onTeamASelect={setTeamA}
           onTeamBSelect={setTeamB}
           onJerseyChangeA={handleJerseyChangeA}
           onJerseyChangeB={handleJerseyChangeB}
           onOpeningPossessionChange={setOpeningPossession}
           onHomeAttacksRightChange={setHomeAttacksRight}
+          onHasFortyYardChange={setHasFortyYard}
           onNext={handleStartGame}
           isLoading={isStarting}
         />

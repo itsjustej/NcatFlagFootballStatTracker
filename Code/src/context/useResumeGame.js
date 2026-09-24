@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
-import { firstDownYard, kickoffYard, yardsGained as calcYardsGained, distanceToFirst, effectiveHomeAttacksRight } from '../gameLogic';
+import { firstDownYard, kickoffYard, yardsGained as calcYardsGained, distanceToFirst, effectiveHomeAttacksRight, playPeriod, otHomeAttacksRight } from '../gameLogic';
+import { playerFirstName } from '../utils/playerName';
 
 const OUTCOME_TO_DRIVE_RESULT = {
   td:                'Touchdown',
@@ -38,12 +39,13 @@ function isDriveComplete(lastPlay) {
 export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRight = true) {
   const { data: gameRow } = await supabase
     .from('Game')
-    .select('opening_possession, home_attacks_right')
+    .select('opening_possession, home_attacks_right, has_forty_yard')
     .eq('game_id', gameId)
     .single();
 
   const openingHomeAttacksRight = gameRow?.home_attacks_right !== false;
   const openingPossession = gameRow?.opening_possession === 'away' ? 'away' : 'home';
+  const hasFortyYard = gameRow?.has_forty_yard !== false;
 
   const { data: plays, error } = await supabase
     .from('Play')
@@ -87,7 +89,9 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
       // Conversion belongs to the current drive (same driveId as the TD before it)
       driveIds.push(driveId);
     } else {
-      if (lastNonConvPoss !== null && possession !== lastNonConvPoss) {
+      const prev = plays[i - 1];
+      const halfChanged = i > 0 && playPeriod(play) !== playPeriod(prev) && !prev.is_conversion;
+      if (lastNonConvPoss !== null && (possession !== lastNonConvPoss || halfChanged)) {
         driveId++;
       }
       driveIds.push(driveId);
@@ -161,7 +165,9 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
           play.yard_line,
           play.new_yard_line,
           possession,
-          effectiveHomeAttacksRight(openingHomeAttacksRight, play.first_half),
+          play.overtime
+            ? otHomeAttacksRight(possession)
+            : effectiveHomeAttacksRight(openingHomeAttacksRight, play.first_half),
         )
       : 0;
 
@@ -171,12 +177,11 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
     const rusher   = parts.find(p => p.role === 'rusher');
     const defender = parts.find(p => p.role === 'defender');
 
-    const pName    = passer?.player_name?.split(' ')[0]   ?? 'QB';
-    const recName  = receiver?.player_name?.split(' ')[0] ?? 'Receiver';
-    const rushName = rusher?.player_name?.split(' ')[0]   ?? 'Runner';
-    const defStr   = defender?.player_name?.split(' ')[0]
-      ? ` (tackled by ${defender.player_name.split(' ')[0]})`
-      : '';
+    const pName    = playerFirstName(passer?.player_name, 'QB');
+    const recName  = playerFirstName(receiver?.player_name, 'Receiver');
+    const rushName = playerFirstName(rusher?.player_name, 'Runner');
+    const defFirst = playerFirstName(defender?.player_name);
+    const defStr   = defFirst ? ` (tackled by ${defFirst})` : '';
 
     let description = `${play.play_type} — ${play.outcome}`;
 
@@ -194,7 +199,7 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
       else description = `${rushName} rushed for ${yardsGained} yard${yardsGained !== 1 ? 's' : ''}${defStr}`;
     } else if (play.play_type === 'pass') {
       if (play.outcome === 'td')              description = `${pName} passes to ${recName} for a touchdown`;
-      else if (play.outcome === 'pick_6')     description = `${pName} throws interception${defender ? ` to ${defender.player_name.split(' ')[0]}` : ''} for a touchdown`;
+      else if (play.outcome === 'pick_6')     description = `${pName} throws interception${defFirst ? ` to ${defFirst}` : ''} for a touchdown`;
       else if (play.outcome === 'interception') description = `${pName} throws interception`;
       else if (play.outcome === 'incomplete')   description = `${pName} throws incompletion`;
       else description = `${pName} passes to ${recName} for ${yardsGained} yard${yardsGained !== 1 ? 's' : ''}${defStr}`;
@@ -211,11 +216,10 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
     return {
       id:              String(play.play_id),
       playNumber:      i + 1,
-      half:            play.first_half ? 1 : 2,
+      half:            playPeriod(play),
       down:            play.down,
       distance:        play.distance,
       yardLine:        play.yard_line,
-      clock:           play.game_clock,
       description,
       yardsGained,
       homeScore,
@@ -250,7 +254,11 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
     lastNonConvOutcome === 'punt_return_td'
   );
 
-  const currentHomeAttacksRight = effectiveHomeAttacksRight(openingHomeAttacksRight, lastPlay.first_half);
+  const inOvertime = !!lastPlay.overtime;
+  const driveComplete = isDriveComplete(lastPlay);
+  const currentHomeAttacksRight = inOvertime
+    ? otHomeAttacksRight(lastPossession)
+    : effectiveHomeAttacksRight(openingHomeAttacksRight, lastPlay.first_half);
 
   if (conversionPending) {
     if (lastNonConvOutcome === 'td') {
@@ -261,9 +269,9 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
     }
     currentYard = lastNonConv.new_yard_line ?? lastNonConv.yard_line;
   } else if (scoringOutcomes.includes(lastNonConvOutcome)) {
-    // Possession flips after a score — receiving team starts from their own 14
+    // Possession flips after a score — receiving team starts from their own 10
     currentPossession = lastPossession === 'home' ? 'away' : 'home';
-    currentYard = kickoffYard(currentPossession, currentHomeAttacksRight);
+    currentYard = kickoffYard(currentPossession, currentHomeAttacksRight, hasFortyYard);
   } else if (possessionFlipOutcomes.includes(lastNonConvOutcome)) {
     // Punt, INT, or turnover — defense takes over at the spot
     currentPossession = lastPossession === 'home' ? 'away' : 'home';
@@ -273,8 +281,8 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
     currentYard       = lastNonConv.new_yard_line ?? lastNonConv.yard_line;
   }
 
-  const fdTarget = firstDownYard(currentYard, currentPossession, currentHomeAttacksRight);
-  const distance = distanceToFirst(currentYard, currentPossession, currentHomeAttacksRight);
+  const fdTarget = firstDownYard(currentYard, currentPossession, currentHomeAttacksRight, hasFortyYard);
+  const distance = distanceToFirst(currentYard, currentPossession, currentHomeAttacksRight, hasFortyYard);
 
   // Determine down: if the last non-conv play advanced the ball or scored,
   // the next play is 1st down. Otherwise use the stored down + 1 (capped at 4).
@@ -285,8 +293,8 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
   const currentDriveId = isDriveComplete(lastPlay) ? lastDriveId + 1 : lastDriveId;
 
   return {
-    half:             lastPlay.first_half ? 1 : 2,
-    clock:            lastPlay.game_clock ?? '20:00',
+    half:             playPeriod(lastPlay),
+    otPending:        inOvertime && driveComplete && !conversionPending,
     down:             nextDown,
     distance,
     yardLine:         currentYard,
@@ -295,6 +303,7 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
     openingPossession,
     openingHomeAttacksRight,
     homeAttacksRight: currentHomeAttacksRight,
+    hasFortyYard,
     homeScore,
     awayScore,
     selectedOffender: null,

@@ -13,8 +13,12 @@ import {
   attacksIncreasing,
   secondHalfPossession,
   distanceToFirst,
+  otStartYard,
+  otHomeAttacksRight,
 } from '../gameLogic';
+import { playerFirstName } from '../utils/playerName';
 import HalftimeConfirmDialog from '../components/game/HalftimeConfirmDialog';
+import OtBallDialog from '../components/game/OtBallDialog';
 import PlayStepBar, { getPlayStepIndex } from '../components/game/PlayStepBar';
 import UndoToast from '../components/game/UndoToast';
 import MobilePlayBar from '../components/game/MobilePlayBar';
@@ -55,7 +59,20 @@ function restorePasserFields(lastPasser, possession) {
 }
 
 function afterPossessionFlip(s, newYard, newPossession) {
-  const fdTarget = firstDownYard(newYard, newPossession, s.homeAttacksRight);
+  if (s.half === 3) {
+    const lastPasser = snapshotLastPasser(s);
+    return {
+      otPending: true,
+      lastPasser,
+      selectedOffender: null,
+      selectedDefender: null,
+      selectedReceiver: null,
+      playType: null,
+      playPhase: 'idle',
+      newSpot: null,
+    };
+  }
+  const fdTarget = firstDownYard(newYard, newPossession, s.homeAttacksRight, s.hasFortyYard);
   const distance = attacksIncreasing(newPossession, s.homeAttacksRight)
     ? fdTarget - newYard
     : newYard - fdTarget;
@@ -86,7 +103,7 @@ function enterConversionPhase(s, updates) {
 function afterNormalPlay(s, newYard, firstDownCrossed, newDown) {
   const lastPasser = snapshotLastPasser(s);
   if (firstDownCrossed) {
-    const fdTarget = firstDownYard(newYard, s.possession, s.homeAttacksRight);
+    const fdTarget = firstDownYard(newYard, s.possession, s.homeAttacksRight, s.hasFortyYard);
     const distance = attacksIncreasing(s.possession, s.homeAttacksRight)
       ? fdTarget - newYard
       : newYard - fdTarget;
@@ -96,7 +113,7 @@ function afterNormalPlay(s, newYard, firstDownCrossed, newDown) {
     const newPoss = s.possession === 'home' ? 'away' : 'home';
     return afterPossessionFlip(s, newYard, newPoss);
   }
-  const fdTarget = s.fdTarget ?? firstDownYard(s.yardLine, s.possession, s.homeAttacksRight);
+  const fdTarget = s.fdTarget ?? firstDownYard(s.yardLine, s.possession, s.homeAttacksRight, s.hasFortyYard);
   const distance = attacksIncreasing(s.possession, s.homeAttacksRight)
     ? fdTarget - newYard
     : newYard - fdTarget;
@@ -106,20 +123,9 @@ function afterNormalPlay(s, newYard, firstDownCrossed, newDown) {
 function baseEntry(s) {
   return {
     half: s.half, down: s.down, distance: s.distance,
-    yardLine: s.yardLine, clock: s.clock,
+    yardLine: s.yardLine,
     driveId: s.driveId, drivePossession: s.possession,
   };
-}
-
-function parseClock(clock) {
-  const [m, sec] = clock.split(':').map(Number);
-  return (m || 0) * 60 + (sec || 0);
-}
-
-function formatClock(secs) {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 // ─── GamePage ─────────────────────────────────────────────────────────────────
@@ -130,7 +136,7 @@ export default function GamePage() {
   const {
     currentGameId, game, homePlayers, awayPlayers,
     initialGameState, gameLoading, gameError, exitingRef,
-    updateJersey,
+    updateJersey, clearGame,
   } = useLeague();
 
   const [gs, setGs]                     = useState(null);
@@ -139,13 +145,12 @@ export default function GamePage() {
   const [convStep, setConvStep]         = useState('outcome'); // outcome | points | passer | receiver
   const [convOutcome, setConvOutcome]   = useState(null);     // 'good' | 'nogood'
   const [convPasser, setConvPasser]     = useState(null);
-  const [clockRunning, setClockRunning] = useState(false);
   const [halftimeConfirm, setHalftimeConfirm] = useState(false);
+  const [otPrompt, setOtPrompt] = useState(null);
   const [undoToast, setUndoToast]             = useState(null);
   const [scoreFlash, setScoreFlash]           = useState(null);
   const [latestDriveId, setLatestDriveId]       = useState(null);
   const [pulseStep, setPulseStep]             = useState(null);
-  const intervalRef                           = useRef(null);
   const toastTimerRef                         = useRef(null);
   const prevStepRef                           = useRef(0);
 
@@ -243,28 +248,7 @@ export default function GamePage() {
       }
       return h.slice(0, -1);
     });
-    setClockRunning(false);
   }, [resetConvState]);
-
-  // ── Clock ──────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (clockRunning) {
-      intervalRef.current = setInterval(() => {
-        setGs((s) => {
-          const secs = parseClock(s.clock);
-          if (secs <= 0) { setClockRunning(false); return { ...s, clock: '0:00' }; }
-          return { ...s, clock: formatClock(secs - 1) };
-        });
-      }, 1000);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [clockRunning]);
-
-  const handleClockToggle = useCallback(() => setClockRunning(r => !r), []);
-  const handleClockSet    = useCallback((clock) => setGs(s => ({ ...s, clock })), []);
 
   const handleHalfChange = useCallback((half) => {
     setGs((s) => {
@@ -273,20 +257,19 @@ export default function GamePage() {
       if (half === 2 && s.half === 1) {
         const secondHalfPoss = secondHalfPossession(s.openingPossession ?? initialGameState?.openingPossession ?? 'home');
         const flippedDirection = !openingHar;
-        const yardLine = kickoffYard(secondHalfPoss, flippedDirection);
+        const yardLine = kickoffYard(secondHalfPoss, flippedDirection, s.hasFortyYard);
         return {
           ...s,
           half: 2,
-          clock: '20:00',
           openingHomeAttacksRight: openingHar,
           homeAttacksRight: flippedDirection,
           possession: secondHalfPoss,
           yardLine,
           distance: attacksIncreasing(secondHalfPoss, flippedDirection)
-            ? firstDownYard(yardLine, secondHalfPoss, flippedDirection) - yardLine
-            : yardLine - firstDownYard(yardLine, secondHalfPoss, flippedDirection),
+            ? firstDownYard(yardLine, secondHalfPoss, flippedDirection, s.hasFortyYard) - yardLine
+            : yardLine - firstDownYard(yardLine, secondHalfPoss, flippedDirection, s.hasFortyYard),
           down: 1,
-          fdTarget: firstDownYard(yardLine, secondHalfPoss, flippedDirection),
+          fdTarget: firstDownYard(yardLine, secondHalfPoss, flippedDirection, s.hasFortyYard),
           driveId: s.driveId + 1,
           ...restorePasserFields(s.lastPasser ?? { home: null, away: null }, secondHalfPoss),
         };
@@ -294,33 +277,63 @@ export default function GamePage() {
 
       if (half === 1 && s.half === 2) {
         const openingPoss = s.openingPossession ?? initialGameState?.openingPossession ?? 'home';
-        const yardLine = kickoffYard(openingPoss, openingHar);
+        const yardLine = kickoffYard(openingPoss, openingHar, s.hasFortyYard);
         return {
           ...s,
           half: 1,
-          clock: '20:00',
           homeAttacksRight: openingHar,
           possession: openingPoss,
           yardLine,
-          distance: distanceToFirst(yardLine, openingPoss, openingHar),
+          distance: distanceToFirst(yardLine, openingPoss, openingHar, s.hasFortyYard),
           down: 1,
-          fdTarget: firstDownYard(yardLine, openingPoss, openingHar),
+          fdTarget: firstDownYard(yardLine, openingPoss, openingHar, s.hasFortyYard),
           ...restorePasserFields(s.lastPasser ?? { home: null, away: null }, openingPoss),
         };
       }
 
-      return { ...s, half, clock: '20:00' };
+      return { ...s, half };
     });
-    setClockRunning(false);
   }, [initialGameState]);
 
   const handleHalfChangeRequest = useCallback((half) => {
+    if (half === 3 && gs?.half !== 3) {
+      setOtPrompt('start');
+      return;
+    }
     if (half === 2 && gs?.half === 1) {
       setHalftimeConfirm(true);
       return;
     }
     handleHalfChange(half);
   }, [gs?.half, handleHalfChange]);
+
+  const startOtDrive = useCallback((possession) => {
+    setGs((s) => {
+      const homeAttacksRight = otHomeAttacksRight(possession);
+      const yardLine = otStartYard(s.hasFortyYard);
+      const lastPasser = s.lastPasser ?? { home: null, away: null };
+      const newDrive = s.otPending || s.half !== 3;
+      return {
+        ...s,
+        half: 3,
+        otPending: false,
+        homeAttacksRight,
+        possession,
+        yardLine,
+        distance: distanceToFirst(yardLine, possession, homeAttacksRight, s.hasFortyYard),
+        down: 1,
+        fdTarget: firstDownYard(yardLine, possession, homeAttacksRight, s.hasFortyYard),
+        driveId: newDrive ? s.driveId + 1 : s.driveId,
+        ...restorePasserFields(lastPasser, possession),
+      };
+    });
+    setOtPrompt(null);
+  }, []);
+
+  useEffect(() => {
+    if (gs?.otPending) setOtPrompt('next');
+    else setOtPrompt((p) => (p === 'next' ? null : p));
+  }, [gs?.otPending]);
 
   useEffect(() => {
     if (!gs) return;
@@ -367,23 +380,23 @@ export default function GamePage() {
   const handlePlayType = useCallback((t) => {
     setGsWithHistory((s) => {
       const spot      = s.newSpot ?? s.yardLine;
-      const offFirst  = s.selectedOffender?.name?.split(' ')[0] ?? 'Runner';
-      const defFirst  = s.selectedDefender?.name?.split(' ')[0];
+      const offFirst  = playerFirstName(s.selectedOffender?.name, 'Runner');
+      const defFirst  = playerFirstName(s.selectedDefender?.name);
       const tackleStr = defFirst ? ` (tackled by ${defFirst})` : '';
       const _rusher   = t === 'rush' ? (s.selectedOffender ?? null) : null;
       const _defender = s.selectedDefender ?? null;
 
       if (t === 'rush') {
-        if (isSafety(spot, s.possession, s.homeAttacksRight)) {
+        if (isSafety(spot, s.possession, s.homeAttacksRight, s.hasFortyYard)) {
           const newPoss     = s.possession === 'home' ? 'away' : 'home';
           const newHome     = s.possession === 'away' ? s.homeScore + 2 : s.homeScore;
           const newAway     = s.possession === 'home' ? s.awayScore + 2 : s.awayScore;
-          const newYard     = kickoffYard(newPoss, s.homeAttacksRight);
+          const newYard     = kickoffYard(newPoss, s.homeAttacksRight, s.hasFortyYard);
           const yds         = yardsGained(s.yardLine, spot, s.possession, s.homeAttacksRight);
           const entry = { ...baseEntry(s), description: `${offFirst} rushed for a safety`, yardsGained: yds, homeScore: newHome, awayScore: newAway, driveResult: 'Safety', _playType: 'rush', _outcome: 'safety', _rusher, _defender };
           return { ...s, homeScore: newHome, awayScore: newAway, ...afterPossessionFlip(s, newYard, newPoss), log: addPlay(s.log, entry) };
         }
-        if (isTouchdown(spot, s.possession, s.homeAttacksRight)) {
+        if (isTouchdown(spot, s.possession, s.homeAttacksRight, s.hasFortyYard)) {
           const newHome     = s.possession === 'home' ? s.homeScore + 6 : s.homeScore;
           const newAway     = s.possession === 'away' ? s.awayScore + 6 : s.awayScore;
           const yds         = yardsGained(s.yardLine, spot, s.possession, s.homeAttacksRight);
@@ -396,7 +409,7 @@ export default function GamePage() {
           });
         }
         const yds         = yardsGained(s.yardLine, spot, s.possession, s.homeAttacksRight);
-        const fd          = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight);
+        const fd          = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight, s.hasFortyYard);
         const newDown     = fd ? 1 : s.down + 1;
         const driveResult = newDown > 4 ? 'Turnover on Downs' : undefined;
         const _outcome    = newDown > 4 ? 'turnover_on_downs' : 'complete';
@@ -418,7 +431,7 @@ export default function GamePage() {
         const receivingName = receivingPoss === 'home' ? homeName : awayName;
         const puntingName   = s.possession === 'home' ? homeName : awayName;
 
-        if (isTouchdown(spot, receivingPoss, s.homeAttacksRight)) {
+        if (isTouchdown(spot, receivingPoss, s.homeAttacksRight, s.hasFortyYard)) {
           const newHome = receivingPoss === 'home' ? s.homeScore + 6 : s.homeScore;
           const newAway = receivingPoss === 'away' ? s.awayScore + 6 : s.awayScore;
           const entry   = {
@@ -464,21 +477,21 @@ export default function GamePage() {
   // ── Pass helpers ───────────────────────────────────────────────────────────
 
   function buildPassEntry(s, spot, offFirst, recFirst, yds, tackleStr, _passer, _receiver, _defender) {
-    if (isSafety(spot, s.possession, s.homeAttacksRight)) {
+    if (isSafety(spot, s.possession, s.homeAttacksRight, s.hasFortyYard)) {
       const newPoss = s.possession === 'home' ? 'away' : 'home';
       const newHome = s.possession === 'away' ? s.homeScore + 2 : s.homeScore;
       const newAway = s.possession === 'home' ? s.awayScore + 2 : s.awayScore;
-      const newYard = kickoffYard(newPoss, s.homeAttacksRight);
+      const newYard = kickoffYard(newPoss, s.homeAttacksRight, s.hasFortyYard);
       const entry = { ...baseEntry(s), description: `${offFirst} passes to ${recFirst} for a safety`, yardsGained: yds, homeScore: newHome, awayScore: newAway, driveResult: 'Safety', _playType: 'pass', _outcome: 'safety', _passer, _receiver, _defender };
       return { type: 'safety', entry, newHome, newAway, newPoss, newYard };
     }
-    if (isTouchdown(spot, s.possession, s.homeAttacksRight)) {
+    if (isTouchdown(spot, s.possession, s.homeAttacksRight, s.hasFortyYard)) {
       const newHome = s.possession === 'home' ? s.homeScore + 6 : s.homeScore;
       const newAway = s.possession === 'away' ? s.awayScore + 6 : s.awayScore;
       const entry = { ...baseEntry(s), description: `${offFirst} passes to ${recFirst} for a touchdown`, yardsGained: yds, homeScore: newHome, awayScore: newAway, driveResult: 'Touchdown', _playType: 'pass', _outcome: 'td', _passer, _receiver, _defender };
       return { type: 'td', entry, newHome, newAway };
     }
-    const fd          = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight);
+    const fd          = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight, s.hasFortyYard);
     const newDown     = fd ? 1 : s.down + 1;
     const driveResult = newDown > 4 ? 'Turnover on Downs' : undefined;
     const _outcome    = newDown > 4 ? 'turnover_on_downs' : 'complete';
@@ -489,9 +502,9 @@ export default function GamePage() {
   const handlePassComplete = useCallback(() => {
     setGsWithHistory((s) => {
       const spot        = s.newSpot ?? s.yardLine;
-      const offFirst    = s.selectedOffender?.name?.split(' ')[0] ?? 'QB';
-      const recFirst    = s.selectedReceiver?.name?.split(' ')[0] ?? 'Receiver';
-      const defFirst    = s.selectedDefender?.name?.split(' ')[0];
+      const offFirst    = playerFirstName(s.selectedOffender?.name, 'QB');
+      const recFirst    = playerFirstName(s.selectedReceiver?.name, 'Receiver');
+      const defFirst    = playerFirstName(s.selectedDefender?.name);
       const yds         = yardsGained(s.yardLine, spot, s.possession, s.homeAttacksRight);
       const tackleStr   = defFirst ? ` (tackled by ${defFirst})` : '';
       const _passer     = s.selectedOffender ?? null;
@@ -517,9 +530,9 @@ export default function GamePage() {
   const handlePassReceiverComplete = useCallback((p) => {
     setGsWithHistory((s) => {
       const spot        = s.newSpot ?? s.yardLine;
-      const offFirst    = s.selectedOffender?.name?.split(' ')[0] ?? 'QB';
-      const recFirst    = p.name.split(' ')[0];
-      const defFirst    = s.selectedDefender?.name?.split(' ')[0];
+      const offFirst    = playerFirstName(s.selectedOffender?.name, 'QB');
+      const recFirst    = playerFirstName(p.name);
+      const defFirst    = playerFirstName(s.selectedDefender?.name);
       const yds         = yardsGained(s.yardLine, spot, s.possession, s.homeAttacksRight);
       const tackleStr   = defFirst ? ` (tackled by ${defFirst})` : '';
       const _passer     = s.selectedOffender ?? null;
@@ -544,7 +557,7 @@ export default function GamePage() {
 
   const handlePassIncomplete = useCallback(() => {
     setGsWithHistory((s) => {
-      const offFirst  = s.selectedOffender?.name?.split(' ')[0] ?? 'QB';
+      const offFirst  = playerFirstName(s.selectedOffender?.name, 'QB');
       const _passer   = s.selectedOffender ?? null;
       const _defender = s.selectedDefender ?? null;
       const newDown   = s.down + 1;
@@ -559,11 +572,11 @@ export default function GamePage() {
     setGsWithHistory((s) => {
       const spot      = s.newSpot ?? s.yardLine;
       const newPoss   = s.possession === 'home' ? 'away' : 'home';
-      const offFirst  = s.selectedOffender?.name?.split(' ')[0] ?? 'QB';
-      const defFirst  = s.selectedDefender?.name?.split(' ')[0] ?? 'Defender';
+      const offFirst  = playerFirstName(s.selectedOffender?.name, 'QB');
+      const defFirst  = playerFirstName(s.selectedDefender?.name, 'Defender');
       const _passer   = s.selectedOffender ?? null;
       const _defender = s.selectedDefender ?? null;
-      const isPick6   = isTouchdown(spot, newPoss, s.homeAttacksRight);
+      const isPick6   = isTouchdown(spot, newPoss, s.homeAttacksRight, s.hasFortyYard);
 
       if (isPick6) {
         const newHome = newPoss === 'home' ? s.homeScore + 6 : s.homeScore;
@@ -611,16 +624,16 @@ export default function GamePage() {
         return { ...s, ...afterPossessionFlip(s, spot, newPoss), log: addPlay(s.log, entry) };
       }
       if (autoFirstDown) {
-        const fdTarget = firstDownYard(spot, s.possession, s.homeAttacksRight);
+        const fdTarget = firstDownYard(spot, s.possession, s.homeAttacksRight, s.hasFortyYard);
         const distance = attacksIncreasing(s.possession, s.homeAttacksRight)
           ? fdTarget - spot
           : spot - fdTarget;
         return { ...s, ...reset, yardLine: spot, down: 1, distance, fdTarget, log: addPlay(s.log, entry) };
       }
-      const fd        = s.fdTarget ?? firstDownYard(s.yardLine, s.possession, s.homeAttacksRight);
-      const crossedFD = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight);
+      const fd        = s.fdTarget ?? firstDownYard(s.yardLine, s.possession, s.homeAttacksRight, s.hasFortyYard);
+      const crossedFD = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight, s.hasFortyYard);
       if (crossedFD) {
-        const fdTarget = firstDownYard(spot, s.possession, s.homeAttacksRight);
+        const fdTarget = firstDownYard(spot, s.possession, s.homeAttacksRight, s.hasFortyYard);
         const distance = attacksIncreasing(s.possession, s.homeAttacksRight)
           ? fdTarget - spot
           : spot - fdTarget;
@@ -657,7 +670,7 @@ export default function GamePage() {
         const newPoss = s.possession === 'home' ? 'away' : 'home';
         return {
           ...s,
-          ...afterPossessionFlip(s, kickoffYard(newPoss, s.homeAttacksRight), newPoss),
+          ...afterPossessionFlip(s, kickoffYard(newPoss, s.homeAttacksRight, s.hasFortyYard), newPoss),
           log: addPlay(s.log, entry),
         };
       });
@@ -676,8 +689,8 @@ export default function GamePage() {
   const handleConversionReceiver = useCallback((p) => {
     setGsWithHistory((s) => {
       const pts       = convPts ?? 1;
-      const passFirst = convPasser?.name?.split(' ')[0] ?? 'QB';
-      const recFirst  = p.name.split(' ')[0];
+      const passFirst = playerFirstName(convPasser?.name, 'QB');
+      const recFirst  = playerFirstName(p.name);
       const _passer   = convPasser;
       const _receiver = p;
       const newHome   = s.possession === 'home' ? s.homeScore + pts : s.homeScore;
@@ -701,7 +714,7 @@ export default function GamePage() {
         ...s,
         homeScore: newHome,
         awayScore: newAway,
-        ...afterPossessionFlip(s, kickoffYard(newPoss, s.homeAttacksRight), newPoss),
+        ...afterPossessionFlip(s, kickoffYard(newPoss, s.homeAttacksRight, s.hasFortyYard), newPoss),
         log: addPlay(s.log, entry),
       };
     });
@@ -716,6 +729,20 @@ export default function GamePage() {
 
   return (
     <div className="flex flex-col md:flex-row h-[100dvh] overflow-hidden bg-slate-900 text-white" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      {otPrompt && (
+        <OtBallDialog
+          homeName={homeName}
+          awayName={awayName}
+          allowEnd={otPrompt === 'next'}
+          onChoose={startOtDrive}
+          onEnd={() => {
+            clearGame();
+            navigate(`/games/${gs.gameId}`);
+          }}
+          onCancel={() => setOtPrompt(null)}
+        />
+      )}
+
       {halftimeConfirm && (
         <HalftimeConfirmDialog
           homeName={homeName}
@@ -739,6 +766,7 @@ export default function GamePage() {
               distance={gs.distance}
               possession={gs.possession}
               homeAttacksRight={gs.homeAttacksRight ?? true}
+              hasFortyYard={gs.hasFortyYard !== false}
               newSpot={gs.newSpot}
               onSpot={handleSpot}
               homeName={homeName}
@@ -806,10 +834,7 @@ export default function GamePage() {
       <div className="w-full md:w-80 md:shrink-0 border-t md:border-t-0 md:border-l border-slate-700 bg-slate-800 flex flex-col min-h-[220px] max-h-[38vh] md:max-h-none md:h-full overflow-hidden">
         <Scoreboard
           gs={gs}
-          clockRunning={clockRunning}
           canUndo={history.length > 0}
-          onClockToggle={handleClockToggle}
-          onClockSet={handleClockSet}
           onHalfChange={handleHalfChangeRequest}
           onUndo={handleUndo}
           homeName={homeName}

@@ -3,14 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 export default function LoginPage() {
-  const { login, isAuthenticated } = useAuth();
+
+  const { login, isAuthenticated, isSocial } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
 
+  const homePath = isSocial ? "/stats" : "/";
+
   useEffect(() => {
-    if (isAuthenticated) navigate("/", { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) navigate(homePath, { replace: true });
+  }, [isAuthenticated, navigate, homePath]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -18,11 +21,11 @@ export default function LoginPage() {
     const success = login(username);
 
     if (!success) {
-      setError('Unknown username. Use "admin" or "worker".');
+      setError('Unknown username. Use "admin", "worker", or "social".');
       return;
     }
 
-    navigate("/", { replace: true });
+    navigate(username.trim().toLowerCase() === "social" ? "/stats" : "/", { replace: true });
   };
 
   return (

@@ -1,5 +1,5 @@
-import { useRef, useState, useEffect } from 'react';
-import { Pause, Play, Undo2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Undo2 } from 'lucide-react';
 import { yardLabel as fieldYardLabel } from '../../gameLogic';
 import { possessionColor, TEAM_COLORS } from '../../constants/teamColors';
 
@@ -8,32 +8,21 @@ function downStr(down, dist) {
   return `${down}${sfx[down] ?? 'th'} & ${dist}`;
 }
 
-function isValidClock(v) {
-  return /^\d{1,2}:\d{2}$/.test(v);
-}
-
 export default function Scoreboard({
   gs,
-  clockRunning,
   canUndo,
-  onClockToggle,
-  onClockSet,
   onHalfChange,
   onUndo,
   homeName,
   awayName,
   scoreFlash,
 }) {
-  const { homeScore, awayScore, half, clock, down, distance, possession, yardLine, homeAttacksRight = true } = gs;
+  const { homeScore, awayScore, half, down, distance, possession, yardLine, homeAttacksRight = true } = gs;
   const teamName = possession === 'home' ? homeName : awayName;
   const offColor = possessionColor(possession);
 
-  const [editing, setEditing]   = useState(false);
-  const [editVal, setEditVal]   = useState('');
   const [flashHome, setFlashHome] = useState(false);
   const [flashAway, setFlashAway] = useState(false);
-  const clickTimer              = useRef(null);
-  const inputRef                = useRef(null);
 
   useEffect(() => {
     if (scoreFlash === 'home') {
@@ -50,33 +39,6 @@ export default function Scoreboard({
       return () => clearTimeout(t);
     }
   }, [scoreFlash]);
-
-  function handleClockClick() {
-    if (editing) return;
-    if (clickTimer.current) {
-      clearTimeout(clickTimer.current);
-      clickTimer.current = null;
-      setEditVal(clock);
-      setEditing(true);
-      setTimeout(() => inputRef.current?.select(), 0);
-    } else {
-      clickTimer.current = setTimeout(() => {
-        clickTimer.current = null;
-        onClockToggle();
-      }, 220);
-    }
-  }
-
-  function commitEdit() {
-    const trimmed = editVal.trim();
-    if (isValidClock(trimmed)) onClockSet(trimmed);
-    setEditing(false);
-  }
-
-  function handleEditKeyDown(e) {
-    if (e.key === 'Enter')  commitEdit();
-    if (e.key === 'Escape') setEditing(false);
-  }
 
   return (
     <div className="flex flex-col">
@@ -100,47 +62,22 @@ export default function Scoreboard({
         </div>
 
         <div className="flex flex-col items-center justify-center px-3 gap-1.5 border-x border-slate-700 bg-slate-900/40">
-          <button
-            onClick={handleClockClick}
-            className="flex items-center gap-1.5 group select-none focus:outline-none"
-            title="Click to pause/resume · Double-click to set time"
-          >
-            <span className="transition-opacity group-hover:opacity-70">
-              {clockRunning
-                ? <Pause size={11} className="text-slate-400" />
-                : <Play  size={11} className={clock === '0:00' ? 'text-slate-600' : 'text-emerald-400'} />
-              }
-            </span>
-            {editing ? (
-              <input
-                ref={inputRef}
-                value={editVal}
-                onChange={(e) => setEditVal(e.target.value)}
-                onBlur={commitEdit}
-                onKeyDown={handleEditKeyDown}
-                onClick={(e) => e.stopPropagation()}
-                className="w-16 text-sm font-mono font-bold text-white bg-slate-700 border border-slate-500 rounded px-1 text-center focus:outline-none focus:border-blue-400"
-                placeholder="M:SS"
-              />
-            ) : (
-              <span className={`text-sm font-mono font-bold tabular-nums ${clockRunning ? 'text-white' : 'text-slate-400'}`}>
-                {clock}
-              </span>
-            )}
-          </button>
-
           <div className="flex rounded-md overflow-hidden border border-slate-600">
-            {[1, 2].map((h) => (
+            {[
+              { id: 1, label: '1st' },
+              { id: 2, label: '2nd' },
+              { id: 3, label: 'OT' },
+            ].map((h) => (
               <button
-                key={h}
-                onClick={() => onHalfChange(h)}
+                key={h.id}
+                onClick={() => onHalfChange(h.id)}
                 className={`px-2 py-0.5 text-[10px] font-bold transition-colors ${
-                  half === h
+                  half === h.id
                     ? 'bg-slate-600 text-white'
                     : 'bg-transparent text-slate-500 hover:text-slate-300'
                 }`}
               >
-                {h === 1 ? '1st' : '2nd'}
+                {h.label}
               </button>
             ))}
           </div>
@@ -172,7 +109,7 @@ export default function Scoreboard({
             {teamName} ball
             <span className="text-slate-500 font-normal ml-1.5">·</span>
             <span className="text-slate-400 font-normal ml-1.5">
-              {fieldYardLabel(yardLine, possession, homeAttacksRight)}
+              {fieldYardLabel(yardLine, possession, homeAttacksRight, gs.hasFortyYard)}
             </span>
           </span>
         </div>

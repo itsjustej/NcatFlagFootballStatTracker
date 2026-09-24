@@ -6,7 +6,7 @@ import { ConfirmDeleteDialog } from "../components/teams/ConfirmDeleteDialog";
 import { Plus, Check, Trash2, Calendar } from "lucide-react";
 
 export default function SettingsPage() {
-  const { user, canDelete, logout } = useAuth();
+  const { user, canDelete, canTrackGames, logout } = useAuth();
   const navigate = useNavigate();
   const { leagues, currentLeague, switchLeague, createLeague, deleteLeague } = useLeague();
   const [newLeagueName, setNewLeagueName] = useState("");
@@ -19,7 +19,7 @@ export default function SettingsPage() {
   };
 
   const handleCreate = async () => {
-    if (!newLeagueName.trim()) return;
+    if (!canTrackGames || !newLeagueName.trim()) return;
     setCreating(true);
     await createLeague(newLeagueName.trim());
     setNewLeagueName("");
@@ -32,7 +32,7 @@ export default function SettingsPage() {
     setConfirmDelete(null);
   };
 
-  const roleLabel = user?.role === "admin" ? "Admin" : "Worker";
+  const roleLabel = user?.role === "admin" ? "Admin" : user?.role === "social" ? "Social" : "Worker";
 
   return (
     <div className="bg-slate-900 text-white pt-4 sm:pt-5 px-4 pb-8">
@@ -68,7 +68,9 @@ export default function SettingsPage() {
 
           <div className="p-4 space-y-6">
             {leagues.length === 0 ? (
-              <p className="text-slate-400 text-center py-4">No seasons yet. Create one below.</p>
+              <p className="text-slate-400 text-center py-4">
+                {canTrackGames ? "No seasons yet. Create one below." : "No seasons yet."}
+              </p>
             ) : (
               <div className="space-y-2">
                 {leagues.map((league) => {
@@ -120,6 +122,7 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {canTrackGames && (
             <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-4">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
                 Create New Season
@@ -142,6 +145,7 @@ export default function SettingsPage() {
                 </button>
               </div>
             </div>
+            )}
           </div>
         </div>
       </div>

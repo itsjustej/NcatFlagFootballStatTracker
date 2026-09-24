@@ -4,18 +4,7 @@ import { useLeague } from '../../context/LeagueContext';
 import { possessionColor, TEAM_COLORS } from '../../constants/teamColors';
 import CurrentPlayPreview from './CurrentPlayPreview';
 
-function parseSecs(clock) {
-  const [m, s] = clock.split(':').map(Number);
-  return (m || 0) * 60 + (s || 0);
-}
-
-function formatTop(secs) {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-function buildDrives(log) {
+function buildDrives(log, currentHalf) {
   const map = new Map();
   for (const entry of log) {
     const existing = map.get(entry.driveId) ?? [];
@@ -31,12 +20,6 @@ function buildDrives(log) {
     const terminal   = [...plays].reverse().find((p) => p.driveResult);
     const result     = terminal?.driveResult ?? 'In Progress';
 
-    let timeOfPossession = null;
-    if (plays.length > 0 && first.clock && last.clock) {
-      const elapsed = parseSecs(first.clock) - parseSecs(last.clock);
-      if (elapsed > 0) timeOfPossession = formatTop(elapsed);
-    }
-
     drives.push({
       driveId,
       half:            first.half,
@@ -46,9 +29,18 @@ function buildDrives(log) {
       result,
       endHomeScore:    last.homeScore,
       endAwayScore:    last.awayScore,
-      timeOfPossession,
     });
   });
+
+  const latestHalf = Math.max(
+    currentHalf ?? 1,
+    ...drives.map((d) => d.half ?? 1),
+  );
+  for (const drive of drives) {
+    if (drive.result === 'In Progress' && drive.half < latestHalf) {
+      drive.result = 'End of Half';
+    }
+  }
 
   return drives.sort((a, b) => b.driveId - a.driveId);
 }
@@ -106,9 +98,6 @@ function DriveRow({ drive, homeName, awayName, defaultOpen, scrollRef }) {
           </div>
           <p className="text-[11px] text-slate-400 mt-0.5">
             {playCount} play{playCount !== 1 ? 's' : ''}, {drive.totalYards} yd{drive.totalYards !== 1 ? 's' : ''}
-            {drive.timeOfPossession && (
-              <span className="text-slate-500 ml-1.5">· {drive.timeOfPossession}</span>
-            )}
           </p>
         </div>
 
@@ -154,12 +143,6 @@ function DriveRow({ drive, homeName, awayName, defaultOpen, scrollRef }) {
                       </span>
                     </>
                   )}
-                  {entry.clock && (
-                    <>
-                      <span className="text-slate-700">·</span>
-                      <span className="text-[10px] text-slate-500 tabular-nums font-mono">{entry.clock}</span>
-                    </>
-                  )}
                 </div>
               </div>
             </div>
@@ -170,42 +153,42 @@ function DriveRow({ drive, homeName, awayName, defaultOpen, scrollRef }) {
   );
 }
 
+const PERIODS = [
+  { id: 1, label: '1st' },
+  { id: 2, label: '2nd' },
+  { id: 3, label: 'OT' },
+];
+
 export default function PlayByPlay({ log, homeName, awayName, gs, latestDriveId }) {
   const navigate    = useNavigate();
   const { clearGame } = useLeague();
-  const drives      = buildDrives(log);
-  const half1       = drives.filter((d) => d.half === 1);
-  const half2       = drives.filter((d) => d.half === 2);
+  const drives      = buildDrives(log, gs?.half);
+  const byPeriod    = {
+    1: drives.filter((d) => d.half === 1),
+    2: drives.filter((d) => d.half === 2),
+    3: drives.filter((d) => d.half === 3),
+  };
+  const available   = PERIODS.filter((period) => byPeriod[period.id].length > 0);
+  const latestPeriod = available.length ? available[available.length - 1].id : 1;
+  const [period, setPeriod] = useState(gs?.half && byPeriod[gs.half]?.length ? gs.half : latestPeriod);
   const scrollRef   = useRef(null);
   const listRef     = useRef(null);
+
+  useEffect(() => {
+    if (gs?.half && byPeriod[gs.half]?.length) setPeriod(gs.half);
+  }, [gs?.half]);
+
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [period]);
 
   useEffect(() => {
     if (latestDriveId && scrollRef.current && listRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [latestDriveId, log.length]);
+  }, [latestDriveId, log.length, period]);
 
-  const renderHalf = (halfDrives, label) => (
-    <div>
-      <div className="sticky top-0 z-10 px-4 py-2 bg-slate-800 border-b border-slate-700">
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
-      </div>
-      {halfDrives.length === 0 ? (
-        <p className="text-[11px] text-slate-600 px-4 py-3">No drives yet</p>
-      ) : (
-        halfDrives.map((d) => (
-          <DriveRow
-            key={d.driveId}
-            drive={d}
-            homeName={homeName}
-            awayName={awayName}
-            defaultOpen={d.driveId === latestDriveId}
-            scrollRef={scrollRef}
-          />
-        ))
-      )}
-    </div>
-  );
+  const visible = byPeriod[period] ?? [];
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -226,17 +209,44 @@ export default function PlayByPlay({ log, homeName, awayName, gs, latestDriveId 
 
       {gs && <CurrentPlayPreview gs={gs} homeName={homeName} awayName={awayName} />}
 
+      {available.length > 1 && (
+        <div className="flex gap-1.5 px-3 py-2 border-b border-slate-700 shrink-0">
+          {available.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setPeriod(item.id)}
+              className={`flex-1 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                period === item.id
+                  ? 'bg-slate-600 text-white'
+                  : 'text-slate-500 hover:text-slate-200 hover:bg-slate-700/60'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div ref={listRef} className="flex-1 overflow-y-auto min-h-0">
         {log.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2 text-center px-4">
             <p className="text-slate-500 text-sm font-medium">No plays yet</p>
             <p className="text-slate-600 text-xs">Select a player and log your first play</p>
           </div>
+        ) : visible.length === 0 ? (
+          <p className="text-[11px] text-slate-600 px-4 py-3">No drives yet</p>
         ) : (
-          <>
-            {half2.length > 0 && renderHalf(half2, '2nd Half')}
-            {half1.length > 0 && renderHalf(half1, '1st Half')}
-          </>
+          visible.map((d) => (
+            <DriveRow
+              key={d.driveId}
+              drive={d}
+              homeName={homeName}
+              awayName={awayName}
+              defaultOpen={d.driveId === latestDriveId}
+              scrollRef={scrollRef}
+            />
+          ))
         )}
       </div>
     </div>

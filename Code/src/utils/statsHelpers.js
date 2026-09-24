@@ -1,19 +1,19 @@
 // Shared stat calculation helpers used by DebugPage, TeamStats, PlayerStats, LeagueLeaders.
 
-import { attacksIncreasing, yardsGained as calcYardsGained, effectiveHomeAttacksRight } from '../gameLogic';
+import { attacksIncreasing, yardsGained as calcYardsGained, effectiveHomeAttacksRight, fieldLength } from '../gameLogic';
 
 /** eslint-disable eqeqeq — Supabase team IDs may be string or number */
 
-export function yardsGainedForPlay(play, homeTeamId, openingHomeAttacksRight = true) {
-  const homeAttacksRight = effectiveHomeAttacksRight(
-    openingHomeAttacksRight,
-    play.first_half !== false,
-  );
+export function yardsGainedForPlay(play, homeTeamId, openingHomeAttacksRight = true, hasFortyYard = true) {
   const offenseIsHome = play.offense_team == homeTeamId;
   const possession = offenseIsHome ? 'home' : 'away';
+  const homeAttacksRight = play.overtime
+    ? possession === 'home'
+    : effectiveHomeAttacksRight(openingHomeAttacksRight, play.first_half !== false);
+  const length = fieldLength(hasFortyYard);
 
   if (play.outcome === 'td') {
-    const endZone = attacksIncreasing(possession, homeAttacksRight) ? 80 : 0;
+    const endZone = attacksIncreasing(possession, homeAttacksRight) ? length : 0;
     const newYard = play.new_yard_line ?? endZone;
     return calcYardsGained(play.yard_line, newYard, possession, homeAttacksRight);
   }
@@ -45,7 +45,7 @@ export function isFourthDownAttempt(play) {
   );
 }
 
-export function isConverted(play, homeTeamId, homeAttacksRight = true) {
+export function isConverted(play, homeTeamId, homeAttacksRight = true, hasFortyYard = true) {
   if (play.outcome === 'td') return true;
   if (
     play.play_type === 'punt' ||
@@ -57,7 +57,7 @@ export function isConverted(play, homeTeamId, homeAttacksRight = true) {
     return false;
   }
   if (play.new_yard_line == null) return false;
-  return yardsGainedForPlay(play, homeTeamId, homeAttacksRight) >= play.distance;
+  return yardsGainedForPlay(play, homeTeamId, homeAttacksRight, hasFortyYard) >= play.distance;
 }
 
 /** Conversion plays where a receiver was targeted (has receiver participant). */
@@ -106,16 +106,16 @@ export function countPlayerInterceptions(playerId, participants, plays) {
   ).length;
 }
 
-export function sumPassYards(offPlays, homeTeamId, homeAttacksRight = true) {
+export function sumPassYards(offPlays, homeTeamId, homeAttacksRight = true, hasFortyYard = true) {
   return offPlays
     .filter((p) => p.play_type === 'pass' && isPassCompletionOutcome(p.outcome))
-    .reduce((s, p) => s + yardsGainedForPlay(p, homeTeamId, homeAttacksRight), 0);
+    .reduce((s, p) => s + yardsGainedForPlay(p, homeTeamId, homeAttacksRight, hasFortyYard), 0);
 }
 
-export function sumRushYards(offPlays, homeTeamId, homeAttacksRight = true) {
+export function sumRushYards(offPlays, homeTeamId, homeAttacksRight = true, hasFortyYard = true) {
   return offPlays
     .filter((p) => p.play_type === 'rush')
-    .reduce((s, p) => s + yardsGainedForPlay(p, homeTeamId, homeAttacksRight), 0);
+    .reduce((s, p) => s + yardsGainedForPlay(p, homeTeamId, homeAttacksRight, hasFortyYard), 0);
 }
 
 export function countPassCompletions(offPlays) {
@@ -145,9 +145,9 @@ export function isSuccessRatePlay(play) {
 }
 
 /** Whether the offense succeeded on this play (recalculated from stored yard lines). */
-export function isOffenseSuccessful(play, homeTeamId, homeAttacksRight = true) {
+export function isOffenseSuccessful(play, homeTeamId, homeAttacksRight = true, hasFortyYard = true) {
   if (!isSuccessRatePlay(play)) return false;
-  const yards = yardsGainedForPlay(play, homeTeamId, homeAttacksRight);
+  const yards = yardsGainedForPlay(play, homeTeamId, homeAttacksRight, hasFortyYard);
   return isSuccessfulPlayResult(play.outcome, play.down, play.distance, yards);
 }
 
@@ -163,11 +163,11 @@ export function opponentOffPlaysForTeam(teamId, teamGames, plays) {
 }
 
 /** Offensive success rate for a set of plays (0–100). */
-export function computeOffenseSuccessRate(plays, getHomeTeamId, getOpeningHar = () => true) {
+export function computeOffenseSuccessRate(plays, getHomeTeamId, getOpeningHar = () => true, getHasForty = () => true) {
   const eligible = plays.filter(isSuccessRatePlay);
   if (eligible.length === 0) return 0;
   const successes = eligible.filter((p) =>
-    isOffenseSuccessful(p, getHomeTeamId(p), getOpeningHar(p)),
+    isOffenseSuccessful(p, getHomeTeamId(p), getOpeningHar(p), getHasForty(p)),
   ).length;
   return (successes / eligible.length) * 100;
 }
@@ -191,9 +191,9 @@ export function isExplosiveYards(yards, playType = 'pass') {
 }
 
 /** Scrimmage pass completion (20+ yds) or rush (10+ yds). */
-export function isExplosivePlay(play, homeTeamId, homeAttacksRight = true) {
+export function isExplosivePlay(play, homeTeamId, homeAttacksRight = true, hasFortyYard = true) {
   if (!isSuccessRatePlay(play)) return false;
-  const yards = yardsGainedForPlay(play, homeTeamId, homeAttacksRight);
+  const yards = yardsGainedForPlay(play, homeTeamId, homeAttacksRight, hasFortyYard);
   if (play.play_type === 'pass') {
     return isPassCompletionOutcome(play.outcome) && isExplosivePassYards(yards);
   }
@@ -203,24 +203,25 @@ export function isExplosivePlay(play, homeTeamId, homeAttacksRight = true) {
   return false;
 }
 
-export function countExplosivePlays(plays, getHomeTeamId, getHomeAttacksRight = () => true) {
+export function countExplosivePlays(plays, getHomeTeamId, getHomeAttacksRight = () => true, getHasForty = () => true) {
   return plays.filter((p) =>
-    isExplosivePlay(p, getHomeTeamId(p), getHomeAttacksRight(p)),
+    isExplosivePlay(p, getHomeTeamId(p), getHomeAttacksRight(p), getHasForty(p)),
   ).length;
 }
 
 /** Distance in yards from the offense's snap to the opponent's goal line. */
 export const RED_ZONE_YARDS = 20;
 
-export function yardsToOpponentGoal(yardLine, possession, homeAttacksRight = true) {
+export function yardsToOpponentGoal(yardLine, possession, homeAttacksRight = true, hasFortyYard = true) {
   const homeAtLeft = homeAttacksRight !== false;
-  const own = possession === 'home' ? (homeAtLeft ? 0 : 80) : (homeAtLeft ? 80 : 0);
-  const opp = own === 0 ? 80 : 0;
+  const length = fieldLength(hasFortyYard);
+  const own = possession === 'home' ? (homeAtLeft ? 0 : length) : (homeAtLeft ? length : 0);
+  const opp = own === 0 ? length : 0;
   return Math.abs(yardLine - opp);
 }
 
-export function isRedZoneSnap(yardLine, possession, homeAttacksRight = true) {
-  return yardsToOpponentGoal(yardLine, possession, homeAttacksRight) <= RED_ZONE_YARDS;
+export function isRedZoneSnap(yardLine, possession, homeAttacksRight = true, hasFortyYard = true) {
+  return yardsToOpponentGoal(yardLine, possession, homeAttacksRight, hasFortyYard) <= RED_ZONE_YARDS;
 }
 
 function possessionForOffenseTeam(offenseTeamId, homeTeamId) {
@@ -248,7 +249,7 @@ function assignDriveIdsForGame(sortedNonConvPlays) {
  * Red zone trips: drives with at least one snap inside the opponent's 20.
  * Success: offensive touchdown on that drive.
  */
-export function computeRedZoneStats(teamId, teamGames, plays, getHomeTeamId, getHar) {
+export function computeRedZoneStats(teamId, teamGames, plays, getHomeTeamId, getHar, getHasForty = () => true) {
   let redZoneAttempts = 0;
   let redZoneScores = 0;
 
@@ -273,9 +274,10 @@ export function computeRedZoneStats(teamId, teamGames, plays, getHomeTeamId, get
       if (drivePlays[0].offense_team != teamId) continue;
 
       const har = getHar(game.game_id);
+      const hasForty = getHasForty(game.game_id);
       const inRedZone = drivePlays.some((p) => {
         const possession = possessionForOffenseTeam(p.offense_team, homeId);
-        return isRedZoneSnap(p.yard_line, possession, har);
+        return isRedZoneSnap(p.yard_line, possession, har, hasForty);
       });
 
       if (!inRedZone) continue;
@@ -292,9 +294,9 @@ export function computeRedZoneStats(teamId, teamGames, plays, getHomeTeamId, get
 }
 
 /** Single-game team totals for the recap box score. */
-export function computeTeamBoxStats(teamId, plays, homeTeamId, homeAttacksRight = true) {
-  const yg = (p) => yardsGainedForPlay(p, homeTeamId, homeAttacksRight);
-  const converted = (p) => isConverted(p, homeTeamId, homeAttacksRight);
+export function computeTeamBoxStats(teamId, plays, homeTeamId, homeAttacksRight = true, hasFortyYard = true) {
+  const yg = (p) => yardsGainedForPlay(p, homeTeamId, homeAttacksRight, hasFortyYard);
+  const converted = (p) => isConverted(p, homeTeamId, homeAttacksRight, hasFortyYard);
 
   const offPlays = (plays || []).filter(
     (p) => p.offense_team == teamId && !p.is_conversion && p.play_type !== 'penalty',
@@ -322,20 +324,20 @@ export function computeTeamBoxStats(teamId, plays, homeTeamId, homeAttacksRight 
     interceptionsThrown: passPlays.filter((p) => isInterceptionOutcome(p.outcome)).length,
     thirdDownConversions: thirdDownPlays.filter(converted).length,
     thirdDownAttempts: thirdDownPlays.length,
-    successRate: computeOffenseSuccessRate(offPlays, () => homeTeamId, () => homeAttacksRight),
-    explosivePlays: countExplosivePlays(offPlays, () => homeTeamId, () => homeAttacksRight),
+    successRate: computeOffenseSuccessRate(offPlays, () => homeTeamId, () => homeAttacksRight, () => hasFortyYard),
+    explosivePlays: countExplosivePlays(offPlays, () => homeTeamId, () => homeAttacksRight, () => hasFortyYard),
   };
 }
 
 /** Single-game player line for the recap box score. */
-export function computePlayerBoxStats(player, plays, participants, homeTeamId, homeAttacksRight = true) {
+export function computePlayerBoxStats(player, plays, participants, homeTeamId, homeAttacksRight = true, hasFortyYard = true) {
   const pid = player.player_id;
   const byRole = (role) =>
     (participants || [])
       .filter((p) => p.player_id === pid && p.role === role)
       .map((p) => p.play_id);
   const getPlays = (ids) => (plays || []).filter((p) => ids.includes(p.play_id));
-  const yg = (p) => yardsGainedForPlay(p, homeTeamId, homeAttacksRight);
+  const yg = (p) => yardsGainedForPlay(p, homeTeamId, homeAttacksRight, hasFortyYard);
 
   const passerIds = byRole('passer');
   const rusherIds = byRole('rusher');
@@ -367,13 +369,17 @@ export function computePlayerBoxStats(player, plays, participants, homeTeamId, h
 
   const interceptions = countPlayerInterceptions(pid, participants, plays);
   const flagPulls = defenderData.length;
+  const flagPullsForLoss = defenderData.filter((p) =>
+    (p.play_type === 'rush' || (p.play_type === 'pass' && p.outcome === 'complete'))
+    && yg(p) < 0
+  ).length;
 
   const hasStats =
     passAttempts + carries + receptions + interceptions + flagPulls + passingYards + rushingYards + receivingYards > 0;
 
   return {
     player_id: pid,
-    name: player.name,
+    name: String(player.name ?? '').trim(),
     team_id: player.team_id,
     passAttempts,
     passCompletions,
@@ -388,6 +394,7 @@ export function computePlayerBoxStats(player, plays, participants, homeTeamId, h
     receivingTDs,
     interceptions,
     flagPulls,
+    flagPullsForLoss,
     hasStats,
   };
 }

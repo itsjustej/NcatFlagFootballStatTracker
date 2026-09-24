@@ -3,12 +3,24 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 
-const NAV_LINKS = [
+const ALL_NAV_LINKS = [
   { to: "/", label: "Games" },
   { to: "/stats", label: "Stats" },
   { to: "/teams", label: "Teams" },
   { to: "/settings", label: "Settings" },
 ];
+
+const SOCIAL_NAV_LINKS = [
+  { to: "/", label: "Games" },
+  { to: "/stats", label: "Stats" },
+  { to: "/settings", label: "Settings" },
+];
+
+function roleDisplay(role) {
+  if (role === "admin") return "Admin";
+  if (role === "social") return "Social";
+  return "Worker";
+}
 
 function isNavActive(pathname, to) {
   if (to === "/") return pathname === "/" || pathname.startsWith("/games");
@@ -16,17 +28,18 @@ function isNavActive(pathname, to) {
 }
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, logout, isSocial } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const navLinks = isSocial ? SOCIAL_NAV_LINKS : ALL_NAV_LINKS;
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
-  const roleLabel = user?.role === "admin" ? "Admin" : "Worker";
+  const roleLabel = roleDisplay(user?.role);
 
   return (
     <header className="bg-slate-900 border-b border-slate-700 sticky top-0 z-50">
@@ -39,7 +52,7 @@ export default function Navbar() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 lg:gap-8">
-          {NAV_LINKS.map(({ to, label }) => (
+          {navLinks.map(({ to, label }) => (
             <Link
               key={to}
               to={to}
@@ -57,6 +70,15 @@ export default function Navbar() {
               {roleLabel}
             </span>
           )}
+          {user && (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="text-sm text-red-400 hover:text-red-300 font-medium"
+            >
+              Log out
+            </button>
+          )}
         </nav>
 
         <button
@@ -72,7 +94,7 @@ export default function Navbar() {
       {open && (
         <div className="md:hidden border-t border-slate-700 bg-slate-900 px-4 py-3 pb-safe">
           <nav className="flex flex-col gap-1">
-            {NAV_LINKS.map(({ to, label }) => (
+            {navLinks.map(({ to, label }) => (
               <Link
                 key={to}
                 to={to}

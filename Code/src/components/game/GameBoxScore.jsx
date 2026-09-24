@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 function fmtPct(val) {
   if (typeof val !== 'number' || Number.isNaN(val)) return '—';
   return `${val.toFixed(1)}%`;
@@ -51,7 +53,8 @@ function PlayerTable({ players }) {
             <th className="px-2 py-2 text-center text-yellow-400">C Yds</th>
             <th className="px-2 py-2 text-center text-yellow-400">C TD</th>
             <th className="px-2 py-2 text-center border-l border-slate-700 text-red-400">INT</th>
-            <th className="px-2 py-2 text-center text-red-400 pr-3">FP</th>
+            <th className="px-2 py-2 text-center text-red-400">FP</th>
+            <th className="px-2 py-2 text-center text-red-400 pr-3">FPL</th>
           </tr>
         </thead>
         <tbody>
@@ -76,7 +79,8 @@ function PlayerTable({ players }) {
               <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.receivingYards}</td>
               <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.receivingTDs}</td>
               <td className="px-2 py-2 text-center tabular-nums text-slate-300 border-l border-slate-700/80">{p.interceptions}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300 pr-3">{p.flagPulls}</td>
+              <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.flagPulls}</td>
+              <td className="px-2 py-2 text-center tabular-nums text-slate-300 pr-3">{p.flagPullsForLoss}</td>
             </tr>
           ))}
         </tbody>
@@ -92,13 +96,23 @@ export default function GameBoxScore({
   awayStats,
   homePlayers,
   awayPlayers,
+  view = "all",
 }) {
+  const [side, setSide] = useState("home");
+  const showTeam = view === "all" || view === "team";
+  const showPlayers = view === "all" || view === "players";
+  const playerName = side === "home" ? homeName : awayName;
+  const playerRows = side === "home" ? homePlayers : awayPlayers;
+
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
-        <div className="px-4 py-4 border-b border-slate-700">
-          <h2 className="text-xl font-bold text-white">Team Stats</h2>
-        </div>
+      {showTeam && (
+      <div className={view === "all" ? "rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" : ""}>
+        {view === "all" && (
+          <div className="px-4 py-4 border-b border-slate-700">
+            <h2 className="text-xl font-bold text-white">Team Stats</h2>
+          </div>
+        )}
         <div className="px-4 py-3">
           <div className="grid grid-cols-3 gap-2 pb-2 mb-1 border-b border-slate-700">
             <span className="text-right text-xs font-black uppercase tracking-widest text-blue-400 truncate">{homeName}</span>
@@ -126,22 +140,56 @@ export default function GameBoxScore({
           <CmpRow label="Expl." home={homeStats.explosivePlays} away={awayStats.explosivePlays} />
         </div>
       </div>
+      )}
 
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
-        <div className="px-4 py-4 border-b border-slate-700">
-          <h2 className="text-xl font-bold text-white">{homeName}</h2>
-          <p className="text-slate-400 text-sm mt-0.5">Player stats</p>
-        </div>
-        <PlayerTable players={homePlayers} />
-      </div>
+      {showPlayers && view === "all" && (
+        <>
+          <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+            <div className="px-4 py-4 border-b border-slate-700">
+              <h2 className="text-xl font-bold text-white">{homeName}</h2>
+              <p className="text-slate-400 text-sm mt-0.5">Player stats</p>
+            </div>
+            <PlayerTable players={homePlayers} />
+          </div>
 
-      <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
-        <div className="px-4 py-4 border-b border-slate-700">
-          <h2 className="text-xl font-bold text-white">{awayName}</h2>
-          <p className="text-slate-400 text-sm mt-0.5">Player stats</p>
+          <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+            <div className="px-4 py-4 border-b border-slate-700">
+              <h2 className="text-xl font-bold text-white">{awayName}</h2>
+              <p className="text-slate-400 text-sm mt-0.5">Player stats</p>
+            </div>
+            <PlayerTable players={awayPlayers} />
+          </div>
+        </>
+      )}
+
+      {showPlayers && view === "players" && (
+        <div>
+          <div className="flex gap-2 px-4 py-3 border-b border-slate-700">
+            {[
+              { id: "home", name: homeName },
+              { id: "away", name: awayName },
+            ].map((team) => (
+              <button
+                key={team.id}
+                type="button"
+                onClick={() => setSide(team.id)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                  side === team.id
+                    ? "bg-blue-600 text-white"
+                    : "text-slate-400 hover:text-white hover:bg-slate-700"
+                }`}
+              >
+                {team.name}
+              </button>
+            ))}
+          </div>
+          <div className="px-4 pt-3 pb-1">
+            <h2 className="text-lg font-bold text-white">{playerName}</h2>
+            <p className="text-slate-400 text-sm">Player stats</p>
+          </div>
+          <PlayerTable players={playerRows} />
         </div>
-        <PlayerTable players={awayPlayers} />
-      </div>
+      )}
     </div>
   );
 }

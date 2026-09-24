@@ -1,6 +1,25 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { distanceToFirst, firstDownYard, kickoffYard } from '../gameLogic';
+import { cleanPlayerName } from '../utils/playerName';
+
+/**
+ * Numbered players run left to right by jersey. Players still waiting on a
+ * number stay on the right, ordered by name.
+ */
+export function sortByJersey(players) {
+  return [...players].sort((a, b) => {
+    const aHas = a.number != null && !Number.isNaN(Number(a.number));
+    const bHas = b.number != null && !Number.isNaN(Number(b.number));
+    if (aHas && bHas) {
+      const diff = Number(a.number) - Number(b.number);
+      if (diff !== 0) return diff;
+    } else if (aHas !== bHas) {
+      return aHas ? -1 : 1;
+    }
+    return String(a.name).localeCompare(String(b.name));
+  });
+}
 
 /**
  * Fetches a game, both team rosters, and jersey numbers from the Roster table.
@@ -39,6 +58,7 @@ export function useGame(gameId) {
             game_id,
             opening_possession,
             home_attacks_right,
+            has_forty_yard,
             home:Team!home_team(team_id, name),
             away:Team!away_team(team_id, name)
           `)
@@ -85,7 +105,7 @@ export function useGame(gameId) {
         (players || []).forEach(p => {
           const mapped = {
             id:     String(p.player_id),
-            name:   p.name,
+            name:   cleanPlayerName(p.name),
             number: jerseyMap[p.player_id] ?? null,
             team:   p.team_id === gameInfo.homeTeamId ? 'home' : 'away',
           };
@@ -95,17 +115,18 @@ export function useGame(gameId) {
 
         const openingPossession = gameRow.opening_possession === 'away' ? 'away' : 'home';
         const homeAttacksRight    = gameRow.home_attacks_right !== false;
-        const startYard           = kickoffYard(openingPossession, homeAttacksRight);
+        const hasFortyYard        = gameRow.has_forty_yard !== false;
+        const startYard           = kickoffYard(openingPossession, homeAttacksRight, hasFortyYard);
         const initialGameState = {
           half:               1,
-          clock:              '20:00',
           down:               1,
-          distance:           distanceToFirst(startYard, openingPossession, homeAttacksRight),
+          distance:           distanceToFirst(startYard, openingPossession, homeAttacksRight, hasFortyYard),
           yardLine:           startYard,
           possession:         openingPossession,
           openingPossession,
           openingHomeAttacksRight: homeAttacksRight,
           homeAttacksRight,
+          hasFortyYard,
           homeScore:          0,
           awayScore:          0,
           selectedOffender:   null,
@@ -117,7 +138,7 @@ export function useGame(gameId) {
           lastPasser:         { home: null, away: null },
           penaltyTeam:        null,
           driveId:            1,
-          fdTarget:           firstDownYard(startYard, openingPossession, homeAttacksRight),
+          fdTarget:           firstDownYard(startYard, openingPossession, homeAttacksRight, hasFortyYard),
           log:                [],
           refreshTrigger:     0,
           gameId:             gameInfo.gameId,
@@ -125,8 +146,8 @@ export function useGame(gameId) {
           awayTeamId:         gameInfo.awayTeamId,
         };
 
-        setHomePlayers(home);
-        setAwayPlayers(away);
+        setHomePlayers(sortByJersey(home));
+        setAwayPlayers(sortByJersey(away));
         setGame({ ...gameInfo, initialGameState });
 
       } catch (err) {
@@ -149,7 +170,7 @@ export function useGame(gameId) {
 
     // Optimistic local update
     const applyUpdate = (list) =>
-      list.map(p => p.id === String(playerId) ? { ...p, number: jersey } : p);
+      sortByJersey(list.map(p => p.id === String(playerId) ? { ...p, number: jersey } : p));
 
     setHomePlayers(prev => applyUpdate(prev));
     setAwayPlayers(prev => applyUpdate(prev));

@@ -76,14 +76,33 @@ export default function PlayerStats() {
       const { data: playersData } = await supabase.from("Player").select("*").eq("team_id", teamId);
       const { data: plays }       = await supabase.from("Play").select("*");
       const { data: participants }= await supabase.from("Participants").select("*");
-      const { data: games }       = await supabase.from("Game").select("game_id, home_team, home_attacks_right");
+      const { data: games }       = await supabase.from("Game").select("game_id, league_id, home_team, home_attacks_right, has_forty_yard");
+      const playerIds = (playersData || []).map((p) => p.player_id);
+      const { data: roster } = playerIds.length
+        ? await supabase.from("Roster").select("player_id, game_id, jersey").in("player_id", playerIds)
+        : { data: [] };
+
+      const leagueGameIds = new Set(
+        (games || [])
+          .filter((g) => g.league_id === currentLeague.league_id)
+          .map((g) => g.game_id),
+      );
+      const gamesWithJersey = new Map();
+      for (const row of roster || []) {
+        if (row.jersey == null || !leagueGameIds.has(row.game_id)) continue;
+        const ids = gamesWithJersey.get(row.player_id) ?? new Set();
+        ids.add(row.game_id);
+        gamesWithJersey.set(row.player_id, ids);
+      }
 
       // Build game→home map
       const ghMap = {};
       const harMap = {};
+      const fortyMap = {};
       for (const g of (games || [])) {
         ghMap[g.game_id] = g.home_team;
         harMap[g.game_id] = g.home_attacks_right ?? true;
+        fortyMap[g.game_id] = g.has_forty_yard !== false;
       }
 
       const computed = (playersData || []).map(player => {
@@ -94,7 +113,6 @@ export default function PlayerStats() {
         const rusherIds      = byRole('rusher');
         const receiverIds    = byRole('receiver');
         const defenderIds    = byRole('defender');
-        const interceptorIds = byRole('interceptor');
 
         const getPlays = ids => (plays || []).filter(p => ids.includes(p.play_id));
 
@@ -102,14 +120,12 @@ export default function PlayerStats() {
         const rusherData   = getPlays(rusherIds).filter(p => !p.is_conversion && p.play_type !== 'penalty');
         const receiverData = getPlays(receiverIds).filter(p => !p.is_conversion && p.play_type !== 'penalty');
         const defenderData = getPlays(defenderIds).filter(p => !p.is_conversion && p.play_type !== 'penalty');
-        const convPasser   = getPlays(passerIds).filter(p => p.is_conversion);
         const convReceiver = getPlays(receiverIds).filter(p => p.is_conversion);
 
-        const yg = p => yardsGainedForPlay(p, ghMap[p.game_id], harMap[p.game_id]);
+        const yg = p => yardsGainedForPlay(p, ghMap[p.game_id], harMap[p.game_id], fortyMap[p.game_id]);
 
-        const playerPlayIds = new Set([...passerIds, ...rusherIds, ...receiverIds, ...defenderIds, ...interceptorIds]);
-        const playerGameIds = new Set((plays || []).filter(p => playerPlayIds.has(p.play_id)).map(p => p.game_id));
-        const gamesPlayed   = playerGameIds.size || 1;
+        const gamesPlayed = gamesWithJersey.get(pid)?.size ?? 0;
+        const perGame = (total) => (gamesPlayed > 0 ? total / gamesPlayed : 0);
 
         // Passing
         const passAttempts       = passerData.filter(p => p.play_type === 'pass').length;
@@ -137,6 +153,7 @@ export default function PlayerStats() {
         const recExplosive = receiverData
           .filter(p => isReceivingOutcome(p.outcome) && isExplosiveYards(yg(p), 'pass'))
           .length;
+        const conversionsCaught = convReceiver.filter(p => p.outcome === 'complete').length;
 
         // Defense — TFL includes backward passes too
         const interceptions     = countPlayerInterceptions(pid, participants, plays);
@@ -146,24 +163,16 @@ export default function PlayerStats() {
           && yg(p) < 0
         ).length;
 
-        // Conversions
-        const conv1Thrown = convPasser.filter(p => p.conv_points === 1 && p.outcome === 'complete').length;
-        const conv1Caught = convReceiver.filter(p => p.conv_points === 1 && p.outcome === 'complete').length;
-        const conv2Thrown = convPasser.filter(p => p.conv_points === 2 && p.outcome === 'complete').length;
-        const conv2Caught = convReceiver.filter(p => p.conv_points === 2 && p.outcome === 'complete').length;
-        const conv3Thrown = convPasser.filter(p => p.conv_points === 3 && p.outcome === 'complete').length;
-        const conv3Caught = convReceiver.filter(p => p.conv_points === 3 && p.outcome === 'complete').length;
-
         return {
-          player_id: pid, name: player.name, gamesPlayed,
+          player_id: pid, name: String(player.name ?? '').trim(), gamesPlayed,
           passingYards, passCompletions, passAttempts, completionPct, passingTDs, passExplosive, interceptionsThrown,
           carries, rushingYards, rushingTDs, yardsPerCarry, rushExplosive,
-          receptions, receivingYards, receivingTDs, yardsPerReception, recExplosive,
+          receptions, receivingYards, receivingTDs, yardsPerReception, recExplosive, conversionsCaught,
           interceptions, flagPulls, flagPullsForLoss,
-          conv1Thrown, conv1Caught, conv2Thrown, conv2Caught, conv3Thrown, conv3Caught,
-          passYpg: passingYards / gamesPlayed,
-          rushYpg: rushingYards / gamesPlayed,
-          recYpg:  receivingYards / gamesPlayed,
+          passYpg: perGame(passingYards),
+          rushYpg: perGame(rushingYards),
+          recYpg:  perGame(receivingYards),
+          flagPullsPerGame: perGame(flagPulls),
         };
       });
 
@@ -171,7 +180,7 @@ export default function PlayerStats() {
       setLoading(false);
     };
     fetchPlayers();
-  }, [teamId]);
+  }, [teamId, currentLeague]);
 
   return (
     <div className="space-y-4">
@@ -209,10 +218,9 @@ export default function PlayerStats() {
                   <th colSpan={2} className="sticky left-0 z-40 bg-slate-900 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.65)]" />
                   <GroupHeader label="Passing"     cols={5} className="text-blue-400 border-l border-slate-600" />
                   <GroupHeader label="Rushing"     cols={5} className="text-green-400 border-l border-slate-600" />
-                  <GroupHeader label="Receiving"   cols={5} className="text-yellow-400 border-l border-slate-600" />
+                  <GroupHeader label="Receiving"   cols={6} className="text-yellow-400 border-l border-slate-600" />
                   <GroupHeader label="Defense"     cols={3} className="text-red-400 border-l border-slate-600" />
-                  <GroupHeader label="Conversions" cols={6} className="text-orange-400 border-l border-slate-600" />
-                  <GroupHeader label="Per Game"    cols={3} className="text-purple-400 border-l border-slate-600" />
+                  <GroupHeader label="Per Game"    cols={4} className="text-purple-400 border-l border-slate-600" />
                 </tr>
                 <tr className="bg-slate-800 border-b border-slate-700">
                   <SortTh label="Player"     colKey="name"           sticky className="min-w-[130px] pl-3" />
@@ -232,18 +240,14 @@ export default function PlayerStats() {
                   <SortTh label="Rec TDs"    colKey="receivingTDs"   className="min-w-[68px] text-center" />
                   <SortTh label="Expl."      colKey="recExplosive"   className="min-w-[52px] text-center" />
                   <SortTh label="Yds/Rec"    colKey="yardsPerReception" className="min-w-[68px] text-center" />
+                  <SortTh label="Conv"       colKey="conversionsCaught" className="min-w-[56px] text-center" />
                   <SortTh label="INTs"       colKey="interceptions"  className="border-l border-slate-600 min-w-[52px] text-center" />
                   <SortTh label="FP"         colKey="flagPulls"      className="min-w-[44px] text-center" />
                   <SortTh label="FPL"        colKey="flagPullsForLoss" className="min-w-[44px] text-center" />
-                  <SortTh label="1pt Thr"    colKey="conv1Thrown"    className="border-l border-slate-600 min-w-[64px] text-center" />
-                  <SortTh label="1pt Cau"    colKey="conv1Caught"    className="min-w-[64px] text-center" />
-                  <SortTh label="2pt Thr"    colKey="conv2Thrown"    className="min-w-[64px] text-center" />
-                  <SortTh label="2pt Cau"    colKey="conv2Caught"    className="min-w-[64px] text-center" />
-                  <SortTh label="3pt Thr"    colKey="conv3Thrown"    className="min-w-[64px] text-center" />
-                  <SortTh label="3pt Cau"    colKey="conv3Caught"    className="min-w-[64px] text-center" />
                   <SortTh label="Pass Yds/G" colKey="passYpg"        className="border-l border-slate-600 min-w-[84px] text-center" />
                   <SortTh label="Rush Yds/G" colKey="rushYpg"        className="min-w-[84px] text-center" />
-                  <SortTh label="Rec Yds/G"  colKey="recYpg"         className="min-w-[84px] text-center pr-3" />
+                  <SortTh label="Rec Yds/G"  colKey="recYpg"         className="min-w-[84px] text-center" />
+                  <SortTh label="FP/G"       colKey="flagPullsPerGame" className="min-w-[64px] text-center pr-3" />
                 </tr>
               </thead>
               <tbody>
@@ -274,18 +278,14 @@ export default function PlayerStats() {
                     <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.receivingTDs}</td>
                     <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.recExplosive}</td>
                     <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{fmt(p.yardsPerReception)}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conversionsCaught}</td>
                     <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.interceptions}</td>
                     <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.flagPulls}</td>
                     <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.flagPullsForLoss}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.conv1Thrown}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conv1Caught}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conv2Thrown}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conv2Caught}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conv3Thrown}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conv3Caught}</td>
                     <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{fmt(p.passYpg)}</td>
                     <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{fmt(p.rushYpg)}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums pr-3">{fmt(p.recYpg)}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{fmt(p.recYpg)}</td>
+                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums pr-3">{fmt(p.flagPullsPerGame)}</td>
                   </tr>
                 ))}
               </tbody>

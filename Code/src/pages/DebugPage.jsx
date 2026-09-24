@@ -30,9 +30,13 @@ const ratio = (num, den) => `${num}/${den}`;
 
 function computeTeamStats(tid, homeTeamId, plays, participants, games) {
   const harMap = {};
-  for (const g of games) harMap[g.game_id] = g.home_attacks_right ?? true;
-  const yg = (p) => yardsGainedForPlay(p, homeTeamId, harMap[p.game_id]);
-  const converted = (p) => isConverted(p, homeTeamId, harMap[p.game_id]);
+  const fortyMap = {};
+  for (const g of games) {
+    harMap[g.game_id] = g.home_attacks_right ?? true;
+    fortyMap[g.game_id] = g.has_forty_yard !== false;
+  }
+  const yg = (p) => yardsGainedForPlay(p, homeTeamId, harMap[p.game_id], fortyMap[p.game_id]);
+  const converted = (p) => isConverted(p, homeTeamId, harMap[p.game_id], fortyMap[p.game_id]);
   // eslint-disable-next-line eqeqeq
   const offPlays = plays.filter(p => p.offense_team == tid && !p.is_conversion && p.play_type !== "penalty");
   // eslint-disable-next-line eqeqeq
@@ -67,12 +71,12 @@ function computeTeamStats(tid, homeTeamId, plays, participants, games) {
 
   // Success rate (recalculated from yard lines + down/distance)
   const successible = offPlays.filter(isSuccessRatePlay);
-  const successful  = successible.filter(p => isOffenseSuccessful(p, homeTeamId, harMap[p.game_id]));
+  const successful  = successible.filter(p => isOffenseSuccessful(p, homeTeamId, harMap[p.game_id], fortyMap[p.game_id]));
   const successRate = successible.length > 0
     ? (successful.length / successible.length) * 100
     : 0;
 
-  const explosivePlays = countExplosivePlays(offPlays, p => homeTeamId, p => harMap[p.game_id]);
+  const explosivePlays = countExplosivePlays(offPlays, p => homeTeamId, p => harMap[p.game_id], p => fortyMap[p.game_id]);
 
   // TFLs forced — rush plays that went backward with a defender participant
   const defRushTFLIds = new Set(
@@ -114,8 +118,12 @@ function computeTeamStats(tid, homeTeamId, plays, participants, games) {
 
 function computePlayerStats(playersData, homeTeamId, plays, participants, games) {
   const harMap = {};
-  for (const g of games) harMap[g.game_id] = g.home_attacks_right ?? true;
-  const yg = (p) => yardsGainedForPlay(p, homeTeamId, harMap[p.game_id]);
+  const fortyMap = {};
+  for (const g of games) {
+    harMap[g.game_id] = g.home_attacks_right ?? true;
+    fortyMap[g.game_id] = g.has_forty_yard !== false;
+  }
+  const yg = (p) => yardsGainedForPlay(p, homeTeamId, harMap[p.game_id], fortyMap[p.game_id]);
   return playersData.map((player) => {
     const pid = player.player_id;
 
@@ -296,7 +304,7 @@ export default function DebugPage() {
 
     const { data: gameRow } = await supabase
       .from("Game")
-      .select("game_id, home_team, away_team, home_attacks_right, home:Team!home_team(team_id, name), away:Team!away_team(team_id, name)")
+      .select("game_id, home_team, away_team, home_attacks_right, has_forty_yard, home:Team!home_team(team_id, name), away:Team!away_team(team_id, name)")
       .eq("game_id", gid)
       .single();
 

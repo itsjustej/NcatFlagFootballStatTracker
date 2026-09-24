@@ -203,19 +203,32 @@ export default function LeagueLeaders() {
       const { data: games }        = await supabase.from("Game").select("*").eq("league_id", currentLeague.league_id);
       const { data: allPlays }     = await supabase.from("Play").select("*");
       const { data: participants } = await supabase.from("Participants").select("*");
+      const leaderPlayerIds = (players || []).map((p) => p.player_id);
+      const { data: roster } = leaderPlayerIds.length
+        ? await supabase.from("Roster").select("player_id, game_id, jersey").in("player_id", leaderPlayerIds)
+        : { data: [] };
 
       const leagueGameIds = new Set((games || []).map((g) => g.game_id));
       const plays = (allPlays || []).filter((p) => leagueGameIds.has(p.game_id));
+      const gamesWithJersey = new Map();
+      for (const row of roster || []) {
+        if (row.jersey == null || !leagueGameIds.has(row.game_id)) continue;
+        const ids = gamesWithJersey.get(row.player_id) ?? new Set();
+        ids.add(row.game_id);
+        gamesWithJersey.set(row.player_id, ids);
+      }
 
       // Build game→home map
       const ghMap = {};
       const harMap = {};
+      const fortyMap = {};
       for (const g of (games || [])) {
         ghMap[g.game_id] = g.home_team;
         harMap[g.game_id] = g.home_attacks_right ?? true;
+        fortyMap[g.game_id] = g.has_forty_yard !== false;
       }
 
-      const yg = p => yardsGainedForPlay(p, ghMap[p.game_id], harMap[p.game_id]);
+      const yg = p => yardsGainedForPlay(p, ghMap[p.game_id], harMap[p.game_id], fortyMap[p.game_id]);
 
       // ── PLAYER STATS ──────────────────────────────────────────────────────
       const computedPlayers = (players || []).map(player => {
@@ -227,7 +240,6 @@ export default function LeagueLeaders() {
         const rusherIds      = byRole('rusher');
         const receiverIds    = byRole('receiver');
         const defenderIds    = byRole('defender');
-        const interceptorIds = byRole('interceptor');
 
         const getPlays = ids => (plays || []).filter(p => ids.includes(p.play_id));
 
@@ -258,21 +270,20 @@ export default function LeagueLeaders() {
           && yg(p) < 0
         ).length;
 
-        const allIds    = new Set([...passerIds, ...rusherIds, ...receiverIds, ...defenderIds, ...interceptorIds]);
-        const gameIds   = new Set((plays || []).filter(p => allIds.has(p.play_id)).map(p => p.game_id));
-        const gamesPlayed = gameIds.size || 1;
+        const gamesPlayed = gamesWithJersey.get(pid)?.size ?? 0;
+        const perGame = (total) => (gamesPlayed > 0 ? total / gamesPlayed : 0);
 
         return {
           player_id: pid,
-          name: player.name,
+          name: String(player.name ?? '').trim(),
           team_name: team?.name || '',
           team_abbr: team?.abbreviation || team?.abbr || team?.name || '',
           passingYards, passingTDs, completionPct,
           rushingYards, rushes, rushingTDs,
           receivingYards, receivingTDs, receptions,
-          passingYpg:   passingYards   / gamesPlayed,
-          rushingYpg:   rushingYards   / gamesPlayed,
-          receivingYpg: receivingYards / gamesPlayed,
+          passingYpg:   perGame(passingYards),
+          rushingYpg:   perGame(rushingYards),
+          receivingYpg: perGame(receivingYards),
           interceptions, flagPulls, flagPullsForLoss,
         };
       });
@@ -326,6 +337,7 @@ export default function LeagueLeaders() {
           successibleOff,
           (p) => ghMap[p.game_id],
           (p) => harMap[p.game_id],
+          (p) => fortyMap[p.game_id],
         );
 
         const oppOffPlays = opponentOffPlaysForTeam(tid, teamGames, plays);
@@ -333,10 +345,11 @@ export default function LeagueLeaders() {
           oppOffPlays,
           (p) => ghMap[p.game_id],
           (p) => harMap[p.game_id],
+          (p) => fortyMap[p.game_id],
         );
 
-        const explosivePlays = countExplosivePlays(offPlays, p => ghMap[p.game_id], p => harMap[p.game_id]);
-        const explosivePlaysAgainst = countExplosivePlays(defPlays, p => ghMap[p.game_id], p => harMap[p.game_id]);
+        const explosivePlays = countExplosivePlays(offPlays, p => ghMap[p.game_id], p => harMap[p.game_id], p => fortyMap[p.game_id]);
+        const explosivePlaysAgainst = countExplosivePlays(defPlays, p => ghMap[p.game_id], p => harMap[p.game_id], p => fortyMap[p.game_id]);
 
         const interceptions = defPlays.filter(p => isInterceptionOutcome(p.outcome)).length;
 
@@ -389,6 +402,7 @@ export default function LeagueLeaders() {
           plays,
           (gameId) => ghMap[gameId],
           (gameId) => harMap[gameId],
+          (gameId) => fortyMap[gameId],
         );
 
         return {

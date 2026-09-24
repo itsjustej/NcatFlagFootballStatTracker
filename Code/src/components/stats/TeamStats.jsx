@@ -133,9 +133,11 @@ export default function TeamStats() {
       // Build game→home map for direction-aware calculations
       const ghMap = {};
       const harMap = {};
+      const fortyMap = {};
       for (const g of (games || [])) {
         ghMap[g.game_id] = g.home_team;
         harMap[g.game_id] = g.home_attacks_right ?? true;
+        fortyMap[g.game_id] = g.has_forty_yard !== false;
       }
       setGameHomeMap(ghMap);
 
@@ -169,8 +171,8 @@ export default function TeamStats() {
 
         // ── Yards (direction-aware) ────────────────────────────────────────
         // For each play we look up which team was home in that game.
-        const yg = (p) => yardsGainedForPlay(p, ghMap[p.game_id], harMap[p.game_id]);
-        const converted = (p) => isConverted(p, ghMap[p.game_id], harMap[p.game_id]);
+        const yg = (p) => yardsGainedForPlay(p, ghMap[p.game_id], harMap[p.game_id], fortyMap[p.game_id]);
+        const converted = (p) => isConverted(p, ghMap[p.game_id], harMap[p.game_id], fortyMap[p.game_id]);
 
         const passYards  = offPlays.filter(p => p.play_type === 'pass' && isPassCompletionOutcome(p.outcome)).reduce((s, p) => s + yg(p), 0);
         const rushYards  = offPlays.filter(p => p.play_type === 'rush').reduce((s, p) => s + yg(p), 0);
@@ -193,6 +195,7 @@ export default function TeamStats() {
           successibleOffPlays,
           (p) => ghMap[p.game_id],
           (p) => harMap[p.game_id],
+          (p) => fortyMap[p.game_id],
         );
 
         const oppOffPlays = opponentOffPlaysForTeam(tid, teamGames, plays);
@@ -200,10 +203,11 @@ export default function TeamStats() {
           oppOffPlays,
           (p) => ghMap[p.game_id],
           (p) => harMap[p.game_id],
+          (p) => fortyMap[p.game_id],
         );
 
-        const explosivePlays = countExplosivePlays(offPlays, p => ghMap[p.game_id], p => harMap[p.game_id]);
-        const explosivePlaysAgainst = countExplosivePlays(defPlays, p => ghMap[p.game_id], p => harMap[p.game_id]);
+        const explosivePlays = countExplosivePlays(offPlays, p => ghMap[p.game_id], p => harMap[p.game_id], p => fortyMap[p.game_id]);
+        const explosivePlaysAgainst = countExplosivePlays(defPlays, p => ghMap[p.game_id], p => harMap[p.game_id], p => fortyMap[p.game_id]);
 
         // ── 3rd & 4th down ─────────────────────────────────────────────────
         const thirdDownPlays  = offPlays.filter(p => p.down === 3);
@@ -325,6 +329,7 @@ export default function TeamStats() {
           plays,
           (gameId) => ghMap[gameId],
           (gameId) => harMap[gameId],
+          (gameId) => fortyMap[gameId],
         );
 
         computed[tid] = {

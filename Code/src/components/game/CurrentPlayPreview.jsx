@@ -1,5 +1,6 @@
 import { yardLabel as fieldYardLabel } from '../../gameLogic';
 import { possessionColor } from '../../constants/teamColors';
+import { playerFirstName } from '../../utils/playerName';
 
 function downStr(down, dist) {
   const sfx = ['', 'st', 'nd', 'rd', 'th'];
@@ -11,8 +12,8 @@ export default function CurrentPlayPreview({ gs, homeName, awayName }) {
 
   const teamName = gs.possession === 'home' ? homeName : awayName;
   const color    = possessionColor(gs.possession);
-  const carrier  = gs.selectedOffender?.name?.split(' ')[0];
-  const defender = gs.selectedDefender?.name?.split(' ')[0];
+  const carrier  = playerFirstName(gs.selectedOffender?.name);
+  const defender = playerFirstName(gs.selectedDefender?.name);
 
   let phase = 'Select ball carrier';
   if (gs.selectedOffender && gs.newSpot == null) phase = 'Tap field to spot ball';
@@ -37,7 +38,7 @@ export default function CurrentPlayPreview({ gs, homeName, awayName }) {
         <span>·</span>
         <span>{downStr(gs.down, gs.distance)}</span>
         <span>·</span>
-        <span>{fieldYardLabel(gs.yardLine, gs.possession, gs.homeAttacksRight ?? true)}</span>
+        <span>{fieldYardLabel(gs.yardLine, gs.possession, gs.homeAttacksRight ?? true, gs.hasFortyYard)}</span>
         {carrier && (
           <>
             <span>·</span>

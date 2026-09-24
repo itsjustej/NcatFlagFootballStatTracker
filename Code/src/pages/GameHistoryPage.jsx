@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import { Play } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
+import { useAuth } from "../auth/AuthContext";
 
 export default function GameHistoryPage() {
   const { currentLeague } = useLeague();
+  const { canTrackGames } = useAuth();
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -90,13 +92,15 @@ export default function GameHistoryPage() {
             <p className="text-slate-400 text-sm">
               {loading ? "Loading games..." : `${games.length} game${games.length !== 1 ? "s" : ""} recorded`}
             </p>
-            <Link
-              to="/start-game"
-              className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center gap-2 text-white text-sm font-semibold min-h-[44px] shrink-0 transition-colors"
-            >
-              <Play className="w-4 h-4" />
-              Start Game
-            </Link>
+            {canTrackGames && (
+              <Link
+                to="/start-game"
+                className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center gap-2 text-white text-sm font-semibold min-h-[44px] shrink-0 transition-colors"
+              >
+                <Play className="w-4 h-4" />
+                Start Game
+              </Link>
+            )}
           </div>
 
           {loading && (

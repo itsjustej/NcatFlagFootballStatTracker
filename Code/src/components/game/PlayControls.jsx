@@ -1,4 +1,5 @@
 import { possessionColor } from '../../constants/teamColors';
+import { playerFirstName } from '../../utils/playerName';
 
 
 
@@ -44,7 +45,7 @@ function PlayerChip({ player, selected, accentColor, onClick }) {
 
       <span className="text-[12px] font-bold text-white leading-tight text-center px-1">
 
-        {player.name.split(' ')[0]}
+        {playerFirstName(player.name)}
 
       </span>
 
@@ -580,7 +581,7 @@ export default function PlayControls({
 
                 <p className="text-[11px] text-slate-500 text-center">
 
-                  Passer: {convPasser.name.split(' ')[0]}
+                  Passer: {playerFirstName(convPasser.name)}
 
                 </p>
 

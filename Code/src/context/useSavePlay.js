@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { attacksIncreasing } from '../gameLogic';
+import { attacksIncreasing, fieldLength } from '../gameLogic';
 import { isSuccessfulPlayResult } from '../utils/statsHelpers';
 
 function isSuccessfulPlay(entry, outcome, yardsGained) {
@@ -23,7 +23,7 @@ function resolveNewYardLine(gs, entry, outcome) {
       return increasing ? gs.yardLine + yards : gs.yardLine - yards;
     }
     if (outcome === 'td') {
-      return increasing ? 80 : 0;
+      return increasing ? fieldLength(gs.hasFortyYard) : 0;
     }
   }
 
@@ -101,11 +101,11 @@ export async function savePlay(gs, entry, { passer, receiver, defender, rusher, 
         play_type:       playType,
         outcome,
         first_half:      entry.half === 1,
+        overtime:        entry.half === 3,
         is_conversion:   isConversion,
         conv_points:     isConversion ? convPoints : null,
         home_good_play:  homeGoodPlay,
         penalty_team_id: penaltyTeamId ? parseInt(penaltyTeamId, 10) : null,
-        game_clock:      entry.clock ?? '0:00',
         yard_line:       entry.yardLine,
         new_yard_line:   newYardLine,
         down:            entry.down,

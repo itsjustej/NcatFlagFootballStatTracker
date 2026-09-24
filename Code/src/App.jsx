@@ -5,6 +5,7 @@ import ScrollToTop from "./components/layout/ScrollToTop";
 // Auth
 import LoginPage from "./pages/LoginPage";
 import RequireAuth from "./auth/RequireAuth";
+import RequireStaff from "./auth/RequireStaff";
 
 // Pages
 import StartGamePage from "./pages/StartGamePage";
@@ -33,14 +34,17 @@ export default function App() {
         {/* Protected */}
         <Route element={<RequireAuth />}>
           <Route path="/" element={<GameHistoryPage />} />
-          <Route path="/start-game" element={<StartGamePage />} />
-          <Route path="/teams" element={<TeamsPage />} />
-          <Route path="/game" element={<GamePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/games" element={<Navigate to="/" replace />} />
           <Route path="/games/:id" element={<GameViewPage />} />
-          <Route path="/debug" element={<DebugPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+
+          <Route element={<RequireStaff />}>
+            <Route path="/start-game" element={<StartGamePage />} />
+            <Route path="/teams" element={<TeamsPage />} />
+            <Route path="/game" element={<GamePage />} />
+            <Route path="/debug" element={<DebugPage />} />
+          </Route>
         </Route>
       </Routes>
     </>
