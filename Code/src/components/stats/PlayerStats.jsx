@@ -16,6 +16,62 @@ import {
 const fmt = (val, digits = 1) =>
   typeof val === "number" && !isNaN(val) ? val.toFixed(digits) : "0.0";
 
+const CATEGORIES = [
+  {
+    id: 'passing',
+    label: 'Passing',
+    columns: [
+      { key: 'passingYards', label: 'Yds' },
+      { key: 'completionPct', label: 'Comp %', render: (p) => `${fmt(p.completionPct)}% (${p.passCompletions}/${p.passAttempts})` },
+      { key: 'passingTDs', label: 'TD' },
+      { key: 'passExplosive', label: 'Expl.' },
+      { key: 'interceptionsThrown', label: 'INT' },
+    ],
+  },
+  {
+    id: 'rushing',
+    label: 'Rushing',
+    columns: [
+      { key: 'rushingYards', label: 'Yds' },
+      { key: 'carries', label: 'Car' },
+      { key: 'rushingTDs', label: 'TD' },
+      { key: 'rushExplosive', label: 'Expl.' },
+      { key: 'yardsPerCarry', label: 'Yds/Car', render: (p) => fmt(p.yardsPerCarry) },
+    ],
+  },
+  {
+    id: 'receiving',
+    label: 'Receiving',
+    columns: [
+      { key: 'receivingYards', label: 'Yds' },
+      { key: 'receptions', label: 'Rec' },
+      { key: 'receivingTDs', label: 'TD' },
+      { key: 'recExplosive', label: 'Expl.' },
+      { key: 'yardsPerReception', label: 'Yds/Rec', render: (p) => fmt(p.yardsPerReception) },
+      { key: 'conversionsCaught', label: 'Conv' },
+    ],
+  },
+  {
+    id: 'defense',
+    label: 'Defense',
+    columns: [
+      { key: 'interceptions', label: 'INT' },
+      { key: 'flagPulls', label: 'FP' },
+      { key: 'flagPullsForLoss', label: 'FPL' },
+    ],
+  },
+  {
+    id: 'perGame',
+    label: 'Per Game',
+    columns: [
+      { key: 'passYpg', label: 'Pass', render: (p) => fmt(p.passYpg) },
+      { key: 'rushYpg', label: 'Rush', render: (p) => fmt(p.rushYpg) },
+      { key: 'recYpg', label: 'Rec', render: (p) => fmt(p.recYpg) },
+      { key: 'flagPullsPerGame', label: 'FP', render: (p) => fmt(p.flagPullsPerGame) },
+    ],
+  },
+];
+
 export default function PlayerStats() {
   const { currentLeague } = useLeague();
   const [teams, setTeams]     = useState([]);
@@ -24,6 +80,7 @@ export default function PlayerStats() {
   const [loading, setLoading] = useState(false);
   const [sortKey, setSortKey] = useState('name');
   const [sortAsc, setSortAsc] = useState(true);
+  const [category, setCategory] = useState('passing');
 
   const handleSort = (key) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -47,12 +104,7 @@ export default function PlayerStats() {
     </th>
   );
 
-  const GroupHeader = ({ label, cols, className = "" }) => (
-    <th colSpan={cols} className={`px-2 py-2 text-[10px] font-bold uppercase tracking-widest text-center ${className}`}>
-      {label}
-    </th>
-  );
-
+  const activeCategory = CATEGORIES.find((item) => item.id === category) ?? CATEGORIES[0];
   const playerCol = "w-[9.5rem] min-w-[9.5rem] max-w-[9.5rem] box-border";
   const stickyPlayerCell = (idx) =>
     `sticky left-0 z-10 whitespace-nowrap font-medium text-white shadow-[4px_0_10px_-4px_rgba(0,0,0,0.65)] ${playerCol} ${
@@ -212,86 +264,65 @@ export default function PlayerStats() {
         )}
 
         {!loading && players.length > 0 && (
-          <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch]">
-            <table className="w-max min-w-full text-left text-sm border-collapse">
-              <thead>
-                <tr className="bg-slate-900 border-b border-slate-700">
-                  <th colSpan={2} className="bg-slate-900" />
-                  <GroupHeader label="Passing"     cols={5} className="text-blue-400 border-l border-slate-600" />
-                  <GroupHeader label="Rushing"     cols={5} className="text-green-400 border-l border-slate-600" />
-                  <GroupHeader label="Receiving"   cols={6} className="text-yellow-400 border-l border-slate-600" />
-                  <GroupHeader label="Defense"     cols={3} className="text-red-400 border-l border-slate-600" />
-                  <GroupHeader label="Per Game"    cols={4} className="text-purple-400 border-l border-slate-600" />
-                </tr>
-                <tr className="bg-slate-800 border-b border-slate-700">
-                  <SortTh label="Player"     colKey="name"           sticky className={`${playerCol} pl-3`} />
-                  <SortTh label="GP"         colKey="gamesPlayed"    className="min-w-[44px] text-center" />
-                  <SortTh label="Pass Yds"   colKey="passingYards"   className="border-l border-slate-600 min-w-[72px] text-center" />
-                  <SortTh label="Comp %"     colKey="completionPct"  className="min-w-[110px] text-center" />
-                  <SortTh label="Pass TDs"   colKey="passingTDs"     className="min-w-[72px] text-center" />
-                  <SortTh label="Expl."      colKey="passExplosive"  className="min-w-[52px] text-center" />
-                  <SortTh label="INT Thr"    colKey="interceptionsThrown" className="min-w-[68px] text-center" />
-                  <SortTh label="Rush Yds"   colKey="rushingYards"   className="border-l border-slate-600 min-w-[72px] text-center" />
-                  <SortTh label="Carries"    colKey="carries"        className="min-w-[64px] text-center" />
-                  <SortTh label="Rush TDs"   colKey="rushingTDs"     className="min-w-[72px] text-center" />
-                  <SortTh label="Expl."      colKey="rushExplosive"  className="min-w-[52px] text-center" />
-                  <SortTh label="Yds/Car"    colKey="yardsPerCarry"  className="min-w-[68px] text-center" />
-                  <SortTh label="Rec Yds"    colKey="receivingYards" className="border-l border-slate-600 min-w-[72px] text-center" />
-                  <SortTh label="Catches"    colKey="receptions"     className="min-w-[64px] text-center" />
-                  <SortTh label="Rec TDs"    colKey="receivingTDs"   className="min-w-[68px] text-center" />
-                  <SortTh label="Expl."      colKey="recExplosive"   className="min-w-[52px] text-center" />
-                  <SortTh label="Yds/Rec"    colKey="yardsPerReception" className="min-w-[68px] text-center" />
-                  <SortTh label="Conv"       colKey="conversionsCaught" className="min-w-[56px] text-center" />
-                  <SortTh label="INTs"       colKey="interceptions"  className="border-l border-slate-600 min-w-[52px] text-center" />
-                  <SortTh label="FP"         colKey="flagPulls"      className="min-w-[44px] text-center" />
-                  <SortTh label="FPL"        colKey="flagPullsForLoss" className="min-w-[44px] text-center" />
-                  <SortTh label="Pass Yds/G" colKey="passYpg"        className="border-l border-slate-600 min-w-[84px] text-center" />
-                  <SortTh label="Rush Yds/G" colKey="rushYpg"        className="min-w-[84px] text-center" />
-                  <SortTh label="Rec Yds/G"  colKey="recYpg"         className="min-w-[84px] text-center" />
-                  <SortTh label="FP/G"       colKey="flagPullsPerGame" className="min-w-[64px] text-center pr-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {sortedPlayers.map((p, idx) => (
-                  <tr
-                    key={p.player_id}
-                    className={`border-b border-slate-700/80 hover:bg-slate-700/30 transition-colors ${
-                      idx % 2 === 0 ? 'bg-slate-900/70' : 'bg-slate-800/50'
-                    }`}
-                  >
-                    <td className={`px-3 py-2 ${stickyPlayerCell(idx)}`}>{p.name}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.gamesPlayed}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.passingYards}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">
-                      {fmt(p.completionPct)}%
-                      <span className="text-slate-500 text-[10px] ml-1">({p.passCompletions}/{p.passAttempts})</span>
-                    </td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.passingTDs}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.passExplosive}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.interceptionsThrown}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.rushingYards}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.carries}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.rushingTDs}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.rushExplosive}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{fmt(p.yardsPerCarry)}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.receivingYards}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.receptions}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.receivingTDs}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.recExplosive}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{fmt(p.yardsPerReception)}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.conversionsCaught}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{p.interceptions}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.flagPulls}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.flagPullsForLoss}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums border-l border-slate-700/80">{fmt(p.passYpg)}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{fmt(p.rushYpg)}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{fmt(p.recYpg)}</td>
-                    <td className="px-2 py-2 text-slate-300 text-center tabular-nums pr-3">{fmt(p.flagPullsPerGame)}</td>
+          <>
+            <div className="flex gap-1 overflow-x-auto px-3 py-3 border-b border-slate-700">
+              {CATEGORIES.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setCategory(item.id)}
+                  className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                    category === item.id
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch]">
+              <table className="w-full min-w-[20rem] text-left text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-800 border-b border-slate-700">
+                    <SortTh label="Player" colKey="name" sticky className={`${playerCol} pl-3`} />
+                    <SortTh label="GP" colKey="gamesPlayed" className="min-w-[3rem] text-center" />
+                    {activeCategory.columns.map((col, index) => (
+                      <SortTh
+                        key={col.key}
+                        label={col.label}
+                        colKey={col.key}
+                        className={`text-center ${index === 0 ? 'border-l border-slate-600' : ''} ${index === activeCategory.columns.length - 1 ? 'pr-3' : ''}`}
+                      />
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {sortedPlayers.map((p, idx) => (
+                    <tr
+                      key={p.player_id}
+                      className={`border-b border-slate-700/80 hover:bg-slate-700/30 transition-colors ${
+                        idx % 2 === 0 ? 'bg-slate-900/70' : 'bg-slate-800/50'
+                      }`}
+                    >
+                      <td className={`px-3 py-2 ${stickyPlayerCell(idx)}`}>{p.name}</td>
+                      <td className="px-2 py-2 text-slate-300 text-center tabular-nums">{p.gamesPlayed}</td>
+                      {activeCategory.columns.map((col, index) => (
+                        <td
+                          key={col.key}
+                          className={`px-2 py-2 text-slate-300 text-center tabular-nums whitespace-nowrap ${
+                            index === 0 ? 'border-l border-slate-700/80' : ''
+                          } ${index === activeCategory.columns.length - 1 ? 'pr-3' : ''}`}
+                        >
+                          {col.render ? col.render(p) : p[col.key]}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

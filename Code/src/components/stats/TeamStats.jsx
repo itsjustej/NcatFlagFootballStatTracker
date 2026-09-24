@@ -31,15 +31,19 @@ function StatRow({ label, value, rank, total, isPercentage, pctValue, lowerIsBet
       : 0;
   const barColor = lowerIsBetter ? "bg-red-500" : "bg-blue-500";
   return (
-    <div className="flex items-center gap-4 py-3 border-b border-slate-700/50 last:border-0">
-      <span className="text-slate-300 text-sm w-52 shrink-0">{label}</span>
-      <div className="flex-1 bg-slate-700 rounded-full h-1.5">
-        <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${barWidth}%` }} />
+    <div className="py-3 border-b border-slate-700/50 last:border-0">
+      <div className="flex items-baseline justify-between gap-3 mb-1.5">
+        <span className="text-slate-300 text-sm min-w-0">{label}</span>
+        <span className="flex items-baseline gap-2 shrink-0">
+          <span className="text-white font-bold text-sm tabular-nums">{value}</span>
+          {rank != null && (
+            <span className="text-slate-500 text-[11px] tabular-nums">#{rank}</span>
+          )}
+        </span>
       </div>
-      <span className="text-white font-bold text-sm w-16 text-right">{value}</span>
-      {rank != null && (
-        <span className="text-slate-400 text-xs w-16 text-right">#{rank} of {total}</span>
-      )}
+      <div className="bg-slate-700 rounded-full h-1.5">
+        <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${Math.min(barWidth, 100)}%` }} />
+      </div>
     </div>
   );
 }
@@ -48,7 +52,7 @@ function StatRow({ label, value, rank, total, isPercentage, pctValue, lowerIsBet
 function ConversionBar({ label, attempts, completions, rank, total }) {
   const pct = attempts > 0 ? ((completions / attempts) * 100).toFixed(1) : 0;
   return (
-    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-5">
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-4">
       <div className="flex items-center justify-between mb-2">
         <span className="text-slate-400 text-xs">{label}</span>
         <span className="text-slate-400 text-xs">#{rank} of {total}</span>
@@ -67,8 +71,8 @@ function ConversionBar({ label, attempts, completions, rank, total }) {
 // ---------------- RECORD CARD ---------------- //
 function RecordCard({ label, value, color }) {
   return (
-    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-6 text-center">
-      <p className={`text-4xl font-bold ${color}`}>{value}</p>
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-4 text-center">
+      <p className={`text-3xl sm:text-4xl font-bold ${color}`}>{value}</p>
       <p className="text-slate-400 text-sm mt-1">{label}</p>
     </div>
   );
@@ -497,7 +501,7 @@ export default function TeamStats() {
               <RefreshCw className="w-5 h-5 text-green-400" />
               <h3 className="text-white font-bold tracking-wide">CONVERSIONS</h3>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <ConversionBar label="1-POINT" attempts={stats.conv1Attempts} completions={stats.conv1Made} rank={rank('conv1Pct')} total={numTeams} />
               <ConversionBar label="2-POINT" attempts={stats.conv2Attempts} completions={stats.conv2Made} rank={rank('conv2Pct')} total={numTeams} />
               <ConversionBar label="3-POINT" attempts={stats.conv3Attempts} completions={stats.conv3Made} rank={rank('conv3Pct')} total={numTeams} />
