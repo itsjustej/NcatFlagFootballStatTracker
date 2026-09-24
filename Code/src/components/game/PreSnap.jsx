@@ -111,10 +111,8 @@ function PlayerBtn({ player, selected, accentColor, onClick, onJerseyUpdate, com
       type="button"
       onClick={handleTap}
       title="Double-tap to edit jersey #"
-      className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl border transition-all duration-150 active:scale-95 cursor-pointer select-none hover:border-white/20 touch-manipulation"
+      className="w-full min-h-14 flex flex-col items-center justify-center rounded-xl border transition-all duration-150 active:scale-95 cursor-pointer select-none hover:border-white/20 touch-manipulation"
       style={{
-        width:       72,
-        height:      60,
         background:  selected ? accentColor : '#1e293b',
         borderColor: selected ? accentColor : 'rgba(255,255,255,0.12)',
         boxShadow:   selected ? `0 0 0 1px ${accentColor}` : 'none',
@@ -130,7 +128,7 @@ function PlayerBtn({ player, selected, accentColor, onClick, onJerseyUpdate, com
           </span>
         )}
       </div>
-      <span className="text-[12px] font-bold text-white leading-tight text-center px-1">
+      <span className="text-[12px] font-bold text-white leading-tight text-center px-1 truncate w-full">
         {playerFirstName(player.name)}
       </span>
     </button>
@@ -179,7 +177,7 @@ export default function PreSnap({
             </span>
           )}
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {offensePlayers.map(p => (
             <PlayerBtn
               key={p.id}
@@ -195,7 +193,7 @@ export default function PreSnap({
 
       <div
         className={`transition-all duration-300 overflow-hidden ${
-          showDefense ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+          showDefense ? 'max-h-[40rem] opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
         <div className="flex items-center gap-2 mb-2">
@@ -211,7 +209,7 @@ export default function PreSnap({
             <span className="ml-auto text-[10px] text-slate-500 italic">Optional</span>
           )}
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {defensePlayers.map(p => (
             <PlayerBtn
               key={p.id}

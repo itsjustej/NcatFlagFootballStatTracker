@@ -21,7 +21,6 @@ import HalftimeConfirmDialog from '../components/game/HalftimeConfirmDialog';
 import OtBallDialog from '../components/game/OtBallDialog';
 import PlayStepBar, { getPlayStepIndex } from '../components/game/PlayStepBar';
 import UndoToast from '../components/game/UndoToast';
-import MobilePlayBar from '../components/game/MobilePlayBar';
 import FieldSpot    from '../components/game/FieldSpot';
 import PreSnap      from '../components/game/PreSnap';
 import PlayControls from '../components/game/PlayControls';
@@ -151,6 +150,7 @@ export default function GamePage() {
   const [scoreFlash, setScoreFlash]           = useState(null);
   const [latestDriveId, setLatestDriveId]       = useState(null);
   const [pulseStep, setPulseStep]             = useState(null);
+  const [showPlays, setShowPlays]             = useState(false);
   const toastTimerRef                         = useRef(null);
   const prevStepRef                           = useRef(0);
 
@@ -756,7 +756,19 @@ export default function GamePage() {
         />
       )}
 
-      <div className="flex-1 min-w-0 flex flex-col relative">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col relative">
+        <div className="md:hidden shrink-0 border-b border-slate-800">
+          <Scoreboard
+            gs={gs}
+            canUndo={history.length > 0}
+            onHalfChange={handleHalfChangeRequest}
+            onUndo={handleUndo}
+            homeName={homeName}
+            awayName={awayName}
+            scoreFlash={scoreFlash}
+            onOpenPlays={() => setShowPlays(true)}
+          />
+        </div>
         {/* Sticky field + step bar */}
         <div className="sticky top-0 z-20 bg-slate-900 border-b border-slate-800 shrink-0">
           <PlayStepBar gs={gs} convStep={convStep} pulseStep={pulseStep} />
@@ -779,7 +791,7 @@ export default function GamePage() {
 
         {/* Scrollable play loop */}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-4 flex flex-col gap-4 pb-28 md:pb-4">
+          <div className="p-4 flex flex-col gap-4 pb-6">
             {gs.playPhase !== 'conversion' && (
               <PreSnap
                 possession={gs.possession}
@@ -822,8 +834,6 @@ export default function GamePage() {
           </div>
         </div>
 
-        <MobilePlayBar gs={gs} onPlayType={handlePlayType} visible={!!gs.selectedOffender} />
-
         <UndoToast
           message={undoToast}
           onUndo={() => { handleUndo(); setUndoToast(null); }}
@@ -831,7 +841,7 @@ export default function GamePage() {
         />
       </div>
 
-      <div className="w-full md:w-80 md:shrink-0 border-t md:border-t-0 md:border-l border-slate-700 bg-slate-800 flex flex-col min-h-[220px] max-h-[38vh] md:max-h-none md:h-full overflow-hidden">
+      <div className="hidden md:flex w-80 shrink-0 border-l border-slate-700 bg-slate-800 flex-col h-full overflow-hidden">
         <Scoreboard
           gs={gs}
           canUndo={history.length > 0}
@@ -851,6 +861,30 @@ export default function GamePage() {
           />
         </div>
       </div>
+
+      {showPlays && (
+        <div className="md:hidden fixed inset-0 z-40 bg-slate-800 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 shrink-0">
+            <span className="text-sm font-bold text-white">Plays</span>
+            <button
+              type="button"
+              onClick={() => setShowPlays(false)}
+              className="min-h-11 px-3 text-sm font-bold text-slate-300"
+            >
+              Close
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <PlayByPlay
+              log={gs.log}
+              homeName={homeName}
+              awayName={awayName}
+              gs={gs}
+              latestDriveId={latestDriveId}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

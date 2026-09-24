@@ -30,62 +30,112 @@ function CmpRow({ label, home, away, higherIsBetter = true }) {
   );
 }
 
+const PLAYER_CATEGORIES = [
+  {
+    id: "passing",
+    label: "Passing",
+    columns: [
+      { key: "comp", label: "C/ATT", render: (p) => `${p.passCompletions}/${p.passAttempts}` },
+      { key: "passingYards", label: "Yds" },
+      { key: "passingTDs", label: "TD" },
+      { key: "interceptionsThrown", label: "INT" },
+    ],
+  },
+  {
+    id: "rushing",
+    label: "Rushing",
+    columns: [
+      { key: "carries", label: "Car" },
+      { key: "rushingYards", label: "Yds" },
+      { key: "rushingTDs", label: "TD" },
+    ],
+  },
+  {
+    id: "receiving",
+    label: "Receiving",
+    columns: [
+      { key: "receptions", label: "Rec" },
+      { key: "receivingYards", label: "Yds" },
+      { key: "receivingTDs", label: "TD" },
+    ],
+  },
+  {
+    id: "defense",
+    label: "Defense",
+    columns: [
+      { key: "interceptions", label: "INT" },
+      { key: "flagPulls", label: "FP" },
+      { key: "flagPullsForLoss", label: "FPL" },
+    ],
+  },
+];
+
 function PlayerTable({ players }) {
+  const [category, setCategory] = useState("passing");
+  const active = PLAYER_CATEGORIES.find((item) => item.id === category) ?? PLAYER_CATEGORIES[0];
   const rows = players.filter((p) => p.hasStats);
+  const playerCol = "w-[9.5rem] min-w-[9.5rem] max-w-[9.5rem] box-border";
+
   if (rows.length === 0) {
     return <p className="px-4 py-6 text-slate-500 text-sm text-center">No player stats yet.</p>;
   }
 
   return (
-    <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch]">
-      <table className="w-max min-w-full text-left text-sm border-collapse">
-        <thead>
-          <tr className="bg-slate-900 border-b border-slate-700 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-            <th className="px-3 py-2 sticky left-0 bg-slate-900 z-10 min-w-[120px]">Player</th>
-            <th className="px-2 py-2 text-center border-l border-slate-700 text-blue-400">C/ATT</th>
-            <th className="px-2 py-2 text-center text-blue-400">P Yds</th>
-            <th className="px-2 py-2 text-center text-blue-400">P TD</th>
-            <th className="px-2 py-2 text-center text-blue-400">INT</th>
-            <th className="px-2 py-2 text-center border-l border-slate-700 text-green-400">CAR</th>
-            <th className="px-2 py-2 text-center text-green-400">R Yds</th>
-            <th className="px-2 py-2 text-center text-green-400">R TD</th>
-            <th className="px-2 py-2 text-center border-l border-slate-700 text-yellow-400">REC</th>
-            <th className="px-2 py-2 text-center text-yellow-400">C Yds</th>
-            <th className="px-2 py-2 text-center text-yellow-400">C TD</th>
-            <th className="px-2 py-2 text-center border-l border-slate-700 text-red-400">INT</th>
-            <th className="px-2 py-2 text-center text-red-400">FP</th>
-            <th className="px-2 py-2 text-center text-red-400 pr-3">FPL</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((p, idx) => (
-            <tr
-              key={p.player_id}
-              className={`border-b border-slate-700/70 ${idx % 2 === 0 ? 'bg-slate-900/70' : 'bg-slate-800/40'}`}
-            >
-              <td className={`px-3 py-2 font-medium text-white sticky left-0 z-10 ${idx % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800'}`}>
-                {p.name}
-              </td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300 border-l border-slate-700/80">
-                {p.passCompletions}/{p.passAttempts}
-              </td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.passingYards}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.passingTDs}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.interceptionsThrown}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300 border-l border-slate-700/80">{p.carries}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.rushingYards}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.rushingTDs}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300 border-l border-slate-700/80">{p.receptions}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.receivingYards}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.receivingTDs}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300 border-l border-slate-700/80">{p.interceptions}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300">{p.flagPulls}</td>
-              <td className="px-2 py-2 text-center tabular-nums text-slate-300 pr-3">{p.flagPullsForLoss}</td>
+    <>
+      <div className="flex gap-1 overflow-x-auto px-3 py-3 border-b border-slate-700">
+        {PLAYER_CATEGORIES.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setCategory(item.id)}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+              category === item.id
+                ? "bg-blue-600 text-white"
+                : "text-slate-400 hover:text-white hover:bg-slate-700"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch]">
+        <table className="w-full min-w-[20rem] text-left text-sm border-collapse">
+          <thead>
+            <tr className="bg-slate-800 border-b border-slate-700 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              <th className={`px-3 py-2 sticky left-0 z-10 bg-slate-800 text-left ${playerCol}`}>Player</th>
+              {active.columns.map((col, index) => (
+                <th
+                  key={col.key}
+                  className={`px-2 py-2 text-center whitespace-nowrap ${index === 0 ? "border-l border-slate-600" : ""} ${index === active.columns.length - 1 ? "pr-3" : ""}`}
+                >
+                  {col.label}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((p, idx) => (
+              <tr
+                key={p.player_id}
+                className={`border-b border-slate-700/70 ${idx % 2 === 0 ? "bg-slate-900/70" : "bg-slate-800/40"}`}
+              >
+                <td className={`px-3 py-2 font-medium text-white sticky left-0 z-10 whitespace-nowrap shadow-[4px_0_10px_-4px_rgba(0,0,0,0.65)] ${playerCol} ${idx % 2 === 0 ? "bg-slate-900" : "bg-slate-800"}`}>
+                  {p.name}
+                </td>
+                {active.columns.map((col, index) => (
+                  <td
+                    key={col.key}
+                    className={`px-2 py-2 text-center tabular-nums text-slate-300 whitespace-nowrap ${index === 0 ? "border-l border-slate-700/80" : ""} ${index === active.columns.length - 1 ? "pr-3" : ""}`}
+                  >
+                    {col.render ? col.render(p) : p[col.key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

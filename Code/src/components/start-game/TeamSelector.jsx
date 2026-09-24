@@ -16,14 +16,14 @@ function JerseyInput({ value, onChange }) {
       onClick={e => e.target.select()}
       onWheel={e => e.target.blur()}
       placeholder="#"
-      className="w-12 text-center bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-white text-xs font-bold focus:outline-none focus:border-blue-400 tabular-nums"
+      className="w-16 min-h-11 text-center bg-slate-700 border border-slate-600 rounded-lg px-2 py-2 text-white text-base font-bold focus:outline-none focus:border-blue-400 tabular-nums"
     />
   );
 }
 
 function PlayerRosterRow({ player, jersey, onJerseyChange }) {
   return (
-    <li className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-700/50 last:border-0">
+    <li className="flex items-center justify-between gap-3 py-2 border-b border-slate-700/50 last:border-0">
       <div className="flex items-center gap-2 min-w-0">
         <span
           className="text-xs font-black tabular-nums w-7 text-center shrink-0"
@@ -51,7 +51,7 @@ function FieldPreview({ homeName, awayName, homeAttacksRight, hasFortyYard }) {
   const markerYards = fieldMarkerYards(hasFortyYard);
 
   return (
-    <div className="relative w-full h-14 rounded-lg overflow-hidden border border-slate-600">
+    <div className="relative w-full h-20 sm:h-14 rounded-lg overflow-hidden border border-slate-600">
       <div className="absolute inset-0 bg-[#14532d]" />
       <div
         className="absolute top-0 bottom-0 left-0 flex items-center justify-center"
@@ -143,7 +143,7 @@ export default function TeamSelector({
   const canStart = teamA && teamB && teamA.team_id !== teamB.team_id;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8 sm:space-y-10 pb-4">
       <div className="grid md:grid-cols-2 gap-6 md:gap-12">
 
         {/* HOME TEAM */}
@@ -215,7 +215,7 @@ export default function TeamSelector({
       </div>
 
       {canStart && (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 space-y-6">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6 space-y-6">
           <h2 className="text-xl font-bold text-white">Kickoff & Field Direction</h2>
 
           <div>
@@ -308,7 +308,7 @@ export default function TeamSelector({
         <button
           onClick={onNext}
           disabled={isLoading || !canStart}
-          className="w-full sm:w-auto px-6 py-3 rounded-lg transition font-semibold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+          className="w-full sm:w-auto px-6 py-3 rounded-lg transition font-semibold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:cursor-not-allowed min-h-12"
         >
           {isLoading ? "Starting…" : "Start Game"}
         </button>

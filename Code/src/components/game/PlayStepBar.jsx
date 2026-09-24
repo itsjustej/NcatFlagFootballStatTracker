@@ -1,8 +1,8 @@
 const STEPS = [
-  { id: 'carrier', label: 'Ball carrier', short: '1' },
-  { id: 'spot',    label: 'Spot ball',    short: '2' },
-  { id: 'play',    label: 'Play type',    short: '3' },
-  { id: 'result',  label: 'Result',       short: '4' },
+  { id: 'carrier', label: 'Ball carrier', mobile: 'Carrier', short: '1' },
+  { id: 'spot',    label: 'Spot ball',    mobile: 'Spot',    short: '2' },
+  { id: 'play',    label: 'Play type',    mobile: 'Type',    short: '3' },
+  { id: 'result',  label: 'Result',       mobile: 'Result',  short: '4' },
 ];
 
 export function getPlayStepIndex(gs, convStep) {
@@ -30,10 +30,10 @@ export function getPlayStepIndex(gs, convStep) {
 }
 
 const CONV_STEPS = [
-  { id: 'result',   label: 'Good?',    short: '1' },
-  { id: 'points',   label: 'Points',   short: '2' },
-  { id: 'passer',   label: 'Passer',   short: '3' },
-  { id: 'receiver', label: 'Catch',    short: '4' },
+  { id: 'result',   label: 'Good?',    mobile: 'Good?',  short: '1' },
+  { id: 'points',   label: 'Points',   mobile: 'Pts',    short: '2' },
+  { id: 'passer',   label: 'Passer',   mobile: 'Pass',   short: '3' },
+  { id: 'receiver', label: 'Catch',    mobile: 'Catch',  short: '4' },
 ];
 
 export default function PlayStepBar({ gs, convStep, pulseStep }) {
@@ -68,11 +68,12 @@ export default function PlayStepBar({ gs, convStep, pulseStep }) {
                   {done ? '✓' : step.short}
                 </span>
                 <span
-                  className={`text-[10px] font-semibold truncate hidden sm:inline transition-colors duration-300 ${
+                  className={`text-[10px] font-semibold truncate transition-colors duration-300 ${
                     current ? 'text-white' : done ? 'text-slate-400' : 'text-slate-600'
                   }`}
                 >
-                  {step.label}
+                  <span className="sm:hidden">{step.mobile ?? step.label}</span>
+                  <span className="hidden sm:inline">{step.label}</span>
                 </span>
               </div>
               {i < steps.length - 1 && (

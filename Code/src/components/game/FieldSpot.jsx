@@ -63,10 +63,9 @@ export default function FieldSpot({
   return (
     <div className="select-none">
       <div
-        className={`relative w-full cursor-crosshair overflow-hidden rounded-xl border border-green-950 ${
+        className={`relative w-full h-28 md:h-[8.5rem] cursor-crosshair overflow-hidden rounded-xl border border-green-950 ${
           pulse ? 'field-pulse' : ''
         }`}
-        style={{ height: '8.5rem' }}
         onClick={handleClick}
       >
         <div className="absolute inset-0 bg-[#14532d]" />
@@ -164,25 +163,25 @@ export default function FieldSpot({
         )}
       </div>
 
-      <div className="flex items-center justify-between mt-2 px-0.5">
-        <span className="text-[10px] text-slate-500 font-medium">{leftName}</span>
+      <div className="flex items-center justify-between gap-2 mt-2 px-0.5">
+        <span className="text-[10px] text-slate-500 font-medium truncate min-w-0 flex-1">{leftName}</span>
         {newSpot !== null ? (
-          <span className="text-[11px] font-semibold text-white">
+          <span className="text-[11px] font-semibold text-white shrink-0 text-center">
             {fieldYardLabel(newSpot, possession, homeAttacksRight, hasFortyYard)}
             <span className={`font-normal ml-1 ${spotDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
               ({spotDelta > 0 ? '+' : ''}{spotDelta} yds)
             </span>
           </span>
         ) : (
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-slate-400 shrink-0 text-center">
             {fieldYardLabel(yardLine, possession, homeAttacksRight, hasFortyYard)}
             <span className="text-blue-400/80 ml-1 font-medium">— tap to spot</span>
           </span>
         )}
-        <span className="text-[10px] text-slate-500 font-medium">{rightName}</span>
+        <span className="text-[10px] text-slate-500 font-medium truncate min-w-0 flex-1 text-right">{rightName}</span>
       </div>
 
-      <div className="flex items-center gap-4 mt-1.5 px-0.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 px-0.5">
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-0.5 bg-blue-400 rounded" />
           <span className="text-[10px] text-slate-500">Scrimmage</span>

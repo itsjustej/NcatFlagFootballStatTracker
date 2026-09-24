@@ -13,13 +13,9 @@ function PlayerChip({ player, selected, accentColor, onClick }) {
 
       onClick={onClick}
 
-      className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl border transition-all duration-150 active:scale-95 cursor-pointer hover:border-white/20"
+      className="w-full min-h-14 flex flex-col items-center justify-center rounded-xl border transition-all duration-150 active:scale-95 cursor-pointer hover:border-white/20"
 
       style={{
-
-        width:       72,
-
-        height:      60,
 
         background:  selected ? accentColor : '#1e293b',
 
@@ -43,7 +39,7 @@ function PlayerChip({ player, selected, accentColor, onClick }) {
 
       </span>
 
-      <span className="text-[12px] font-bold text-white leading-tight text-center px-1">
+      <span className="text-[12px] font-bold text-white leading-tight text-center px-1 truncate w-full">
 
         {playerFirstName(player.name)}
 
@@ -157,7 +153,7 @@ export default function PlayControls({
 
         <Section title="Play Type">
 
-          <div className="hidden md:grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
 
             {PLAY_TYPES.map(({ t, label, bg }) => (
 
@@ -169,7 +165,7 @@ export default function PlayControls({
 
                 onClick={() => onPlayType(t)}
 
-                className="py-3 rounded-xl font-bold text-sm text-white transition-all duration-150 active:scale-95 hover:brightness-110"
+                className="py-4 sm:py-3 rounded-xl font-bold text-base sm:text-sm text-white transition-all duration-150 active:scale-95 hover:brightness-110"
 
                 style={{
 
@@ -191,12 +187,6 @@ export default function PlayControls({
 
           </div>
 
-          <p className="md:hidden text-[11px] text-slate-500 text-center">
-
-            Use the play buttons at the bottom of the screen
-
-          </p>
-
         </Section>
 
       )}
@@ -207,7 +197,7 @@ export default function PlayControls({
 
         <Section title="Select Receiver">
 
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
 
             <button
 
@@ -215,9 +205,7 @@ export default function PlayControls({
 
               onClick={onPassIncomplete}
 
-              className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl border-2 border-red-500/60 bg-red-600/20 text-red-400 font-black text-[11px] active:scale-95 transition-all"
-
-              style={{ width: 72, height: 60 }}
+              className="w-full min-h-14 flex flex-col items-center justify-center rounded-xl border-2 border-red-500/60 bg-red-600/20 text-red-400 font-black text-[11px] active:scale-95 transition-all"
 
             >
 
@@ -233,9 +221,7 @@ export default function PlayControls({
 
               disabled={!gs.selectedDefender}
 
-              className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl border-2 border-orange-500/60 bg-orange-600/20 text-orange-400 font-black text-[11px] active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-
-              style={{ width: 72, height: 60 }}
+              className="w-full min-h-14 flex flex-col items-center justify-center rounded-xl border-2 border-orange-500/60 bg-orange-600/20 text-orange-400 font-black text-[11px] active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
 
             >
 
@@ -519,7 +505,7 @@ export default function PlayControls({
 
             <Section title="Who threw it?">
 
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
 
                 {offensePlayers.map((p) => (
 
@@ -551,7 +537,7 @@ export default function PlayControls({
 
             <Section title="Who caught it?">
 
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
 
                 {offensePlayers
 
