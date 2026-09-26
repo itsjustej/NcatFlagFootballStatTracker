@@ -1,6 +1,7 @@
 import { supabase } from '../supabaseClient';
 import { firstDownYard, kickoffYard, yardsGained as calcYardsGained, distanceToFirst, effectiveHomeAttacksRight, playPeriod, otHomeAttacksRight } from '../gameLogic';
 import { playerFirstName } from '../utils/playerName';
+import { creditsFromParticipants } from '../utils/playCredit';
 
 const OUTCOME_TO_DRIVE_RESULT = {
   td:                'Touchdown',
@@ -62,12 +63,16 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
   if (playIds.length > 0) {
     const { data: parts } = await supabase
       .from('Participants')
-      .select('play_id, role, player:Player(player_id, name)')
+      .select('play_id, role, player_id, player:Player(player_id, name)')
       .in('play_id', playIds);
 
     for (const p of (parts ?? [])) {
       if (!partsByPlay[p.play_id]) partsByPlay[p.play_id] = [];
-      partsByPlay[p.play_id].push({ role: p.role, player_name: p.player?.name ?? '' });
+      partsByPlay[p.play_id].push({
+        role: p.role,
+        player_id: p.player_id,
+        player_name: p.player?.name ?? '',
+      });
     }
   }
 
@@ -175,7 +180,7 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
     const passer   = parts.find(p => p.role === 'passer');
     const receiver = parts.find(p => p.role === 'receiver');
     const rusher   = parts.find(p => p.role === 'rusher');
-    const defender = parts.find(p => p.role === 'defender');
+    const defender = parts.find(p => p.role === 'defender' || p.role === 'interceptor');
 
     const pName    = playerFirstName(passer?.player_name, 'QB');
     const recName  = playerFirstName(receiver?.player_name, 'Receiver');
@@ -200,7 +205,7 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
     } else if (play.play_type === 'pass') {
       if (play.outcome === 'td')              description = `${pName} passes to ${recName} for a touchdown`;
       else if (play.outcome === 'pick_6')     description = `${pName} throws interception${defFirst ? ` to ${defFirst}` : ''} for a touchdown`;
-      else if (play.outcome === 'interception') description = `${pName} throws interception`;
+      else if (play.outcome === 'interception') description = `${pName} throws interception${defFirst ? ` to ${defFirst}` : ''}`;
       else if (play.outcome === 'incomplete')   description = `${pName} throws incompletion`;
       else description = `${pName} passes to ${recName} for ${yardsGained} yard${yardsGained !== 1 ? 's' : ''}${defStr}`;
     } else if (play.play_type === 'punt') {
@@ -227,6 +232,8 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
       driveId:         did,
       drivePossession: possession,
       driveResult,
+      playId:          play.play_id,
+      credits:         creditsFromParticipants(parts),
     };
   });
 

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLeague } from '../context/LeagueContext';
 import { savePlay } from '../context/useSavePlay';
+import { creditsFromLogEntry, swapCreditName, updatePlayCredit } from '../utils/playCredit';
 import { resumeGame } from '../context/useResumeGame';
 import {
   firstDownYard,
@@ -195,7 +196,7 @@ export default function GamePage() {
       }
       if (next.log.length > prev.log.length) {
         const newEntry   = next.log[next.log.length - 1];
-        const historyEntry = { state: prev, playId: null };
+        const historyEntry = { state: prev, playId: null, entryId: newEntry.id };
         setHistory(h => [...h, historyEntry]);
 
         if (newEntry.homeScore > prev.homeScore) setScoreFlash('home');
@@ -221,16 +222,44 @@ export default function GamePage() {
               : null,
         }).then(play => {
           if (play?.play_id) {
-            setHistory(h => {
-              const updated = [...h];
-              updated[updated.length - 1] = { ...updated[updated.length - 1], playId: play.play_id };
-              return updated;
-            });
+            const playId = play.play_id;
+            const entryId = newEntry.id;
+            const credits = creditsFromLogEntry(newEntry);
+            setHistory(h => h.map(item => (
+              item.entryId === entryId ? { ...item, playId } : item
+            )));
+            setGs(s => ({
+              ...s,
+              log: s.log.map(e => (e.id === entryId ? { ...e, playId, credits } : e)),
+            }));
           }
         });
       }
       return next;
     });
+  }, []);
+
+  const handleEditCredit = useCallback(async (entry, changes) => {
+    let description = entry.description;
+    let credits = (entry.credits || []).map((c) => ({ ...c }));
+    for (const change of changes) {
+      await updatePlayCredit({
+        playId: entry.playId,
+        role: change.role,
+        fromPlayerId: change.fromPlayerId,
+        toPlayerId: change.toPlayerId,
+      });
+      description = swapCreditName(description, change.role, change.fromName, change.toPlayer.name);
+      credits = credits.map((c) => (
+        c.role === change.role
+          ? { role: c.role, playerId: Number(change.toPlayerId), playerName: change.toPlayer.name }
+          : c
+      ));
+    }
+    setGs((s) => ({
+      ...s,
+      log: s.log.map((e) => (e.id === entry.id ? { ...e, description, credits } : e)),
+    }));
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -858,6 +887,9 @@ export default function GamePage() {
             awayName={awayName}
             gs={gs}
             latestDriveId={latestDriveId}
+            homePlayers={homePlayers}
+            awayPlayers={awayPlayers}
+            onEditCredit={handleEditCredit}
           />
         </div>
       </div>
@@ -881,6 +913,9 @@ export default function GamePage() {
               awayName={awayName}
               gs={gs}
               latestDriveId={latestDriveId}
+              homePlayers={homePlayers}
+              awayPlayers={awayPlayers}
+              onEditCredit={handleEditCredit}
             />
           </div>
         </div>

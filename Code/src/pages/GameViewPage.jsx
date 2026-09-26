@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { BarChart3, List, Play, Trash2, Users } from "lucide-react";
 import { supabase } from "../supabaseClient";
@@ -13,7 +13,9 @@ import {
   computeTeamBoxStats,
   computePlayerBoxStats,
 } from "../utils/statsHelpers";
-import { playerFirstName } from "../utils/playerName";
+import { cleanPlayerName, playerFirstName } from "../utils/playerName";
+import { sortByJersey } from "../context/useGame";
+import { creditsFromParticipants, updatePlayCredit } from "../utils/playCredit";
 import { playPeriod } from "../gameLogic";
 
 // ── Outcome → driveResult mapping (inverse of useSavePlay) ───────────────────
@@ -23,16 +25,42 @@ const OUTCOME_TO_DRIVE_RESULT = {
   interception:       'Interception',
   turnover_on_downs:  'Turnover on Downs',
   punt:               'Punt',
+  punt_return_td:     'Punt Return TD',
   safety:             'Safety',
   end_of_half:        'End of Half',
 };
+
+const SCORING_DRIVE_RESULTS = new Set(['Touchdown', 'Pick 6', 'Punt Return TD']);
+
+/** Extra-point tries share the touchdown's drive. Label that drive from the score, not the try. */
+function driveResultForEndingPlay(play, plays, index) {
+  if (play.is_conversion) {
+    let scored = null;
+    for (let j = index - 1; j >= 0; j--) {
+      const prev = plays[j];
+      if (prev.is_conversion) continue;
+      const sameDrive = prev.offense_team === play.offense_team && playPeriod(prev) === playPeriod(play);
+      scored = sameDrive ? prev : null;
+      break;
+    }
+    const scoredLabel = scored ? OUTCOME_TO_DRIVE_RESULT[scored.outcome] : undefined;
+    if (scoredLabel && SCORING_DRIVE_RESULTS.has(scoredLabel)) {
+      const pts = play.conv_points ?? 0;
+      return play.outcome === 'complete'
+        ? `Touchdown, ${pts} pt good`
+        : `Touchdown, ${pts} pt no good`;
+    }
+    return scoredLabel;
+  }
+  return OUTCOME_TO_DRIVE_RESULT[play.outcome];
+}
 
 // ── Build a human-readable description from a play row + participants ─────────
 function buildDescription(play, participants, homeTeamId, homeAttacksRight, hasFortyYard) {
   const passer   = participants.find(p => p.role === 'passer');
   const receiver = participants.find(p => p.role === 'receiver');
   const rusher   = participants.find(p => p.role === 'rusher');
-  const defender = participants.find(p => p.role === 'defender');
+  const defender = participants.find(p => p.role === 'defender' || p.role === 'interceptor');
 
   const passerName   = playerFirstName(passer?.player_name, 'QB');
   const receiverName = playerFirstName(receiver?.player_name, 'Receiver');
@@ -109,6 +137,30 @@ async function fetchGameData(gameId) {
     .select('player_id, name, team_id')
     .in('team_id', [homeTeamId, gameRow.away.team_id]);
 
+  const { data: rosterRows } = await supabase
+    .from('Roster')
+    .select('player_id, jersey')
+    .eq('game_id', gameId);
+  const jerseyById = {};
+  for (const row of rosterRows || []) jerseyById[row.player_id] = row.jersey;
+
+  const homeRoster = [];
+  const awayRoster = [];
+  for (const p of rosterPlayers || []) {
+    const mapped = {
+      id: String(p.player_id),
+      name: cleanPlayerName(p.name),
+      number: jerseyById[p.player_id] ?? null,
+      team: p.team_id === homeTeamId ? 'home' : 'away',
+    };
+    if (mapped.team === 'home') homeRoster.push(mapped);
+    else awayRoster.push(mapped);
+  }
+  const rosters = {
+    homeRoster: sortByJersey(homeRoster),
+    awayRoster: sortByJersey(awayRoster),
+  };
+
   const emptyBox = {
     homeName,
     awayName,
@@ -124,6 +176,7 @@ async function fetchGameData(gameId) {
     awayPlayers: (rosterPlayers || [])
       .filter((p) => p.team_id === gameRow.away.team_id)
       .map((p) => computePlayerBoxStats(p, [], [], homeTeamId, homeAttacksRight, hasFortyYard)),
+    ...rosters,
   };
 
   if (playsErr) throw playsErr;
@@ -149,6 +202,7 @@ async function fetchGameData(gameId) {
     if (!partsByPlay[p.play_id]) partsByPlay[p.play_id] = [];
     partsByPlay[p.play_id].push({
       role:        p.role,
+      player_id:   p.player_id,
       player_name: p.player?.name ?? '',
     });
   }
@@ -211,7 +265,7 @@ async function fetchGameData(gameId) {
     const isDriveEnd     = !nextPlay || nextPossession !== possession;
     const nextHalfChanged = nextPlay && playPeriod(play) !== playPeriod(nextPlay) && !play.is_conversion && !nextPlay.is_conversion;
     const driveResult    = isDriveEnd || nextHalfChanged
-      ? (OUTCOME_TO_DRIVE_RESULT[play.outcome] ?? (nextHalfChanged ? 'End of Half' : undefined))
+      ? (driveResultForEndingPlay(play, plays, i) ?? (nextHalfChanged ? 'End of Half' : undefined))
       : undefined;
 
     return {
@@ -228,6 +282,8 @@ async function fetchGameData(gameId) {
       driveId,
       drivePossession: possession,
       driveResult,
+      playId:          play.play_id,
+      credits:         creditsFromParticipants(participants),
     };
   });
 
@@ -258,6 +314,7 @@ async function fetchGameData(gameId) {
     awayStats,
     homePlayers,
     awayPlayers,
+    ...rosters,
   };
 }
 
@@ -304,6 +361,30 @@ export default function GameViewPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const handleEditCredit = useCallback(async (entry, changes) => {
+    let failure = null;
+    for (const change of changes) {
+      try {
+        await updatePlayCredit({
+          playId: entry.playId,
+          role: change.role,
+          fromPlayerId: change.fromPlayerId,
+          toPlayerId: change.toPlayerId,
+        });
+      } catch (err) {
+        failure = err;
+        break;
+      }
+    }
+    try {
+      const fresh = await fetchGameData(Number(id));
+      setData(fresh);
+    } catch (err) {
+      if (!failure) failure = err;
+    }
+    if (failure) throw failure;
+  }, [id]);
+
   if (loading) return (
     <div className="flex h-screen items-center justify-center bg-slate-900 text-slate-400 text-sm">
       Loading game…
@@ -316,7 +397,10 @@ export default function GameViewPage() {
     </div>
   );
 
-  const { homeName, awayName, log, finalHome, finalAway, periodScores, homeStats, awayStats, homePlayers, awayPlayers } = data;
+  const {
+    homeName, awayName, log, finalHome, finalAway, periodScores,
+    homeStats, awayStats, homePlayers, awayPlayers, homeRoster, awayRoster,
+  } = data;
 
   const handleResume = () => {
     startGame(Number(id));
@@ -415,7 +499,14 @@ export default function GameViewPage() {
 
         <div className="flex-1 min-h-0 bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
           {tab === "plays" && (
-            <PlayByPlay log={log} homeName={homeName} awayName={awayName} />
+            <PlayByPlay
+              log={log}
+              homeName={homeName}
+              awayName={awayName}
+              homePlayers={homeRoster}
+              awayPlayers={awayRoster}
+              onEditCredit={canTrackGames ? handleEditCredit : undefined}
+            />
           )}
           {tab === "team" && (
             <div className="h-full overflow-y-auto">

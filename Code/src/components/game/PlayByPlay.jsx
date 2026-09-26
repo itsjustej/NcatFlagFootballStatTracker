@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Pencil } from 'lucide-react';
 import { useLeague } from '../../context/LeagueContext';
 import { possessionColor, TEAM_COLORS } from '../../constants/teamColors';
 import CurrentPlayPreview from './CurrentPlayPreview';
+import EditPlayCredit from './EditPlayCredit';
 
 function buildDrives(log, currentHalf) {
   const map = new Map();
@@ -51,8 +53,8 @@ function downStr(down, dist) {
 }
 
 function resultColor(result) {
-  if (result.startsWith('Touchdown, ') && result.endsWith('good')) return '#16a34a';
-  if (result.startsWith('Touchdown, no good'))                      return '#f97316';
+  if (result.includes('no good')) return '#f97316';
+  if (result.startsWith('Touchdown')) return '#16a34a';
   const map = {
     Touchdown:           '#16a34a',
     'Pick 6':            '#16a34a',
@@ -67,7 +69,11 @@ function resultColor(result) {
   return map[result] ?? '#94a3b8';
 }
 
-function DriveRow({ drive, homeName, awayName, defaultOpen, scrollRef }) {
+function canEditPlay(entry) {
+  return Boolean(entry?.playId && entry.credits?.length);
+}
+
+function DriveRow({ drive, homeName, awayName, defaultOpen, scrollRef, onEditCredit }) {
   const [open, setOpen]  = useState(defaultOpen);
   const teamName         = drive.possession === 'home' ? homeName : awayName;
   const teamColor        = possessionColor(drive.possession);
@@ -145,6 +151,16 @@ function DriveRow({ drive, homeName, awayName, defaultOpen, scrollRef }) {
                   )}
                 </div>
               </div>
+              {onEditCredit && canEditPlay(entry) && (
+                <button
+                  type="button"
+                  aria-label="Edit who is credited"
+                  onClick={() => onEditCredit(entry)}
+                  className="shrink-0 self-start min-w-11 min-h-11 -mr-2 flex items-center justify-center rounded-lg text-slate-500 hover:text-white hover:bg-slate-700/70"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -159,7 +175,16 @@ const PERIODS = [
   { id: 3, label: 'OT' },
 ];
 
-export default function PlayByPlay({ log, homeName, awayName, gs, latestDriveId }) {
+export default function PlayByPlay({
+  log,
+  homeName,
+  awayName,
+  gs,
+  latestDriveId,
+  homePlayers = [],
+  awayPlayers = [],
+  onEditCredit,
+}) {
   const navigate    = useNavigate();
   const { clearGame } = useLeague();
   const drives      = buildDrives(log, gs?.half);
@@ -171,8 +196,10 @@ export default function PlayByPlay({ log, homeName, awayName, gs, latestDriveId 
   const available   = PERIODS.filter((period) => byPeriod[period.id].length > 0);
   const latestPeriod = available.length ? available[available.length - 1].id : 1;
   const [period, setPeriod] = useState(gs?.half && byPeriod[gs.half]?.length ? gs.half : latestPeriod);
+  const [editingId, setEditingId] = useState(null);
   const scrollRef   = useRef(null);
   const listRef     = useRef(null);
+  const editing     = editingId ? log.find((entry) => entry.id === editingId) : null;
 
   useEffect(() => {
     if (gs?.half && byPeriod[gs.half]?.length) setPeriod(gs.half);
@@ -245,10 +272,22 @@ export default function PlayByPlay({ log, homeName, awayName, gs, latestDriveId 
               awayName={awayName}
               defaultOpen={d.driveId === latestDriveId}
               scrollRef={scrollRef}
+              onEditCredit={onEditCredit ? (entry) => setEditingId(entry.id) : null}
             />
           ))
         )}
       </div>
+
+      {editing && onEditCredit && (
+        <EditPlayCredit
+          key={editing.id}
+          entry={editing}
+          homePlayers={homePlayers}
+          awayPlayers={awayPlayers}
+          onClose={() => setEditingId(null)}
+          onSave={(changes) => onEditCredit(editing, changes)}
+        />
+      )}
     </div>
   );
 }
