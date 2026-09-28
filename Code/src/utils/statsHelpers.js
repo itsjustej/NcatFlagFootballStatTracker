@@ -313,6 +313,7 @@ export function computeTeamBoxStats(teamId, plays, homeTeamId, homeAttacksRight 
   const passCompletions = countPassCompletions(passPlays);
 
   return {
+    totalPlays: offPlays.filter(isSuccessRatePlay).length,
     passYards,
     rushYards,
     totalYards: passYards + rushYards,

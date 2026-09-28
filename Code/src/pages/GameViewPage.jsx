@@ -125,22 +125,17 @@ async function fetchGameData(gameId) {
   const homeAttacksRight = gameRow.home_attacks_right !== false;
   const hasFortyYard = gameRow.has_forty_yard !== false;
 
-  // 2. All plays for this game ordered by play_id
-  const { data: plays, error: playsErr } = await supabase
-    .from('Play')
-    .select('*')
-    .eq('game_id', gameId)
-    .order('play_id', { ascending: true });
+  const awayTeamId = gameRow.away.team_id;
 
-  const { data: rosterPlayers } = await supabase
-    .from('Player')
-    .select('player_id, name, team_id')
-    .in('team_id', [homeTeamId, gameRow.away.team_id]);
-
-  const { data: rosterRows } = await supabase
-    .from('Roster')
-    .select('player_id, jersey')
-    .eq('game_id', gameId);
+  // Plays, both rosters, and jersey numbers are independent once the game is known.
+  const [playsResult, rosterPlayersResult, rosterRowsResult] = await Promise.all([
+    supabase.from('Play').select('*').eq('game_id', gameId).order('play_id', { ascending: true }),
+    supabase.from('Player').select('player_id, name, team_id').in('team_id', [homeTeamId, awayTeamId]),
+    supabase.from('Roster').select('player_id, jersey').eq('game_id', gameId),
+  ]);
+  const { data: plays, error: playsErr } = playsResult;
+  const { data: rosterPlayers } = rosterPlayersResult;
+  const { data: rosterRows } = rosterRowsResult;
   const jerseyById = {};
   for (const row of rosterRows || []) jerseyById[row.player_id] = row.jersey;
 
@@ -288,7 +283,6 @@ async function fetchGameData(gameId) {
   });
 
   const last = log[log.length - 1];
-  const awayTeamId = gameRow.away.team_id;
   const homeStats = computeTeamBoxStats(homeTeamId, plays, homeTeamId, homeAttacksRight, hasFortyYard);
   const awayStats = computeTeamBoxStats(awayTeamId, plays, homeTeamId, homeAttacksRight, hasFortyYard);
   const statParticipants = (parts || []).map((p) => ({

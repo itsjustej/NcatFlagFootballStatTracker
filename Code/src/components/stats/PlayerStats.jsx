@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { supabase } from "../../supabaseClient";
 import { useLeague } from "../../context/LeagueContext";
+import { loadLeagueSeason } from "../../utils/leagueSeason";
 
 import {
   yardsGainedForPlay,
@@ -77,6 +77,7 @@ export default function PlayerStats() {
   const [teams, setTeams]     = useState([]);
   const [teamId, setTeamId]   = useState("");
   const [players, setPlayers] = useState([]);
+  const [season, setSeason]   = useState(null);
   const [loading, setLoading] = useState(false);
   const [sortKey, setSortKey] = useState('name');
   const [sortAsc, setSortAsc] = useState(true);
@@ -113,33 +114,28 @@ export default function PlayerStats() {
 
   useEffect(() => {
     if (!currentLeague) return;
-    setTeamId(""); setPlayers([]);
-    const fetchTeams = async () => {
-      const { data } = await supabase.from("Team").select("*").eq("league_id", currentLeague.league_id);
-      setTeams(data || []);
-    };
-    fetchTeams();
+    let cancelled = false;
+    setTeamId("");
+    setPlayers([]);
+    setSeason(null);
+    loadLeagueSeason(currentLeague.league_id)
+      .then((data) => {
+        if (cancelled) return;
+        setTeams(data.teams);
+        setSeason(data);
+      })
+      .catch((err) => console.error(err));
+    return () => { cancelled = true; };
   }, [currentLeague]);
 
   useEffect(() => {
-    if (!teamId) return;
+    if (!teamId || !season) return;
     const fetchPlayers = async () => {
       setLoading(true);
 
-      const { data: playersData } = await supabase.from("Player").select("*").eq("team_id", teamId);
-      const { data: plays }       = await supabase.from("Play").select("*");
-      const { data: participants }= await supabase.from("Participants").select("*");
-      const { data: games }       = await supabase.from("Game").select("game_id, league_id, home_team, home_attacks_right, has_forty_yard");
-      const playerIds = (playersData || []).map((p) => p.player_id);
-      const { data: roster } = playerIds.length
-        ? await supabase.from("Roster").select("player_id, game_id, jersey").in("player_id", playerIds)
-        : { data: [] };
-
-      const leagueGameIds = new Set(
-        (games || [])
-          .filter((g) => g.league_id === currentLeague.league_id)
-          .map((g) => g.game_id),
-      );
+      const playersData = season.players.filter((p) => String(p.team_id) === String(teamId));
+      const { plays, participants, games, roster } = season;
+      const leagueGameIds = new Set((games || []).map((g) => g.game_id));
       const gamesWithJersey = new Map();
       for (const row of roster || []) {
         if (row.jersey == null || !leagueGameIds.has(row.game_id)) continue;
@@ -233,7 +229,7 @@ export default function PlayerStats() {
       setLoading(false);
     };
     fetchPlayers();
-  }, [teamId, currentLeague]);
+  }, [teamId, season]);
 
   return (
     <div className="space-y-4">

@@ -24,20 +24,15 @@ export default function GameHistoryPage() {
       .select(`
         game_id,
         home_team:home_team ( team_id, name ),
-        away_team:away_team ( team_id, name )
+        away_team:away_team ( team_id, name ),
+        Play ( offense_team, outcome, is_conversion, conv_points )
       `)
       .eq("league_id", currentLeague.league_id);
 
     if (error) { console.error(error); setLoading(false); return; }
 
-    const { data: plays, error: playsError } = await supabase
-      .from("Play")
-      .select("game_id, offense_team, outcome, is_conversion, conv_points");
-
-    if (playsError) { console.error(playsError); setLoading(false); return; }
-
     const formatted = data.map((g) => {
-      const gamePlays = plays.filter((p) => p.game_id === g.game_id);
+      const gamePlays = g.Play || [];
 
       const calcPoints = (teamId) =>
         gamePlays

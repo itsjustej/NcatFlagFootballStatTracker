@@ -22,14 +22,14 @@ export default function StartGamePage() {
   useEffect(() => {
     if (!currentLeague) return;
     const fetchTeams = async () => {
-      const { data: teamsData, error: teamsError } = await supabase
-        .from("Team")
-        .select("*")
-        .eq("league_id", currentLeague.league_id);
+      const [teamsResult, playersResult] = await Promise.all([
+        supabase.from("Team").select("*").eq("league_id", currentLeague.league_id),
+        supabase.from("Player").select("player_id, name, team_id"),
+      ]);
+      const { data: teamsData, error: teamsError } = teamsResult;
+      const { data: playersData } = playersResult;
 
       if (teamsError) { console.error(teamsError); return; }
-
-      const { data: playersData } = await supabase.from("Player").select("*");
 
       const formatted = teamsData.map(t => ({
         team_id: t.team_id,

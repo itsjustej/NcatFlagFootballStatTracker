@@ -3,8 +3,8 @@ import {
   LineChart, Line, XAxis, YAxis, Legend, ResponsiveContainer, Tooltip
 } from "recharts";
 import { ChevronDown, TrendingUp, Shield, RefreshCw } from "lucide-react";
-import { supabase } from "../../supabaseClient";
 import { useLeague } from "../../context/LeagueContext";
+import { loadLeagueSeason } from "../../utils/leagueSeason";
 
 import {
   yardsGainedForPlay,
@@ -121,18 +121,17 @@ export default function TeamStats() {
     setAllStats({});
 
     const fetchAll = async () => {
-      const { data: teamsData } = await supabase
-        .from("Team").select("*").eq("league_id", currentLeague.league_id);
-      if (!teamsData) return;
-      setTeams(teamsData);
-
       setLoading(true);
-      const { data: games }        = await supabase.from("Game").select("*").eq("league_id", currentLeague.league_id);
-      const { data: allPlays }     = await supabase.from("Play").select("*");
-      const { data: participants } = await supabase.from("Participants").select("*");
-
-      const leagueGameIds = new Set((games || []).map((g) => g.game_id));
-      const plays = (allPlays || []).filter((p) => leagueGameIds.has(p.game_id));
+      let season;
+      try {
+        season = await loadLeagueSeason(currentLeague.league_id);
+      } catch (err) {
+        console.error(err);
+        setLoading(false);
+        return;
+      }
+      const { teams: teamsData, games, plays, participants } = season;
+      setTeams(teamsData);
 
       // Build game→home map for direction-aware calculations
       const ghMap = {};
@@ -346,6 +345,8 @@ export default function TeamStats() {
           passYpgAgainst:  gamesPlayed > 0 ? (passYardsAgainst  / gamesPlayed).toFixed(1) : 0,
           rushYpgAgainst:  gamesPlayed > 0 ? (rushYardsAgainst  / gamesPlayed).toFixed(1) : 0,
           totalYpgAgainst: gamesPlayed > 0 ? (totalYardsAgainst / gamesPlayed).toFixed(1) : 0,
+          playsPerGame: gamesPlayed > 0 ? (scrimmageOffPlays.length / gamesPlayed).toFixed(1) : 0,
+          playsPerGameAgainst: gamesPlayed > 0 ? (scrimmageDefPlays.length / gamesPlayed).toFixed(1) : 0,
           yardsPerPlay:        yardsPerPlay.toFixed(1),
           yardsPerPlayAgainst: yardsPerPlayAgainst.toFixed(1),
           successFor:          successFor.toFixed(1),
@@ -457,6 +458,7 @@ export default function TeamStats() {
               <StatRow label="Passing yards / game"  value={stats.passYpg}             rank={rank('passYpg')}           total={numTeams} />
               <StatRow label="Rushing yards / game"  value={stats.rushYpg}             rank={rank('rushYpg')}           total={numTeams} />
               <StatRow label="Total yards / game"    value={stats.totalYpg}            rank={rank('totalYpg')}          total={numTeams} />
+              <StatRow label="Plays per game"        value={stats.playsPerGame}        rank={rank('playsPerGame')}      total={numTeams} />
               <StatRow label="Yards per play"        value={stats.yardsPerPlay}        rank={rank('yardsPerPlay')}      total={numTeams} />
               <StatRow label="Success rate"          value={`${stats.successFor}%`}    rank={rank('successFor')}        total={numTeams} isPercentage pctValue={stats.successFor} />
               <StatRow label="Explosive plays" value={stats.explosivePlays}      rank={rank('explosivePlays')}     total={numTeams} />
@@ -476,6 +478,7 @@ export default function TeamStats() {
               <StatRow label="Pass yards against / game"  value={stats.passYpgAgainst}         rank={rank('passYpgAgainst', true)}     total={numTeams} lowerIsBetter />
               <StatRow label="Rush yards against / game"  value={stats.rushYpgAgainst}         rank={rank('rushYpgAgainst', true)}     total={numTeams} lowerIsBetter />
               <StatRow label="Total yards against / game" value={stats.totalYpgAgainst}        rank={rank('totalYpgAgainst', true)}    total={numTeams} lowerIsBetter />
+              <StatRow label="Plays per game against"     value={stats.playsPerGameAgainst}    rank={rank('playsPerGameAgainst', true)} total={numTeams} lowerIsBetter />
               <StatRow label="Yards per play against"     value={stats.yardsPerPlayAgainst}    rank={rank('yardsPerPlayAgainst', true)} total={numTeams} lowerIsBetter />
               <StatRow label="Success rate against"    value={`${stats.successAgainst}%`}   rank={rank('successAgainst', true)}     total={numTeams} isPercentage pctValue={stats.successAgainst} lowerIsBetter />
               <StatRow label="Explosive plays allowed" value={stats.explosivePlaysAgainst} rank={rank('explosivePlaysAgainst', true)} total={numTeams} lowerIsBetter />

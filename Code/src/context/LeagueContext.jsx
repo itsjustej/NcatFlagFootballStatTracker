@@ -1,13 +1,44 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useGame } from "./useGame";
 
 const LeagueContext = createContext(null);
+const STORED_LEAGUE_KEY = "currentLeague";
+
+function readStoredLeague() {
+  try {
+    const raw = localStorage.getItem(STORED_LEAGUE_KEY);
+    if (raw) {
+      const league = JSON.parse(raw);
+      if (league && typeof league.league_id === "number") return league;
+    }
+  } catch {
+    /* fall through to the id saved by older sessions */
+  }
+  const id = parseInt(localStorage.getItem("currentLeagueId") || "", 10);
+  if (Number.isNaN(id)) return null;
+  return { league_id: id, name: "" };
+}
+
+function storeLeague(league) {
+  if (!league) {
+    localStorage.removeItem(STORED_LEAGUE_KEY);
+    localStorage.removeItem("currentLeagueId");
+    return;
+  }
+  localStorage.setItem(STORED_LEAGUE_KEY, JSON.stringify({
+    league_id: league.league_id,
+    name: league.name,
+  }));
+  localStorage.setItem("currentLeagueId", String(league.league_id));
+}
 
 export function LeagueProvider({ children }) {
+  const { pathname } = useLocation();
   // ── League state ──────────────────────────────────────────────────
   const [leagues, setLeagues] = useState([]);
-  const [currentLeague, setCurrentLeague] = useState(null);
+  const [currentLeague, setCurrentLeague] = useState(readStoredLeague);
 
   useEffect(() => {
     const fetchLeagues = async () => {
@@ -15,14 +46,17 @@ export function LeagueProvider({ children }) {
       if (!data) return;
       setLeagues(data);
 
-      const stored = localStorage.getItem("currentLeagueId");
-      if (stored) {
-        const found = data.find((l) => l.league_id === parseInt(stored));
-        if (found) { setCurrentLeague(found); return; }
+      const storedId = readStoredLeague()?.league_id
+        ?? parseInt(localStorage.getItem("currentLeagueId") || "", 10);
+      const found = data.find((l) => l.league_id === storedId);
+      if (found) {
+        setCurrentLeague(found);
+        storeLeague(found);
+        return;
       }
       if (data.length > 0) {
         setCurrentLeague(data[0]);
-        localStorage.setItem("currentLeagueId", data[0].league_id);
+        storeLeague(data[0]);
       }
     };
     fetchLeagues();
@@ -30,7 +64,7 @@ export function LeagueProvider({ children }) {
 
   const switchLeague = (league) => {
     setCurrentLeague(league);
-    localStorage.setItem("currentLeagueId", league.league_id);
+    storeLeague(league);
   };
 
   const createLeague = async (name) => {
@@ -57,7 +91,7 @@ export function LeagueProvider({ children }) {
         switchLeague(remaining[0]);
       } else {
         setCurrentLeague(null);
-        localStorage.removeItem("currentLeagueId");
+        storeLeague(null);
       }
     }
   };
@@ -78,7 +112,7 @@ export function LeagueProvider({ children }) {
     loading: gameLoading,
     error: gameError,
     updateJersey,  // ← added
-  } = useGame(currentGameId);
+  } = useGame(pathname === "/game" ? currentGameId : null);
 
   const startGame = (gameId) => {
     exitingRef.current = false;

@@ -170,6 +170,7 @@ export default function GameBoxScore({
             <span className="text-left text-xs font-black uppercase tracking-widest text-[#C9A84C] truncate">{awayName}</span>
           </div>
           <CmpRow label="Total Yds" home={homeStats.totalYards} away={awayStats.totalYards} />
+          <CmpRow label="Plays" home={homeStats.totalPlays} away={awayStats.totalPlays} />
           <CmpRow label="Pass Yds" home={homeStats.passYards} away={awayStats.passYards} />
           <CmpRow label="Rush Yds" home={homeStats.rushYards} away={awayStats.rushYards} />
           <CmpRow

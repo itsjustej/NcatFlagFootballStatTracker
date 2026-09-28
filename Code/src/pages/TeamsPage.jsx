@@ -22,17 +22,14 @@ export default function TeamsPage() {
   }, [currentLeague]);
 
   const fetchTeams = async () => {
-    const { data: teamsData, error: teamsError } = await supabase
-      .from("Team")
-      .select("*")
-      .eq("league_id", currentLeague.league_id);
+    const [teamsResult, playersResult] = await Promise.all([
+      supabase.from("Team").select("*").eq("league_id", currentLeague.league_id),
+      supabase.from("Player").select("player_id, name, team_id"),
+    ]);
+    const { data: teamsData, error: teamsError } = teamsResult;
+    const { data: playersData, error: playersError } = playersResult;
 
     if (teamsError) { console.error(teamsError); return; }
-
-    const { data: playersData, error: playersError } = await supabase
-      .from("Player")
-      .select("*");
-
     if (playersError) { console.error(playersError); return; }
 
     const formatted = teamsData.map((t) => ({

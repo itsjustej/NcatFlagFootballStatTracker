@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Trophy } from "lucide-react";
-import { supabase } from "../../supabaseClient";
 import { useLeague } from "../../context/LeagueContext";
+import { loadLeagueSeason } from "../../utils/leagueSeason";
 import { computeLeagueStandings } from "../../utils/standingsHelpers";
 
 const MINIMIZED_KEY = "standingsTickerMinimized";
@@ -58,20 +58,13 @@ export default function StandingsTicker({ onExpandedChange }) {
 
     const fetchStandings = async () => {
       setLoading(true);
-      const { data: teams } = await supabase
-        .from("Team")
-        .select("*")
-        .eq("league_id", currentLeague.league_id);
-      const { data: games } = await supabase
-        .from("Game")
-        .select("*")
-        .eq("league_id", currentLeague.league_id);
-      const { data: allPlays } = await supabase.from("Play").select("*");
-
-      const leagueGameIds = new Set((games || []).map((g) => g.game_id));
-      const plays = (allPlays || []).filter((p) => leagueGameIds.has(p.game_id));
-
-      setStandings(computeLeagueStandings(teams, games, plays));
+      try {
+        const { teams, games, plays } = await loadLeagueSeason(currentLeague.league_id);
+        setStandings(computeLeagueStandings(teams, games, plays));
+      } catch (err) {
+        console.error(err);
+        setStandings([]);
+      }
       setLoading(false);
     };
 

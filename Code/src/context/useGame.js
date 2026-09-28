@@ -51,20 +51,22 @@ export function useGame(gameId) {
       setError(null);
 
       try {
-        // 1. Game + team names
-        const { data: gameRow, error: gameErr } = await supabase
-          .from('Game')
-          .select(`
-            game_id,
-            opening_possession,
-            home_attacks_right,
-            has_forty_yard,
-            home:Team!home_team(team_id, name),
-            away:Team!away_team(team_id, name)
-          `)
-          .eq('game_id', gameId)
-          .single();
-
+        const [gameResult, rosterResult] = await Promise.all([
+          supabase
+            .from('Game')
+            .select(`
+              game_id,
+              opening_possession,
+              home_attacks_right,
+              has_forty_yard,
+              home:Team!home_team(team_id, name),
+              away:Team!away_team(team_id, name)
+            `)
+            .eq('game_id', gameId)
+            .single(),
+          supabase.from('Roster').select('player_id, jersey').eq('game_id', gameId),
+        ]);
+        const { data: gameRow, error: gameErr } = gameResult;
         if (gameErr) throw gameErr;
 
         const gameInfo = {
@@ -83,20 +85,9 @@ export function useGame(gameId) {
 
         if (playerErr) throw playerErr;
 
-        // 3. Jersey numbers from Roster for this game
-        const playerIds = (players || []).map(p => p.player_id);
-        let jerseyMap = {}; // player_id → jersey number
-
-        if (playerIds.length > 0) {
-          const { data: rosterRows } = await supabase
-            .from('Roster')
-            .select('player_id, jersey')
-            .eq('game_id', gameId)
-            .in('player_id', playerIds);
-
-          for (const row of (rosterRows || [])) {
-            jerseyMap[row.player_id] = row.jersey;
-          }
+        const jerseyMap = {};
+        for (const row of (rosterResult.data || [])) {
+          jerseyMap[row.player_id] = row.jersey;
         }
 
         // 4. Map to UI player shape

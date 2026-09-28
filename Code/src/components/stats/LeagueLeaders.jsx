@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../../supabaseClient";
+import { loadLeagueSeason } from "../../utils/leagueSeason";
 import { useLeague } from "../../context/LeagueContext";
 
 import {
@@ -208,18 +208,16 @@ export default function LeagueLeaders() {
     const fetchAll = async () => {
       setLoading(true);
 
-      const { data: teams }        = await supabase.from("Team").select("*").eq("league_id", currentLeague.league_id);
-      const { data: players }      = await supabase.from("Player").select("*").in("team_id", (teams || []).map(t => t.team_id));
-      const { data: games }        = await supabase.from("Game").select("*").eq("league_id", currentLeague.league_id);
-      const { data: allPlays }     = await supabase.from("Play").select("*");
-      const { data: participants } = await supabase.from("Participants").select("*");
-      const leaderPlayerIds = (players || []).map((p) => p.player_id);
-      const { data: roster } = leaderPlayerIds.length
-        ? await supabase.from("Roster").select("player_id, game_id, jersey").in("player_id", leaderPlayerIds)
-        : { data: [] };
-
+      let season;
+      try {
+        season = await loadLeagueSeason(currentLeague.league_id);
+      } catch (err) {
+        console.error(err);
+        setLoading(false);
+        return;
+      }
+      const { teams, players, games, plays, participants, roster } = season;
       const leagueGameIds = new Set((games || []).map((g) => g.game_id));
-      const plays = (allPlays || []).filter((p) => leagueGameIds.has(p.game_id));
       const gamesWithJersey = new Map();
       for (const row of roster || []) {
         if (row.jersey == null || !leagueGameIds.has(row.game_id)) continue;
