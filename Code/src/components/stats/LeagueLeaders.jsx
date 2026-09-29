@@ -289,8 +289,8 @@ export default function LeagueLeaders() {
 
         const round2 = (n) => Math.round(n * 100) / 100;
         const passingFanPts = round2(passingTDs * 4 + passingYards / 25 - interceptionsThrown);
-        const rushingFanPts = round2(rushingTDs * 6 + rushingYards * 0.1);
-        const receivingFanPts = round2(receivingTDs * 6 + receivingYards * 0.1 + receptions);
+        const rushingFanPts = round2(rushingTDs * 4 + rushingYards * 0.1);
+        const receivingFanPts = round2(receivingTDs * 4 + receivingYards * 0.1 + receptions);
 
         const interceptions    = countPlayerInterceptions(pid, participants, plays);
         const flagPulls        = defenderData.length;
