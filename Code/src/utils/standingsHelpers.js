@@ -65,3 +65,74 @@ export function computeLeagueStandings(teams, games, plays) {
 
   return rows.map((row, i) => ({ ...row, rank: i + 1 }));
 }
+
+const MARGIN_CAP = 12;
+
+function clampMargin(margin) {
+  return Math.max(-MARGIN_CAP, Math.min(MARGIN_CAP, margin));
+}
+
+/**
+ * Power ratings from adjusted scoring margin plus opponent strength.
+ * Each game sets teamRating − opponentRating = margin, capped at ±12.
+ * Ratings are centered so teams that have played average 0.
+ */
+export function computePowerRankings(teams, games, plays) {
+  const standings = computeLeagueStandings(teams, games, plays);
+  if (standings.length === 0) return [];
+
+  const leagueGameIds = new Set((games || []).map((g) => g.game_id));
+  const leaguePlays = (plays || []).filter((p) => leagueGameIds.has(p.game_id));
+  const playedIds = new Set(standings.map((row) => String(row.team_id)));
+
+  const matchups = [];
+  for (const game of games || []) {
+    const home = String(game.home_team);
+    const away = String(game.away_team);
+    if (!playedIds.has(home) || !playedIds.has(away)) continue;
+    const gamePlays = leaguePlays.filter((p) => p.game_id === game.game_id);
+    const homePts = pointsForTeam(gamePlays, game.home_team);
+    const awayPts = pointsForTeam(gamePlays, game.away_team);
+    matchups.push({ home, away, margin: clampMargin(homePts - awayPts) });
+  }
+
+  const ratings = new Map(standings.map((row) => [String(row.team_id), 0]));
+
+  for (let iter = 0; iter < 200; iter += 1) {
+    const next = new Map();
+    for (const row of standings) {
+      const id = String(row.team_id);
+      const samples = [];
+      for (const game of matchups) {
+        if (game.home === id) samples.push(game.margin + (ratings.get(game.away) || 0));
+        else if (game.away === id) samples.push(-game.margin + (ratings.get(game.home) || 0));
+      }
+      const target = samples.length
+        ? samples.reduce((sum, n) => sum + n, 0) / samples.length
+        : ratings.get(id) || 0;
+      next.set(id, target);
+    }
+
+    const mean = [...next.values()].reduce((sum, n) => sum + n, 0) / next.size;
+    let maxDelta = 0;
+    for (const [id, target] of next) {
+      const blended = (ratings.get(id) || 0) * 0.5 + (target - mean) * 0.5;
+      maxDelta = Math.max(maxDelta, Math.abs(blended - (ratings.get(id) || 0)));
+      ratings.set(id, blended);
+    }
+    if (maxDelta < 1e-6) break;
+  }
+
+  const rows = standings.map((row) => ({
+    ...row,
+    power: ratings.get(String(row.team_id)) || 0,
+  }));
+
+  rows.sort((a, b) => {
+    if (b.power !== a.power) return b.power - a.power;
+    if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
+    return a.name.localeCompare(b.name);
+  });
+
+  return rows.map((row, i) => ({ ...row, rank: i + 1 }));
+}

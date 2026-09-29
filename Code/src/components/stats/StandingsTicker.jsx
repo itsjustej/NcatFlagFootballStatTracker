@@ -2,14 +2,14 @@ import React, { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Trophy } from "lucide-react";
 import { useLeague } from "../../context/LeagueContext";
 import { loadLeagueSeason } from "../../utils/leagueSeason";
-import { computeLeagueStandings } from "../../utils/standingsHelpers";
+import { computeLeagueStandings, computePowerRankings } from "../../utils/standingsHelpers";
 
 const MINIMIZED_KEY = "standingsTickerMinimized";
 
-function TickerSegment({ standings }) {
+function TickerSegment({ rows, mode }) {
   return (
     <>
-      {standings.map((team, i) => (
+      {rows.map((team, i) => (
         <span key={team.team_id} className="inline-flex items-center gap-2 shrink-0">
           <span
             className={`text-[10px] font-black tabular-nums ${
@@ -19,13 +19,10 @@ function TickerSegment({ standings }) {
             #{team.rank}
           </span>
           <span className="text-sm font-bold text-white whitespace-nowrap">{team.name}</span>
-          <span className="text-sm font-mono text-slate-300 tabular-nums">{team.record}</span>
-          {team.gamesPlayed > 0 && (
-            <span className="text-[10px] text-slate-500 tabular-nums">
-              ({(team.winPct * 100).toFixed(0)}%)
-            </span>
+          {mode === "standings" && (
+            <span className="text-sm font-mono text-slate-300 tabular-nums">{team.record}</span>
           )}
-          {i < standings.length - 1 && <span className="text-slate-600 ml-6">•</span>}
+          {i < rows.length - 1 && <span className="text-slate-600">•</span>}
         </span>
       ))}
     </>
@@ -35,6 +32,8 @@ function TickerSegment({ standings }) {
 export default function StandingsTicker({ onExpandedChange }) {
   const { currentLeague } = useLeague();
   const [standings, setStandings] = useState([]);
+  const [powerRankings, setPowerRankings] = useState([]);
+  const [mode, setMode] = useState("standings");
   const [loading, setLoading] = useState(true);
   const [minimized, setMinimized] = useState(() => {
     try {
@@ -45,6 +44,7 @@ export default function StandingsTicker({ onExpandedChange }) {
   });
   const viewportRef = useRef(null);
   const listRef = useRef(null);
+  const rows = mode === "power" ? powerRankings : standings;
 
   useEffect(() => {
     onExpandedChange?.(!minimized);
@@ -53,6 +53,7 @@ export default function StandingsTicker({ onExpandedChange }) {
   useEffect(() => {
     if (!currentLeague) {
       setStandings([]);
+      setPowerRankings([]);
       setLoading(false);
       return;
     }
@@ -62,9 +63,11 @@ export default function StandingsTicker({ onExpandedChange }) {
       try {
         const { teams, games, plays } = await loadLeagueSeason(currentLeague.league_id);
         setStandings(computeLeagueStandings(teams, games, plays));
+        setPowerRankings(computePowerRankings(teams, games, plays));
       } catch (err) {
         console.error(err);
         setStandings([]);
+        setPowerRankings([]);
       }
       setLoading(false);
     };
@@ -75,11 +78,11 @@ export default function StandingsTicker({ onExpandedChange }) {
   useEffect(() => {
     const viewport = viewportRef.current;
     const list = listRef.current;
-    if (!viewport || !list || minimized || standings.length === 0) return;
+    if (!viewport || !list || minimized || rows.length === 0) return;
 
     let frame = 0;
     let x = 0;
-    let mode = "hold-start";
+    let scrollMode = "hold-start";
     let holdUntil = performance.now() + 2200;
     let last = performance.now();
     const pixelsPerSecond = 70;
@@ -100,18 +103,18 @@ export default function StandingsTicker({ onExpandedChange }) {
         return;
       }
 
-      if (mode === "hold-start" || mode === "hold-end") {
-        if (now >= holdUntil) mode = mode === "hold-start" ? "to-end" : "to-start";
-      } else if (mode === "to-end") {
+      if (scrollMode === "hold-start" || scrollMode === "hold-end") {
+        if (now >= holdUntil) scrollMode = scrollMode === "hold-start" ? "to-end" : "to-start";
+      } else if (scrollMode === "to-end") {
         x = Math.max(endX, x - pixelsPerSecond * dt);
         if (x === endX) {
-          mode = "hold-end";
+          scrollMode = "hold-end";
           holdUntil = now + 2200;
         }
       } else {
         x = Math.min(0, x + pixelsPerSecond * dt);
         if (x === 0) {
-          mode = "hold-start";
+          scrollMode = "hold-start";
           holdUntil = now + 2200;
         }
       }
@@ -122,7 +125,7 @@ export default function StandingsTicker({ onExpandedChange }) {
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [standings, minimized]);
+  }, [rows, minimized]);
 
   const toggleMinimized = () => {
     setMinimized((prev) => {
@@ -150,7 +153,7 @@ export default function StandingsTicker({ onExpandedChange }) {
             hover:bg-slate-800 hover:border-slate-500 transition-colors"
         >
           <Trophy className="w-3.5 h-3.5 text-yellow-400" />
-          Standings
+          {mode === "power" ? "Power Rankings" : "Standings"}
           <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
         </button>
       </div>
@@ -163,17 +166,38 @@ export default function StandingsTicker({ onExpandedChange }) {
         bg-slate-950/95 backdrop-blur-md shadow-[0_-8px_32px_rgba(0,0,0,0.45)] pb-safe"
     >
       <div className="flex items-center justify-between px-3 sm:px-4 h-9 border-b border-slate-800/80 shrink-0">
-        <div className="flex items-center gap-2">
-          <Trophy className="w-3.5 h-3.5 text-yellow-400" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-            League Standings
-          </span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Trophy className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+          <div className="flex items-center gap-1">
+            {[
+              { id: "standings", label: "Standings" },
+              { id: "power", label: "Power Rankings", short: "Power" },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setMode(item.id)}
+                className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-[0.14em] transition-colors ${
+                  mode === item.id
+                    ? "bg-slate-700 text-white"
+                    : "text-slate-500 hover:text-white"
+                }`}
+              >
+                {item.short ? (
+                  <>
+                    <span className="sm:hidden">{item.short}</span>
+                    <span className="hidden sm:inline">{item.label}</span>
+                  </>
+                ) : item.label}
+              </button>
+            ))}
+          </div>
         </div>
         <button
           type="button"
           onClick={toggleMinimized}
-          className="p-1.5 rounded-md text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
-          title="Minimize standings"
+          className="p-1.5 rounded-md text-slate-500 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+          title={mode === "power" ? "Minimize power rankings" : "Minimize standings"}
         >
           <ChevronDown className="w-4 h-4" />
         </button>
@@ -182,11 +206,11 @@ export default function StandingsTicker({ onExpandedChange }) {
       <div ref={viewportRef} className="relative h-11 overflow-hidden px-3 sm:px-4">
         {loading ? (
           <p className="text-xs text-slate-500 text-center py-3">Loading standings…</p>
-        ) : standings.length === 0 ? (
+        ) : rows.length === 0 ? (
           <p className="text-xs text-slate-500 text-center py-3">No games played yet</p>
         ) : (
-          <div ref={listRef} className="flex items-center justify-between h-full min-w-full w-max will-change-transform">
-            <TickerSegment standings={standings} />
+          <div ref={listRef} className="flex items-center gap-8 h-full w-max will-change-transform">
+            <TickerSegment rows={rows} mode={mode} />
           </div>
         )}
       </div>
