@@ -20,6 +20,7 @@ import {
   opponentOffPlaysForTeam,
   countExplosivePlays,
   computeRedZoneStats,
+  pointsForTeam,
 } from "../../utils/statsHelpers";
 
 // ---------------- STAT ROW ---------------- //
@@ -158,18 +159,12 @@ export default function TeamStats() {
         const defPlays = (plays || []).filter(p => p.defense_team == tid && !p.is_conversion && p.play_type !== 'penalty');
 
         // ── Scoring ────────────────────────────────────────────────────────
-        // eslint-disable-next-line eqeqeq
-        const allOffPlays   = (plays || []).filter(p => p.offense_team == tid);
-        const points        = allOffPlays.reduce((sum, p) => {
-          if (p.outcome === 'td') return sum + 6;
-          if (p.is_conversion && p.outcome === 'complete') return sum + (p.conv_points || 0);
-          return sum;
-        }, 0);
-        // eslint-disable-next-line eqeqeq
-        const pointsAgainst = (plays || []).filter(p => p.defense_team == tid).reduce((sum, p) => {
-          if (p.outcome === 'td') return sum + 6;
-          if (p.is_conversion && p.outcome === 'complete') return sum + (p.conv_points || 0);
-          return sum;
+        const points = pointsForTeam(plays, tid);
+        const pointsAgainst = teamGames.reduce((sum, g) => {
+          // eslint-disable-next-line eqeqeq
+          const oppId = g.home_team == tid ? g.away_team : g.home_team;
+          const gPlays = (plays || []).filter((p) => p.game_id === g.game_id);
+          return sum + pointsForTeam(gPlays, oppId);
         }, 0);
 
         // ── Yards (direction-aware) ────────────────────────────────────────
@@ -275,24 +270,14 @@ export default function TeamStats() {
 
         // ── Per-game arrays for charts ─────────────────────────────────────
         const pointsPerGame = teamGames.map(g => {
-          // eslint-disable-next-line eqeqeq
-          const gPlays = (plays || []).filter(p => p.game_id === g.game_id && p.offense_team == tid);
-          return gPlays.reduce((sum, p) => {
-            if (p.outcome === 'td') return sum + 6;
-            if (p.is_conversion && p.outcome === 'complete') return sum + (p.conv_points || 0);
-            return sum;
-          }, 0);
+          const gPlays = (plays || []).filter(p => p.game_id === g.game_id);
+          return pointsForTeam(gPlays, tid);
         });
         const pointsAgainstPerGame = teamGames.map(g => {
           // eslint-disable-next-line eqeqeq
           const oppId  = g.home_team == tid ? g.away_team : g.home_team;
-          // eslint-disable-next-line eqeqeq
-          const gPlays = (plays || []).filter(p => p.game_id === g.game_id && p.offense_team == oppId);
-          return gPlays.reduce((sum, p) => {
-            if (p.outcome === 'td') return sum + 6;
-            if (p.is_conversion && p.outcome === 'complete') return sum + (p.conv_points || 0);
-            return sum;
-          }, 0);
+          const gPlays = (plays || []).filter(p => p.game_id === g.game_id);
+          return pointsForTeam(gPlays, oppId);
         });
         const yardsPerGame = teamGames.map(g => {
           // eslint-disable-next-line eqeqeq

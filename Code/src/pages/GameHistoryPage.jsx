@@ -4,6 +4,7 @@ import { Play } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
 import { useAuth } from "../auth/AuthContext";
+import { pointsForTeam } from "../utils/statsHelpers";
 
 export default function GameHistoryPage() {
   const { currentLeague } = useLeague();
@@ -25,7 +26,7 @@ export default function GameHistoryPage() {
         game_id,
         home_team:home_team ( team_id, name ),
         away_team:away_team ( team_id, name ),
-        Play ( offense_team, outcome, is_conversion, conv_points )
+        Play ( offense_team, defense_team, outcome, is_conversion, conv_points )
       `)
       .eq("league_id", currentLeague.league_id);
 
@@ -34,17 +35,8 @@ export default function GameHistoryPage() {
     const formatted = data.map((g) => {
       const gamePlays = g.Play || [];
 
-      const calcPoints = (teamId) =>
-        gamePlays
-          .filter((p) => p.offense_team === teamId)
-          .reduce((sum, p) => {
-            if (p.outcome === "td") return sum + 6;
-            if (p.is_conversion && p.outcome === "complete") return sum + (p.conv_points || 0);
-            return sum;
-          }, 0);
-
-      const homePoints = calcPoints(g.home_team.team_id);
-      const awayPoints = calcPoints(g.away_team.team_id);
+      const homePoints = pointsForTeam(gamePlays, g.home_team.team_id);
+      const awayPoints = pointsForTeam(gamePlays, g.away_team.team_id);
 
       return {
         game_id:     g.game_id,

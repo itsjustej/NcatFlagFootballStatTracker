@@ -17,6 +17,7 @@ import {
   opponentOffPlaysForTeam,
   countExplosivePlays,
   computeRedZoneStats,
+  pointsForTeam,
 } from "../../utils/statsHelpers";
 
 const fmt = (val, digits = 1) =>
@@ -236,7 +237,14 @@ export default function LeagueLeaders() {
       const yg = p => yardsGainedForPlay(p, ghMap[p.game_id], harMap[p.game_id], fortyMap[p.game_id]);
 
       // ── PLAYER STATS ──────────────────────────────────────────────────────
-      const computedPlayers = (players || []).filter((player) => !isUnknownPlayer(player)).map(player => {
+      const teamHasPlayed = (teamId) => (games || []).some(
+        // eslint-disable-next-line eqeqeq
+        (g) => g.home_team == teamId || g.away_team == teamId,
+      );
+
+      const computedPlayers = (players || [])
+        .filter((player) => !isUnknownPlayer(player) && teamHasPlayed(player.team_id))
+        .map(player => {
         const pid  = player.player_id;
         const team = (teams || []).find(t => t.team_id === player.team_id);
 
@@ -257,6 +265,7 @@ export default function LeagueLeaders() {
         const passCompletions = countPassCompletions(passerData.filter(p => p.play_type === 'pass'));
         const passingYards    = passerData.filter(p => p.play_type === 'pass' && isPassCompletionOutcome(p.outcome)).reduce((s, p) => s + yg(p), 0);
         const passingTDs      = passerData.filter(p => p.play_type === 'pass' && p.outcome === 'td').length;
+        const interceptionsThrown = passerData.filter(p => isInterceptionOutcome(p.outcome)).length;
         const completionPct   = passAttempts > 0 ? (passCompletions / passAttempts) * 100 : 0;
 
         const rushingYards  = rusherData.reduce((s, p) => s + yg(p), 0);
@@ -271,7 +280,7 @@ export default function LeagueLeaders() {
           .filter((p) => p.is_conversion && p.outcome === 'complete')
           .reduce((sum, p) => sum + (Number(p.conv_points) || 0), 0);
         const round2 = (n) => Math.round(n * 100) / 100;
-        const passingFanPts = round2(passingTDs * 4 + passingYards / 25 + convPointsFor(passerIds));
+        const passingFanPts = round2(passingTDs * 4 + passingYards / 25 + convPointsFor(passerIds) - interceptionsThrown);
         const rushingFanPts = round2(rushingTDs * 6 + rushingYards * 0.1);
         const receivingFanPts = round2(receivingTDs * 6 + receivingYards * 0.1 + receptions + convPointsFor(receiverIds));
 
@@ -304,29 +313,22 @@ export default function LeagueLeaders() {
       setPlayerStats(computedPlayers);
 
       // ── TEAM STATS ────────────────────────────────────────────────────────
-      const computedTeams = (teams || []).map(team => {
+      const computedTeams = (teams || []).filter((team) => teamHasPlayed(team.team_id)).map(team => {
         const tid = team.team_id;
         // eslint-disable-next-line eqeqeq
         const teamGames  = (games || []).filter(g => g.home_team == tid || g.away_team == tid);
-        const gamesPlayed = teamGames.length || 1;
+        const gamesPlayed = teamGames.length;
 
         // eslint-disable-next-line eqeqeq
         const offPlays  = (plays || []).filter(p => p.offense_team == tid && !p.is_conversion && p.play_type !== 'penalty');
         // eslint-disable-next-line eqeqeq
         const defPlays  = (plays || []).filter(p => p.defense_team == tid && !p.is_conversion && p.play_type !== 'penalty');
-        // eslint-disable-next-line eqeqeq
-        const allOff    = (plays || []).filter(p => p.offense_team == tid);
-
-        const points = allOff.reduce((sum, p) => {
-          if (p.outcome === 'td') return sum + 6;
-          if (p.is_conversion && p.outcome === 'complete') return sum + (p.conv_points || 0);
-          return sum;
-        }, 0);
-        // eslint-disable-next-line eqeqeq
-        const pointsAgainst = (plays || []).filter(p => p.defense_team == tid).reduce((sum, p) => {
-          if (p.outcome === 'td') return sum + 6;
-          if (p.is_conversion && p.outcome === 'complete') return sum + (p.conv_points || 0);
-          return sum;
+        const points = pointsForTeam(plays, tid);
+        const pointsAgainst = teamGames.reduce((sum, g) => {
+          // eslint-disable-next-line eqeqeq
+          const oppId = g.home_team == tid ? g.away_team : g.home_team;
+          const gPlays = (plays || []).filter((p) => p.game_id === g.game_id);
+          return sum + pointsForTeam(gPlays, oppId);
         }, 0);
 
         const passYards         = offPlays.filter(p => p.play_type === 'pass' && isPassCompletionOutcome(p.outcome)).reduce((s, p) => s + yg(p), 0);
@@ -386,24 +388,14 @@ export default function LeagueLeaders() {
         const conv3Made     = countConversionMade(convPlays, participants, 3);
 
         const pointsPerGame = teamGames.map(g => {
-          // eslint-disable-next-line eqeqeq
-          const gp = (plays || []).filter(p => p.game_id === g.game_id && p.offense_team == tid);
-          return gp.reduce((sum, p) => {
-            if (p.outcome === 'td') return sum + 6;
-            if (p.is_conversion && p.outcome === 'complete') return sum + (p.conv_points || 0);
-            return sum;
-          }, 0);
+          const gp = (plays || []).filter(p => p.game_id === g.game_id);
+          return pointsForTeam(gp, tid);
         });
         const pointsAgainstPerGame = teamGames.map(g => {
           // eslint-disable-next-line eqeqeq
           const oppId = g.home_team == tid ? g.away_team : g.home_team;
-          // eslint-disable-next-line eqeqeq
-          const gp = (plays || []).filter(p => p.game_id === g.game_id && p.offense_team == oppId);
-          return gp.reduce((sum, p) => {
-            if (p.outcome === 'td') return sum + 6;
-            if (p.is_conversion && p.outcome === 'complete') return sum + (p.conv_points || 0);
-            return sum;
-          }, 0);
+          const gp = (plays || []).filter(p => p.game_id === g.game_id);
+          return pointsForTeam(gp, oppId);
         });
 
         const wins   = teamGames.filter((g, i) => pointsPerGame[i] > pointsAgainstPerGame[i]).length;

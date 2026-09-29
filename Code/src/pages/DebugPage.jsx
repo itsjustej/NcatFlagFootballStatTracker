@@ -16,6 +16,7 @@ import {
   isOffenseSuccessful,
   isExplosiveYards,
   countExplosivePlays,
+  pointsForTeam,
 } from "../utils/statsHelpers";
 
 const pct = (num, den) =>
@@ -42,14 +43,7 @@ function computeTeamStats(tid, homeTeamId, plays, participants, games) {
   // eslint-disable-next-line eqeqeq
   const defPlays = plays.filter(p => p.defense_team == tid && !p.is_conversion && p.play_type !== "penalty");
 
-  // Scoring
-  // eslint-disable-next-line eqeqeq
-  const allOff = plays.filter(p => p.offense_team == tid);
-  const points = allOff.reduce((s, p) => {
-    if (p.outcome === "td") return s + 6;
-    if (p.is_conversion && p.outcome === "complete") return s + (p.conv_points || 0);
-    return s;
-  }, 0);
+  const points = pointsForTeam(plays, tid);
 
   // Yards
   const passYards = offPlays

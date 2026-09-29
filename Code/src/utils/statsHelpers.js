@@ -35,6 +35,31 @@ export function isInterceptionOutcome(outcome) {
   return outcome === 'interception' || outcome === 'pick_6';
 }
 
+/** Team that is awarded the points on this play, if any. */
+export function scoringTeamId(play) {
+  if (!play) return null;
+  if (play.is_conversion && play.outcome === 'complete') return play.offense_team;
+  if (play.outcome === 'td') return play.offense_team;
+  if (play.outcome === 'pick_6' || play.outcome === 'punt_return_td' || play.outcome === 'safety') {
+    return play.defense_team;
+  }
+  return null;
+}
+
+export function pointsOnPlay(play) {
+  if (!play) return 0;
+  if (play.is_conversion) return play.outcome === 'complete' ? (Number(play.conv_points) || 0) : 0;
+  if (play.outcome === 'td' || play.outcome === 'pick_6' || play.outcome === 'punt_return_td') return 6;
+  if (play.outcome === 'safety') return 2;
+  return 0;
+}
+
+export function pointsForTeam(plays, teamId) {
+  return (plays || []).reduce((sum, play) => (
+    scoringTeamId(play) == teamId ? sum + pointsOnPlay(play) : sum
+  ), 0);
+}
+
 /** 4th-down go-for-it attempts — excludes punts and penalty-only rows. */
 export function isFourthDownAttempt(play) {
   return (
@@ -88,6 +113,21 @@ export function countPlayerConversionSuccess(convPlays, participants, playerId, 
       p.player_id === playerId &&
       p.role === role &&
       madeIds.has(p.play_id),
+  ).length;
+}
+
+/** Pick-sixes and punt-return scores credited to this defender. */
+export function countPlayerDefensiveTDs(playerId, participants, plays) {
+  const tdPlayIds = new Set(
+    (plays || [])
+      .filter((p) => !p.is_conversion && (p.outcome === 'pick_6' || p.outcome === 'punt_return_td'))
+      .map((p) => p.play_id),
+  );
+  return (participants || []).filter(
+    (p) =>
+      p.player_id === playerId &&
+      tdPlayIds.has(p.play_id) &&
+      (p.role === 'interceptor' || p.role === 'defender'),
   ).length;
 }
 
@@ -369,6 +409,7 @@ export function computePlayerBoxStats(player, plays, participants, homeTeamId, h
   const receivingTDs = receiverData.filter((p) => p.outcome === 'td').length;
 
   const interceptions = countPlayerInterceptions(pid, participants, plays);
+  const defensiveTDs = countPlayerDefensiveTDs(pid, participants, plays);
   const flagPulls = defenderData.length;
   const flagPullsForLoss = defenderData.filter((p) =>
     (p.play_type === 'rush' || (p.play_type === 'pass' && p.outcome === 'complete'))
@@ -376,7 +417,7 @@ export function computePlayerBoxStats(player, plays, participants, homeTeamId, h
   ).length;
 
   const hasStats =
-    passAttempts + carries + receptions + interceptions + flagPulls + passingYards + rushingYards + receivingYards > 0;
+    passAttempts + carries + receptions + interceptions + defensiveTDs + flagPulls + passingYards + rushingYards + receivingYards > 0;
 
   return {
     player_id: pid,
@@ -394,6 +435,7 @@ export function computePlayerBoxStats(player, plays, participants, homeTeamId, h
     receivingYards,
     receivingTDs,
     interceptions,
+    defensiveTDs,
     flagPulls,
     flagPullsForLoss,
     hasStats,

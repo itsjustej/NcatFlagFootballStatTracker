@@ -64,6 +64,7 @@ const PLAYER_CATEGORIES = [
     label: "Defense",
     columns: [
       { key: "interceptions", label: "INT" },
+      { key: "defensiveTDs", label: "TD" },
       { key: "flagPulls", label: "FP" },
       { key: "flagPullsForLoss", label: "FPL" },
     ],
