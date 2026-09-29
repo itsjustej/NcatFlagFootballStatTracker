@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { possessionColor } from "../../constants/teamColors";
-import { playerFirstName } from "../../utils/playerName";
+import { isUnknownPlayer, playerFirstName } from "../../utils/playerName";
 
 function JerseyEditor({ currentNumber, onSave, onCancel }) {
   const [val, setVal] = useState(currentNumber != null ? String(currentNumber) : "");
@@ -51,9 +51,15 @@ function PlayerBtn({ player, selected, accentColor, onClick, onJerseyUpdate, com
     if (n !== player.number) onJerseyUpdate(parseInt(player.id), n);
   }
 
+  const unknown = isUnknownPlayer(player);
+
   function handleTap(e) {
     e.stopPropagation();
     if (editing) return;
+    if (unknown) {
+      onClick?.();
+      return;
+    }
     const now = Date.now();
     if (now - lastTapRef.current < DOUBLE_TAP_MS) {
       lastTapRef.current = 0;
@@ -90,7 +96,7 @@ function PlayerBtn({ player, selected, accentColor, onClick, onJerseyUpdate, com
             title="Double-tap to edit jersey #"
             className="flex items-center gap-2 min-h-[28px] touch-manipulation"
           >
-            <span style={{ color: accentColor }}>{jerseyLabel}</span>
+            {!unknown && <span style={{ color: accentColor }}>{jerseyLabel}</span>}
             {playerFirstName(player.name)}
           </button>
         )}
@@ -110,7 +116,7 @@ function PlayerBtn({ player, selected, accentColor, onClick, onJerseyUpdate, com
     <button
       type="button"
       onClick={handleTap}
-      title="Double-tap to edit jersey #"
+      title={unknown ? "Credit this play to Unknown" : "Double-tap to edit jersey #"}
       className="w-full min-h-14 flex flex-col items-center justify-center rounded-xl border transition-all duration-150 active:scale-95 cursor-pointer select-none hover:border-white/20 touch-manipulation"
       style={{
         background:  selected ? accentColor : '#1e293b',
@@ -119,7 +125,7 @@ function PlayerBtn({ player, selected, accentColor, onClick, onJerseyUpdate, com
       }}
     >
       <div className="flex items-center justify-center mb-0.5" style={{ height: 18 }} onClick={e => editing && e.stopPropagation()}>
-        {editing ? jerseyEditor : (
+        {editing ? jerseyEditor : !unknown && (
           <span
             className="text-[10px] font-semibold leading-none"
             style={{ color: selected ? 'rgba(255,255,255,0.65)' : accentColor }}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { loadLeagueSeason } from "../../utils/leagueSeason";
 import { useLeague } from "../../context/LeagueContext";
+import { isUnknownPlayer } from "../../utils/playerName";
 
 import {
   yardsGainedForPlay,
@@ -40,19 +41,18 @@ const ROW_HEIGHT = 60; // px, approx height of one row including border
 const VISIBLE_ROWS = 5;
 
 // Multi-stat player leader card — primary stat sorts/filters, secondary stats shown in columns
-function PlayerMultiStatCard({ title, players, primaryKey, primaryLabel, primaryDigits = 0, secondary = [] }) {
-  const filtered = players.filter(p => p[primaryKey] > 0);
-  const sorted = [...filtered].sort((a, b) => b[primaryKey] - a[primaryKey]).slice(0, 10);
+function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
+  const filtered = players.filter(p => p[sortKey] > 0);
+  const sorted = [...filtered].sort((a, b) => b[sortKey] - a[sortKey]).slice(0, 10);
 
   return (
     <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
       <div className="flex items-center justify-between gap-3 px-3 sm:px-4 py-3 border-b border-slate-700">
         <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0">{title}</h3>
-        <div className="flex items-center gap-3 sm:gap-4 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
           {secondary.map(s => (
-            <span key={s.key} className="hidden sm:block w-12 text-right">{s.label}</span>
+            <span key={s.key} className={`hidden sm:block text-right ${s.label.length > 3 ? 'w-14' : 'w-10'}`}>{s.label}</span>
           ))}
-          <span className="w-12 sm:w-14 text-right">{primaryLabel}</span>
         </div>
       </div>
       <div className="overflow-y-auto" style={{ maxHeight: ROW_HEIGHT * VISIBLE_ROWS }}>
@@ -68,16 +68,13 @@ function PlayerMultiStatCard({ title, players, primaryKey, primaryLabel, primary
                 </p>
               )}
             </div>
-            <div className="hidden sm:flex items-center gap-4 shrink-0">
+            <div className="hidden sm:flex items-center gap-3 shrink-0">
               {secondary.map(s => (
-                <span key={s.key} className="w-12 text-right text-slate-300 text-sm tabular-nums">
+                <span key={s.key} className={`text-right text-slate-300 text-sm tabular-nums ${s.label.length > 3 ? 'w-14' : 'w-10'}`}>
                   {fmt(p[s.key], s.digits ?? 0)}{s.suffix || ''}
                 </span>
               ))}
             </div>
-            <span className="w-12 sm:w-14 text-right text-white font-bold text-sm tabular-nums shrink-0">
-              {fmt(p[primaryKey], primaryDigits)}
-            </span>
           </div>
         ))}
         {sorted.length === 0 && <p className="text-slate-500 text-sm px-4 py-3">No data</p>}
@@ -239,7 +236,7 @@ export default function LeagueLeaders() {
       const yg = p => yardsGainedForPlay(p, ghMap[p.game_id], harMap[p.game_id], fortyMap[p.game_id]);
 
       // ── PLAYER STATS ──────────────────────────────────────────────────────
-      const computedPlayers = (players || []).map(player => {
+      const computedPlayers = (players || []).filter((player) => !isUnknownPlayer(player)).map(player => {
         const pid  = player.player_id;
         const team = (teams || []).find(t => t.team_id === player.team_id);
 
@@ -270,6 +267,14 @@ export default function LeagueLeaders() {
         const receivingYards = receiverData.filter(p => isReceivingOutcome(p.outcome)).reduce((s, p) => s + yg(p), 0);
         const receivingTDs   = receiverData.filter(p => p.outcome === 'td').length;
 
+        const convPointsFor = (ids) => getPlays(ids)
+          .filter((p) => p.is_conversion && p.outcome === 'complete')
+          .reduce((sum, p) => sum + (Number(p.conv_points) || 0), 0);
+        const round2 = (n) => Math.round(n * 100) / 100;
+        const passingFanPts = round2(passingTDs * 4 + passingYards / 25 + convPointsFor(passerIds));
+        const rushingFanPts = round2(rushingTDs * 6 + rushingYards * 0.1);
+        const receivingFanPts = round2(receivingTDs * 6 + receivingYards * 0.1 + receptions + convPointsFor(receiverIds));
+
         const interceptions    = countPlayerInterceptions(pid, participants, plays);
         const flagPulls        = defenderData.length;
         // TFL includes backward passes too
@@ -286,9 +291,9 @@ export default function LeagueLeaders() {
           name: String(player.name ?? '').trim(),
           team_name: team?.name || '',
           team_abbr: team?.abbreviation || team?.abbr || team?.name || '',
-          passingYards, passingTDs, completionPct,
-          rushingYards, rushes, rushingTDs,
-          receivingYards, receivingTDs, receptions,
+          passingYards, passingTDs, completionPct, passingFanPts,
+          rushingYards, rushes, rushingTDs, rushingFanPts,
+          receivingYards, receivingTDs, receptions, receivingFanPts,
           passingYpg:   perGame(passingYards),
           rushingYpg:   perGame(rushingYards),
           receivingYpg: perGame(receivingYards),
@@ -468,12 +473,12 @@ export default function LeagueLeaders() {
     <SectionHeader title="Player Leaders" />
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
       <PlayerMultiStatCard
-        title="Pass Yards"
+        title="Passing"
         players={playerStats}
-        primaryKey="passingYards"
-        primaryLabel="YDS"
+        sortKey="passingFanPts"
         secondary={[
           { key: 'completionPct', label: 'COMP%', digits: 0, suffix: '%' },
+          { key: 'passingYards', label: 'YDS', digits: 0 },
           { key: 'passingTDs', label: 'TD', digits: 0 },
         ]}
       />
@@ -487,12 +492,12 @@ export default function LeagueLeaders() {
     </div>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
       <PlayerMultiStatCard
-        title="Rush Yards"
+        title="Rushing"
         players={playerStats}
-        primaryKey="rushingYards"
-        primaryLabel="YDS"
+        sortKey="rushingFanPts"
         secondary={[
           { key: 'rushes', label: 'RUSH', digits: 0 },
+          { key: 'rushingYards', label: 'YDS', digits: 0 },
           { key: 'rushingTDs', label: 'TD', digits: 0 },
         ]}
       />
@@ -506,12 +511,12 @@ export default function LeagueLeaders() {
     </div>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <PlayerMultiStatCard
-        title="Receiving Yards"
+        title="Receiving"
         players={playerStats}
-        primaryKey="receivingYards"
-        primaryLabel="YDS"
+        sortKey="receivingFanPts"
         secondary={[
           { key: 'receptions', label: 'REC', digits: 0 },
+          { key: 'receivingYards', label: 'YDS', digits: 0 },
           { key: 'receivingTDs', label: 'TD', digits: 0 },
         ]}
       />

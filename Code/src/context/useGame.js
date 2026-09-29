@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { distanceToFirst, firstDownYard, kickoffYard } from '../gameLogic';
 import { cleanPlayerName } from '../utils/playerName';
+import { ensureUnknownPlayers, withUnknownLast } from '../utils/unknownPlayer';
 
 /**
  * Numbered players run left to right by jersey. Players still waiting on a
@@ -85,6 +86,16 @@ export function useGame(gameId) {
 
         if (playerErr) throw playerErr;
 
+        const rosterPlayers = [...(players || [])];
+        const unknownByTeam = await ensureUnknownPlayers([
+          gameInfo.homeTeamId,
+          gameInfo.awayTeamId,
+        ]);
+        for (const unknown of unknownByTeam.values()) {
+          if (rosterPlayers.some((p) => p.player_id === unknown.player_id)) continue;
+          rosterPlayers.push(unknown);
+        }
+
         const jerseyMap = {};
         for (const row of (rosterResult.data || [])) {
           jerseyMap[row.player_id] = row.jersey;
@@ -93,7 +104,7 @@ export function useGame(gameId) {
         // 4. Map to UI player shape
         const home = [];
         const away = [];
-        (players || []).forEach(p => {
+        rosterPlayers.forEach(p => {
           const mapped = {
             id:     String(p.player_id),
             name:   cleanPlayerName(p.name),
@@ -137,8 +148,8 @@ export function useGame(gameId) {
           awayTeamId:         gameInfo.awayTeamId,
         };
 
-        setHomePlayers(sortByJersey(home));
-        setAwayPlayers(sortByJersey(away));
+        setHomePlayers(withUnknownLast(sortByJersey(home)));
+        setAwayPlayers(withUnknownLast(sortByJersey(away)));
         setGame({ ...gameInfo, initialGameState });
 
       } catch (err) {

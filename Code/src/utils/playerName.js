@@ -8,3 +8,11 @@ export function playerFirstName(name, fallback = '') {
 export function cleanPlayerName(name) {
   return String(name ?? '').trim().replace(/\s+/g, ' ');
 }
+
+export const UNKNOWN_PLAYER_NAME = 'Unknown';
+
+/** Placeholder credit used when the tracker does not know who made the play. */
+export function isUnknownPlayer(player) {
+  const name = typeof player === 'string' ? player : player?.name;
+  return cleanPlayerName(name).toLowerCase() === UNKNOWN_PLAYER_NAME.toLowerCase();
+}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useLeague } from "../../context/LeagueContext";
 import { loadLeagueSeason } from "../../utils/leagueSeason";
+import { isUnknownPlayer } from "../../utils/playerName";
 
 import {
   yardsGainedForPlay,
@@ -133,7 +134,9 @@ export default function PlayerStats() {
     const fetchPlayers = async () => {
       setLoading(true);
 
-      const playersData = season.players.filter((p) => String(p.team_id) === String(teamId));
+      const playersData = season.players.filter(
+        (p) => String(p.team_id) === String(teamId) && !isUnknownPlayer(p),
+      );
       const { plays, participants, games, roster } = season;
       const leagueGameIds = new Set((games || []).map((g) => g.game_id));
       const gamesWithJersey = new Map();

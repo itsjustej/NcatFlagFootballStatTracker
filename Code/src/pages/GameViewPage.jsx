@@ -13,7 +13,8 @@ import {
   computeTeamBoxStats,
   computePlayerBoxStats,
 } from "../utils/statsHelpers";
-import { cleanPlayerName, playerFirstName } from "../utils/playerName";
+import { cleanPlayerName, isUnknownPlayer, playerFirstName } from "../utils/playerName";
+import { ensureUnknownPlayers, withUnknownLast } from "../utils/unknownPlayer";
 import { sortByJersey } from "../context/useGame";
 import { creditsFromParticipants, updatePlayCredit } from "../utils/playCredit";
 import { playPeriod } from "../gameLogic";
@@ -134,7 +135,11 @@ async function fetchGameData(gameId) {
     supabase.from('Roster').select('player_id, jersey').eq('game_id', gameId),
   ]);
   const { data: plays, error: playsErr } = playsResult;
-  const { data: rosterPlayers } = rosterPlayersResult;
+  const unknownByTeam = await ensureUnknownPlayers([homeTeamId, awayTeamId]);
+  const rosterPlayers = [...(rosterPlayersResult.data || [])];
+  for (const unknown of unknownByTeam.values()) {
+    if (!rosterPlayers.some((p) => p.player_id === unknown.player_id)) rosterPlayers.push(unknown);
+  }
   const { data: rosterRows } = rosterRowsResult;
   const jerseyById = {};
   for (const row of rosterRows || []) jerseyById[row.player_id] = row.jersey;
@@ -152,9 +157,10 @@ async function fetchGameData(gameId) {
     else awayRoster.push(mapped);
   }
   const rosters = {
-    homeRoster: sortByJersey(homeRoster),
-    awayRoster: sortByJersey(awayRoster),
+    homeRoster: withUnknownLast(sortByJersey(homeRoster)),
+    awayRoster: withUnknownLast(sortByJersey(awayRoster)),
   };
+  const namedRosterPlayers = (rosterPlayers || []).filter((p) => !isUnknownPlayer(p));
 
   const emptyBox = {
     homeName,
@@ -165,10 +171,10 @@ async function fetchGameData(gameId) {
     periodScores: scoresByPeriod([]),
     homeStats: computeTeamBoxStats(homeTeamId, [], homeTeamId, homeAttacksRight, hasFortyYard),
     awayStats: computeTeamBoxStats(gameRow.away.team_id, [], homeTeamId, homeAttacksRight, hasFortyYard),
-    homePlayers: (rosterPlayers || [])
+    homePlayers: namedRosterPlayers
       .filter((p) => p.team_id === homeTeamId)
       .map((p) => computePlayerBoxStats(p, [], [], homeTeamId, homeAttacksRight, hasFortyYard)),
-    awayPlayers: (rosterPlayers || [])
+    awayPlayers: namedRosterPlayers
       .filter((p) => p.team_id === gameRow.away.team_id)
       .map((p) => computePlayerBoxStats(p, [], [], homeTeamId, homeAttacksRight, hasFortyYard)),
     ...rosters,
@@ -290,10 +296,10 @@ async function fetchGameData(gameId) {
     role: p.role,
     player_id: p.player_id,
   }));
-  const homePlayers = (rosterPlayers || [])
+  const homePlayers = namedRosterPlayers
     .filter((p) => p.team_id === homeTeamId)
     .map((p) => computePlayerBoxStats(p, plays, statParticipants, homeTeamId, homeAttacksRight, hasFortyYard));
-  const awayPlayers = (rosterPlayers || [])
+  const awayPlayers = namedRosterPlayers
     .filter((p) => p.team_id === awayTeamId)
     .map((p) => computePlayerBoxStats(p, plays, statParticipants, homeTeamId, homeAttacksRight, hasFortyYard));
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
+import { isUnknownPlayer } from "../utils/playerName";
 import TeamSelector from "../components/start-game/TeamSelector";
 
 export default function StartGamePage() {
@@ -35,7 +36,7 @@ export default function StartGamePage() {
         team_id: t.team_id,
         name: t.name,
         players: (playersData || [])
-          .filter(p => p.team_id === t.team_id)
+          .filter(p => p.team_id === t.team_id && !isUnknownPlayer(p))
           .map(p => ({ player_id: p.player_id, name: p.name })),
       }));
 

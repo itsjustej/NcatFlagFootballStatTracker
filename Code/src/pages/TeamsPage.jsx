@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
 import { useAuth } from "../auth/AuthContext";
+import { isUnknownPlayer } from "../utils/playerName";
 
 export default function TeamsPage() {
   const { currentLeague } = useLeague();
@@ -36,7 +37,7 @@ export default function TeamsPage() {
       id: t.team_id,
       name: t.name,
       players: playersData
-        .filter((p) => p.team_id === t.team_id)
+        .filter((p) => p.team_id === t.team_id && !isUnknownPlayer(p))
         .map((p) => ({
           id: p.player_id,
           name: p.name,

@@ -1,5 +1,6 @@
 import { possessionColor } from '../../constants/teamColors';
-import { playerFirstName } from '../../utils/playerName';
+import { isUnknownPlayer, playerFirstName } from '../../utils/playerName';
+import { blocksSecondCredit } from '../../utils/unknownPlayer';
 
 
 
@@ -27,6 +28,7 @@ function PlayerChip({ player, selected, accentColor, onClick }) {
 
     >
 
+      {!isUnknownPlayer(player) && (
       <span
 
         className="text-[10px] font-semibold leading-none mb-1"
@@ -38,6 +40,7 @@ function PlayerChip({ player, selected, accentColor, onClick }) {
         #{player.number ?? '—'}
 
       </span>
+      )}
 
       <span className="text-[12px] font-bold text-white leading-tight text-center px-1 truncate w-full">
 
@@ -231,7 +234,7 @@ export default function PlayControls({
 
             {offensePlayers
 
-              .filter((p) => p.id !== gs.selectedOffender?.id)
+              .filter((p) => !blocksSecondCredit(p, gs.selectedOffender?.id))
 
               .map((p) => (
 
@@ -541,7 +544,7 @@ export default function PlayControls({
 
                 {offensePlayers
 
-                  .filter((p) => p.id !== convPasser?.id)
+                  .filter((p) => !blocksSecondCredit(p, convPasser?.id))
 
                   .map((p) => (
 

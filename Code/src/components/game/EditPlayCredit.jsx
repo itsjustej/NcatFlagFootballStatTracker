@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { possessionColor } from '../../constants/teamColors';
 import { playerFirstName } from '../../utils/playerName';
 import { isOffenseRole, ROLE_LABELS } from '../../utils/playCredit';
+import { isUnknownPlayer } from '../../utils/playerName';
 
 function sideForRole(role, drivePossession) {
   const offenseSide = drivePossession === 'away' ? 'away' : 'home';
@@ -35,7 +36,7 @@ function CreditPicker({ role, credit, players, selectedId, takenIds, accent, dis
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {pool.map((player) => {
           const selected = player.id === selectedId;
-          const taken = takenIds.has(player.id) && !selected;
+          const taken = takenIds.has(player.id) && !selected && !isUnknownPlayer(player);
           return (
             <button
               key={player.id}
