@@ -23,6 +23,17 @@ import {
 const fmt = (val, digits = 1) =>
   typeof val === "number" && !isNaN(val) ? val.toFixed(digits) : "0.0";
 
+const NAME_SUFFIXES = new Set(["jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"]);
+
+function shortPlayerName(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return parts[0] || "";
+  let lastIndex = parts.length - 1;
+  if (NAME_SUFFIXES.has(parts[lastIndex].toLowerCase())) lastIndex -= 1;
+  if (lastIndex < 1) return parts[0];
+  return `${parts[0]} ${parts[lastIndex][0].toUpperCase()}.`;
+}
+
 function PlayerAvatar({ name }) {
   const initials = (name || "?")
     .split(" ")
@@ -31,15 +42,20 @@ function PlayerAvatar({ name }) {
     .slice(0, 2)
     .toUpperCase();
   return (
-    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-600 flex items-center justify-center text-[10px] sm:text-xs font-bold text-slate-200 shrink-0">
+    <div className="hidden sm:flex w-10 h-10 rounded-full bg-slate-600 items-center justify-center text-xs font-bold text-slate-200 shrink-0">
       {initials}
     </div>
   );
 }
 
-// Fixed-height row count (5 visible rows)
-const ROW_HEIGHT = 60; // px, approx height of one row including border
-const VISIBLE_ROWS = 5;
+function PlayerName({ name }) {
+  return (
+    <p className="text-slate-100 text-[11px] sm:text-sm font-semibold truncate">
+      <span className="sm:hidden">{shortPlayerName(name)}</span>
+      <span className="hidden sm:inline">{name}</span>
+    </p>
+  );
+}
 
 // Multi-stat player leader card — primary stat sorts/filters, secondary stats shown in columns
 function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
@@ -48,30 +64,25 @@ function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
 
   return (
     <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between gap-3 px-3 sm:px-4 py-3 border-b border-slate-700">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0">{title}</h3>
-        <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
+      <div className="flex items-center justify-between gap-2 px-2 sm:px-4 py-2 sm:py-3 border-b border-slate-700">
+        <h3 className="text-[11px] sm:text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0 truncate">{title}</h3>
+        <div className="flex items-center gap-0.5 sm:gap-3 text-[9px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
           {secondary.map(s => (
-            <span key={s.key} className={`hidden sm:block text-right ${s.label.length > 3 ? 'w-14' : 'w-10'}`}>{s.label}</span>
+            <span key={s.key} className={`text-right ${s.label.length > 3 ? 'w-7 sm:w-14' : 'w-5 sm:w-10'}`}>{s.short || s.label}</span>
           ))}
         </div>
       </div>
-      <div className="overflow-y-auto" style={{ maxHeight: ROW_HEIGHT * VISIBLE_ROWS }}>
+      <div className="overflow-y-auto max-h-36 sm:max-h-[300px]">
         {sorted.map((p) => (
-          <div key={p.player_id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
+          <div key={p.player_id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
             <PlayerAvatar name={p.name} />
             <div className="flex-1 min-w-0">
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
-              <p className="text-slate-100 text-sm font-semibold truncate">{p.name}</p>
-              {secondary.length > 0 && (
-                <p className="sm:hidden text-[11px] text-slate-400 truncate">
-                  {secondary.map(s => `${s.label} ${fmt(p[s.key], s.digits ?? 0)}${s.suffix || ''}`).join(' · ')}
-                </p>
-              )}
+              <p className="hidden sm:block text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
+              <PlayerName name={p.name} />
             </div>
-            <div className="hidden sm:flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-0.5 sm:gap-3 shrink-0">
               {secondary.map(s => (
-                <span key={s.key} className={`text-right text-slate-300 text-sm tabular-nums ${s.label.length > 3 ? 'w-14' : 'w-10'}`}>
+                <span key={s.key} className={`text-right text-slate-300 text-[11px] sm:text-sm tabular-nums ${s.label.length > 3 ? 'w-7 sm:w-14' : 'w-5 sm:w-10'}`}>
                   {fmt(p[s.key], s.digits ?? 0)}{s.suffix || ''}
                 </span>
               ))}
@@ -84,42 +95,43 @@ function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
   );
 }
 
-function PlayerLeaderCard({ title, players, valueKey, valueLabel, digits = 0, suffix = "", secondary = [] }) {
+function PlayerLeaderCard({ title, shortTitle, players, valueKey, valueLabel, valueShort, digits = 0, suffix = "", secondary = [] }) {
   const filtered = players.filter(p => p[valueKey] > 0);
   const sorted = [...filtered].sort((a, b) => b[valueKey] - a[valueKey]).slice(0, 10);
 
   return (
     <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between gap-3 px-3 sm:px-4 py-3 border-b border-slate-700">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0">{title}</h3>
-        <div className="flex items-center gap-3 sm:gap-4 text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
+      <div className="flex items-center justify-between gap-2 px-2 sm:px-4 py-2 sm:py-3 border-b border-slate-700">
+        <h3 className="text-[11px] sm:text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0 truncate">
+          <span className="sm:hidden">{shortTitle || title}</span>
+          <span className="hidden sm:inline">{title}</span>
+        </h3>
+        <div className="flex items-center gap-1 sm:gap-4 text-[9px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
           {secondary.map(s => (
-            <span key={s.key} className="hidden sm:block w-12 text-right">{s.label}</span>
+            <span key={s.key} className="w-8 sm:w-12 text-right">{s.short || s.label}</span>
           ))}
-          <span className="w-12 sm:w-14 text-right">{valueLabel}</span>
+          <span className="w-8 sm:w-14 text-right">
+            <span className="sm:hidden">{valueShort || valueLabel}</span>
+            <span className="hidden sm:inline">{valueLabel}</span>
+          </span>
         </div>
       </div>
-      <div className="overflow-y-auto" style={{ maxHeight: ROW_HEIGHT * VISIBLE_ROWS }}>
+      <div className="overflow-y-auto max-h-36 sm:max-h-[300px]">
         {sorted.map((p) => (
-          <div key={p.player_id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
+          <div key={p.player_id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
             <PlayerAvatar name={p.name} />
             <div className="flex-1 min-w-0">
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
-              <p className="text-slate-100 text-sm font-semibold truncate">{p.name}</p>
-              {secondary.length > 0 && (
-                <p className="sm:hidden text-[11px] text-slate-400 truncate">
-                  {secondary.map(s => `${s.label} ${fmt(p[s.key], s.digits ?? 0)}${s.suffix || ''}`).join(' · ')}
-                </p>
-              )}
+              <p className="hidden sm:block text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
+              <PlayerName name={p.name} />
             </div>
-            <div className="hidden sm:flex items-center gap-4 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-4 shrink-0">
               {secondary.map(s => (
-                <span key={s.key} className="w-12 text-right text-slate-300 text-sm tabular-nums">
+                <span key={s.key} className="w-8 sm:w-12 text-right text-slate-300 text-[11px] sm:text-sm tabular-nums">
                   {fmt(p[s.key], s.digits ?? 0)}{s.suffix || ''}
                 </span>
               ))}
             </div>
-            <span className="w-12 sm:w-14 text-right text-white font-bold text-sm tabular-nums shrink-0">
+            <span className="w-8 sm:w-14 text-right text-white font-bold text-[11px] sm:text-sm tabular-nums shrink-0">
               {fmt(p[valueKey], digits)}{suffix}
             </span>
           </div>
@@ -137,18 +149,18 @@ function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lower
     lowerIsBetter ? a[valueKey] - b[valueKey] : b[valueKey] - a[valueKey]
   );
   return (
-    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-5 flex flex-col">
-      <h3 className="text-sm font-bold text-white mb-3 uppercase tracking-wide">{title}</h3>
-      <div className="space-y-2">
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-5 flex flex-col">
+      <h3 className="text-[11px] sm:text-sm font-bold text-white mb-1.5 sm:mb-3 uppercase tracking-wide leading-tight">{title}</h3>
+      <div className="space-y-1 sm:space-y-2">
         {sorted.map((t, i) => (
-          <div key={t.team_id} className="flex items-center gap-3 p-2 rounded bg-slate-700/40">
-            <span className="text-slate-400 text-xs w-5 text-center font-bold">{i + 1}</span>
+          <div key={t.team_id} className="flex items-center gap-1.5 sm:gap-3 px-1.5 py-1 sm:p-2 rounded bg-slate-700/40">
+            <span className="text-slate-400 text-[10px] sm:text-xs w-3 sm:w-5 text-center font-bold">{i + 1}</span>
             <div className="flex-1 min-w-0">
-              <p className="text-slate-200 text-sm truncate">{t.name}</p>
+              <p className="text-slate-200 text-[11px] sm:text-sm truncate">{t.name}</p>
             </div>
-            <span className="text-white font-bold text-sm shrink-0 text-right">
+            <span className="text-white font-bold text-[11px] sm:text-sm shrink-0 text-right tabular-nums">
               {ratioKeys && (
-                <span className="text-slate-400 font-medium text-xs mr-1.5">
+                <span className="text-slate-400 font-medium text-[10px] sm:text-xs mr-1">
                   {t[ratioKeys.num]}/{t[ratioKeys.den]}
                 </span>
               )}
@@ -164,7 +176,7 @@ function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lower
 
 function SectionHeader({ title }) {
   return (
-    <h3 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-4">{title}</h3>
+    <h3 className="text-xs sm:text-sm font-bold text-slate-300 uppercase tracking-widest mb-2 sm:mb-4">{title}</h3>
   );
 }
 
@@ -440,7 +452,7 @@ export default function LeagueLeaders() {
       <div className="space-y-4">
         <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
           <div className="px-4 py-4 border-b border-slate-700">
-            <h2 className="text-2xl font-bold text-white">League Leaders</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-white">League Leaders</h2>
           </div>
           <p className="px-4 py-8 text-slate-400 text-center animate-pulse">Loading league leaders...</p>
         </div>
@@ -452,21 +464,21 @@ export default function LeagueLeaders() {
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 border-b border-slate-700">
-          <h2 className="text-2xl font-bold text-white shrink-0">League Leaders</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-white shrink-0">League Leaders</h2>
           <ViewToggle view={view} setView={setView} />
         </div>
 
-        <div className="p-4 space-y-8">
+        <div className="p-2 sm:p-4 space-y-4 sm:space-y-8">
       {view === "players" && (
   <div>
     <SectionHeader title="Player Leaders" />
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-2 sm:mb-4">
       <PlayerMultiStatCard
         title="Passing"
         players={playerStats}
         sortKey="passingFanPts"
         secondary={[
-          { key: 'completionPct', label: 'COMP%', digits: 0, suffix: '%' },
+          { key: 'completionPct', label: 'COMP%', short: 'CMP', digits: 0, suffix: '%' },
           { key: 'passingYards', label: 'YDS', digits: 0 },
           { key: 'passingTDs', label: 'TD', digits: 0 },
         ]}
@@ -476,10 +488,11 @@ export default function LeagueLeaders() {
         players={playerStats}
         valueKey="flagPulls"
         valueLabel="PULLS"
+        valueShort="FP"
         digits={0}
       />
     </div>
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-2 sm:mb-4">
       <PlayerMultiStatCard
         title="Rushing"
         players={playerStats}
@@ -492,13 +505,14 @@ export default function LeagueLeaders() {
       />
       <PlayerLeaderCard
         title="Flag Pulls For Loss"
+        shortTitle="For Loss"
         players={playerStats}
         valueKey="flagPullsForLoss"
         valueLabel="TFL"
         digits={0}
       />
     </div>
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="grid grid-cols-2 gap-2 sm:gap-4">
       <PlayerMultiStatCard
         title="Receiving"
         players={playerStats}
@@ -523,7 +537,7 @@ export default function LeagueLeaders() {
       {view === "offense" && (
         <div>
           <SectionHeader title="Team Leaders — Offense" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-3 sm:mb-6">
             <TeamLeaderCard title="Points Per Game"     teams={teamStats} valueKey="ppg" />
             <TeamLeaderCard title="Passing Yards / Game"teams={teamStats} valueKey="passYpg" />
             <TeamLeaderCard title="Rushing Yards / Game"teams={teamStats} valueKey="rushYpg" />
@@ -535,7 +549,7 @@ export default function LeagueLeaders() {
           </div>
 
           <p className="text-slate-500 text-xs mb-4 uppercase tracking-wide">Conversions</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
             <TeamLeaderCard title="1-Point %" teams={teamStats} valueKey="conv1Pct" suffix="%" />
             <TeamLeaderCard title="2-Point %" teams={teamStats} valueKey="conv2Pct" suffix="%" />
             <TeamLeaderCard title="3-Point %" teams={teamStats} valueKey="conv3Pct" suffix="%" />
@@ -547,7 +561,7 @@ export default function LeagueLeaders() {
       {view === "defense" && (
         <div>
           <SectionHeader title="Team Leaders — Defense" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
             <TeamLeaderCard title="Points Against / Game"      teams={teamStats} valueKey="papg"                lowerIsBetter />
             <TeamLeaderCard title="Pass Yards Against / Game"  teams={teamStats} valueKey="passYpgAgainst"      lowerIsBetter />
             <TeamLeaderCard title="Rush Yards Against / Game"  teams={teamStats} valueKey="rushYpgAgainst"      lowerIsBetter />
