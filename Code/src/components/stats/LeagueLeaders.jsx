@@ -51,8 +51,7 @@ function PlayerAvatar({ name }) {
 function PlayerName({ name }) {
   return (
     <p className="text-slate-100 text-[11px] sm:text-sm font-semibold truncate">
-      <span className="sm:hidden">{shortPlayerName(name)}</span>
-      <span className="hidden sm:inline">{name}</span>
+      {shortPlayerName(name)}
     </p>
   );
 }
@@ -472,7 +471,7 @@ export default function LeagueLeaders() {
       {view === "players" && (
   <div>
     <SectionHeader title="Player Leaders" />
-    <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-2 sm:mb-4">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 mb-2 sm:mb-4">
       <PlayerMultiStatCard
         title="Passing"
         players={playerStats}
@@ -483,16 +482,6 @@ export default function LeagueLeaders() {
           { key: 'passingTDs', label: 'TD', digits: 0 },
         ]}
       />
-      <PlayerLeaderCard
-        title="Flag Pulls"
-        players={playerStats}
-        valueKey="flagPulls"
-        valueLabel="PULLS"
-        valueShort="FP"
-        digits={0}
-      />
-    </div>
-    <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-2 sm:mb-4">
       <PlayerMultiStatCard
         title="Rushing"
         players={playerStats}
@@ -503,16 +492,6 @@ export default function LeagueLeaders() {
           { key: 'rushingTDs', label: 'TD', digits: 0 },
         ]}
       />
-      <PlayerLeaderCard
-        title="Flag Pulls For Loss"
-        shortTitle="For Loss"
-        players={playerStats}
-        valueKey="flagPullsForLoss"
-        valueLabel="TFL"
-        digits={0}
-      />
-    </div>
-    <div className="grid grid-cols-2 gap-2 sm:gap-4">
       <PlayerMultiStatCard
         title="Receiving"
         players={playerStats}
@@ -522,6 +501,24 @@ export default function LeagueLeaders() {
           { key: 'receivingYards', label: 'YDS', digits: 0 },
           { key: 'receivingTDs', label: 'TD', digits: 0 },
         ]}
+      />
+    </div>
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
+      <PlayerLeaderCard
+        title="Flag Pulls"
+        players={playerStats}
+        valueKey="flagPulls"
+        valueLabel="PULLS"
+        valueShort="FP"
+        digits={0}
+      />
+      <PlayerLeaderCard
+        title="Flag Pulls For Loss"
+        shortTitle="For Loss"
+        players={playerStats}
+        valueKey="flagPullsForLoss"
+        valueLabel="TFL"
+        digits={0}
       />
       <PlayerLeaderCard
         title="Interceptions"
