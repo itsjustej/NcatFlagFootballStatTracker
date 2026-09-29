@@ -276,13 +276,10 @@ export default function LeagueLeaders() {
         const receivingYards = receiverData.filter(p => isReceivingOutcome(p.outcome)).reduce((s, p) => s + yg(p), 0);
         const receivingTDs   = receiverData.filter(p => p.outcome === 'td').length;
 
-        const convPointsFor = (ids) => getPlays(ids)
-          .filter((p) => p.is_conversion && p.outcome === 'complete')
-          .reduce((sum, p) => sum + (Number(p.conv_points) || 0), 0);
         const round2 = (n) => Math.round(n * 100) / 100;
-        const passingFanPts = round2(passingTDs * 4 + passingYards / 25 + convPointsFor(passerIds) - interceptionsThrown);
+        const passingFanPts = round2(passingTDs * 4 + passingYards / 25 - interceptionsThrown);
         const rushingFanPts = round2(rushingTDs * 6 + rushingYards * 0.1);
-        const receivingFanPts = round2(receivingTDs * 6 + receivingYards * 0.1 + receptions + convPointsFor(receiverIds));
+        const receivingFanPts = round2(receivingTDs * 6 + receivingYards * 0.1 + receptions);
 
         const interceptions    = countPlayerInterceptions(pid, participants, plays);
         const flagPulls        = defenderData.length;
