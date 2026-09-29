@@ -55,7 +55,7 @@ export function computeLeagueStandings(teams, games, plays) {
       pointDiff: pointsFor - pointsAgainst,
       record: formatRecord(wins, losses, ties),
     };
-  });
+  }).filter((row) => row.gamesPlayed > 0);
 
   rows.sort((a, b) => {
     if (b.winPct !== a.winPct) return b.winPct - a.winPct;

@@ -34,6 +34,7 @@ const PLAYER_CATEGORIES = [
   {
     id: "passing",
     label: "Passing",
+    played: (p) => p.passAttempts > 0,
     columns: [
       { key: "comp", label: "C/ATT", render: (p) => `${p.passCompletions}/${p.passAttempts}` },
       { key: "passingYards", label: "Yds" },
@@ -44,6 +45,7 @@ const PLAYER_CATEGORIES = [
   {
     id: "rushing",
     label: "Rushing",
+    played: (p) => p.carries > 0,
     columns: [
       { key: "carries", label: "Car" },
       { key: "rushingYards", label: "Yds" },
@@ -53,6 +55,7 @@ const PLAYER_CATEGORIES = [
   {
     id: "receiving",
     label: "Receiving",
+    played: (p) => p.receptions > 0,
     columns: [
       { key: "receptions", label: "Rec" },
       { key: "receivingYards", label: "Yds" },
@@ -62,6 +65,7 @@ const PLAYER_CATEGORIES = [
   {
     id: "defense",
     label: "Defense",
+    played: (p) => p.interceptions > 0 || p.defensiveTDs > 0 || p.flagPulls > 0,
     columns: [
       { key: "interceptions", label: "INT" },
       { key: "defensiveTDs", label: "TD" },
@@ -74,10 +78,11 @@ const PLAYER_CATEGORIES = [
 function PlayerTable({ players }) {
   const [category, setCategory] = useState("passing");
   const active = PLAYER_CATEGORIES.find((item) => item.id === category) ?? PLAYER_CATEGORIES[0];
-  const rows = players.filter((p) => p.hasStats);
+  const withStats = players.filter((p) => p.hasStats);
+  const rows = active.played ? withStats.filter(active.played) : withStats;
   const playerCol = "w-[9.5rem] min-w-[9.5rem] max-w-[9.5rem] box-border";
 
-  if (rows.length === 0) {
+  if (withStats.length === 0) {
     return <p className="px-4 py-6 text-slate-500 text-sm text-center">No player stats yet.</p>;
   }
 
@@ -99,6 +104,9 @@ function PlayerTable({ players }) {
           </button>
         ))}
       </div>
+      {rows.length === 0 ? (
+        <p className="px-4 py-6 text-slate-500 text-sm text-center">No players with these stats.</p>
+      ) : (
       <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch]">
         <table className="w-full min-w-[20rem] text-left text-sm border-collapse">
           <thead>
@@ -136,6 +144,7 @@ function PlayerTable({ players }) {
           </tbody>
         </table>
       </div>
+      )}
     </>
   );
 }
