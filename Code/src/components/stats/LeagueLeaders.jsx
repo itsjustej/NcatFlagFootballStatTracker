@@ -471,7 +471,8 @@ export default function LeagueLeaders() {
       {view === "players" && (
   <div>
     <SectionHeader title="Player Leaders" />
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 mb-2 sm:mb-4">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
+      <div className="order-1">
       <PlayerMultiStatCard
         title="Passing"
         players={playerStats}
@@ -482,6 +483,8 @@ export default function LeagueLeaders() {
           { key: 'passingTDs', label: 'TD', digits: 0 },
         ]}
       />
+      </div>
+      <div className="order-3 lg:order-2">
       <PlayerMultiStatCard
         title="Rushing"
         players={playerStats}
@@ -492,6 +495,8 @@ export default function LeagueLeaders() {
           { key: 'rushingTDs', label: 'TD', digits: 0 },
         ]}
       />
+      </div>
+      <div className="order-5 lg:order-3">
       <PlayerMultiStatCard
         title="Receiving"
         players={playerStats}
@@ -502,8 +507,8 @@ export default function LeagueLeaders() {
           { key: 'receivingTDs', label: 'TD', digits: 0 },
         ]}
       />
-    </div>
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
+      </div>
+      <div className="order-2 lg:order-4">
       <PlayerLeaderCard
         title="Flag Pulls"
         players={playerStats}
@@ -512,6 +517,8 @@ export default function LeagueLeaders() {
         valueShort="FP"
         digits={0}
       />
+      </div>
+      <div className="order-4 lg:order-5">
       <PlayerLeaderCard
         title="Flag Pulls For Loss"
         shortTitle="For Loss"
@@ -520,6 +527,8 @@ export default function LeagueLeaders() {
         valueLabel="TFL"
         digits={0}
       />
+      </div>
+      <div className="order-6">
       <PlayerLeaderCard
         title="Interceptions"
         players={playerStats}
@@ -527,6 +536,7 @@ export default function LeagueLeaders() {
         valueLabel="INT"
         digits={0}
       />
+      </div>
     </div>
   </div>
 )}
