@@ -17,6 +17,7 @@ export default function Scoreboard({
   awayName,
   scoreFlash,
   onOpenPlays,
+  onExit,
 }) {
   const { homeScore, awayScore, half, down, distance, possession, yardLine, homeAttacksRight = true } = gs;
   const teamName = possession === 'home' ? homeName : awayName;
@@ -144,6 +145,16 @@ export default function Scoreboard({
           </button>
         </div>
       </div>
+
+      {onExit && (
+        <button
+          type="button"
+          onClick={onExit}
+          className="md:hidden w-full min-h-11 text-sm font-bold text-slate-200 border-t border-slate-700"
+        >
+          Save & Exit
+        </button>
+      )}
     </div>
   );
 }

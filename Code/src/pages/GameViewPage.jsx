@@ -105,17 +105,36 @@ function buildDescription(play, participants, homeTeamId, homeAttacksRight, hasF
 
 // ── Fetch and reconstruct game ────────────────────────────────────────────────
 export async function fetchGameData(gameId) {
-  // 1. Game + team names
+  // One request: game, both rosters, plays, and credits. Separate requests were the wait.
   const { data: gameRow, error: gameErr } = await supabase
     .from('Game')
     .select(`
       game_id,
       home_attacks_right,
       has_forty_yard,
-      home:Team!home_team(team_id, name),
-      away:Team!away_team(team_id, name)
+      home:Team!home_team(
+        team_id,
+        name,
+        Player(player_id, name, team_id)
+      ),
+      away:Team!away_team(
+        team_id,
+        name,
+        Player(player_id, name, team_id)
+      ),
+      Play(
+        *,
+        Participants(
+          play_id,
+          role,
+          player_id,
+          player:Player(player_id, name)
+        )
+      ),
+      Roster!game_roster_game_id_fkey(player_id, jersey)
     `)
     .eq('game_id', gameId)
+    .order('play_id', { referencedTable: 'Play', ascending: true })
     .single();
 
   if (gameErr) throw gameErr;
@@ -127,20 +146,17 @@ export async function fetchGameData(gameId) {
   const hasFortyYard = gameRow.has_forty_yard !== false;
 
   const awayTeamId = gameRow.away.team_id;
+  const loadedPlayers = [...(gameRow.home.Player || []), ...(gameRow.away.Player || [])];
+  const rawPlays = [...(gameRow.Play || [])].sort((a, b) => a.play_id - b.play_id);
+  const plays = rawPlays.map(({ Participants, ...play }) => play);
+  const parts = rawPlays.flatMap((play) => play.Participants || []);
 
-  // Plays, both rosters, and jersey numbers are independent once the game is known.
-  const [playsResult, rosterPlayersResult, rosterRowsResult] = await Promise.all([
-    supabase.from('Play').select('*').eq('game_id', gameId).order('play_id', { ascending: true }),
-    supabase.from('Player').select('player_id, name, team_id').in('team_id', [homeTeamId, awayTeamId]),
-    supabase.from('Roster').select('player_id, jersey').eq('game_id', gameId),
-  ]);
-  const { data: plays, error: playsErr } = playsResult;
-  const unknownByTeam = await ensureUnknownPlayers([homeTeamId, awayTeamId]);
-  const rosterPlayers = [...(rosterPlayersResult.data || [])];
+  const unknownByTeam = await ensureUnknownPlayers([homeTeamId, awayTeamId], loadedPlayers);
+  const rosterPlayers = [...loadedPlayers];
   for (const unknown of unknownByTeam.values()) {
     if (!rosterPlayers.some((p) => p.player_id === unknown.player_id)) rosterPlayers.push(unknown);
   }
-  const { data: rosterRows } = rosterRowsResult;
+  const rosterRows = gameRow.Roster;
   const jerseyById = {};
   for (const row of rosterRows || []) jerseyById[row.player_id] = row.jersey;
 
@@ -180,22 +196,7 @@ export async function fetchGameData(gameId) {
     ...rosters,
   };
 
-  if (playsErr) throw playsErr;
-  if (!plays?.length) return emptyBox;
-
-  // 3. All participants for these plays with player names
-  const playIds = plays.map(p => p.play_id);
-  const { data: parts, error: partsErr } = await supabase
-    .from('Participants')
-    .select(`
-      play_id,
-      role,
-      player_id,
-      player:Player(player_id, name)
-    `)
-    .in('play_id', playIds);
-
-  if (partsErr) throw partsErr;
+  if (!plays.length) return emptyBox;
 
   // Group participants by play_id
   const partsByPlay = {};

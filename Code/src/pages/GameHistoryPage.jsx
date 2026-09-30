@@ -8,50 +8,54 @@ import { pointsForTeam } from "../utils/statsHelpers";
 
 export default function GameHistoryPage() {
   const { currentLeague } = useLeague();
-  const { canTrackGames, canFillPlayers } = useAuth();
+  const { canTrackGames } = useAuth();
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
+  const leagueId = currentLeague?.league_id;
 
   useEffect(() => {
-    if (!currentLeague) return;
+    if (!leagueId) return;
+    let cancelled = false;
+
+    const fetchGames = async () => {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from("Game")
+        .select(`
+          game_id,
+          home_team:home_team ( team_id, name ),
+          away_team:away_team ( team_id, name ),
+          Play ( offense_team, defense_team, outcome, is_conversion, conv_points )
+        `)
+        .eq("league_id", leagueId);
+
+      if (cancelled) return;
+      if (error) { console.error(error); setLoading(false); return; }
+
+      const formatted = data.map((g) => {
+        const gamePlays = g.Play || [];
+        const homePoints = pointsForTeam(gamePlays, g.home_team.team_id);
+        const awayPoints = pointsForTeam(gamePlays, g.away_team.team_id);
+
+        return {
+          game_id:     g.game_id,
+          home_team:   g.home_team,
+          away_team:   g.away_team,
+          home_points: homePoints,
+          away_points: awayPoints,
+          home_won:    homePoints > awayPoints,
+          away_won:    awayPoints > homePoints,
+        };
+      });
+
+      setGames(formatted.sort((a, b) => b.game_id - a.game_id));
+      setLoading(false);
+    };
+
     fetchGames();
-  }, [currentLeague]);
-
-  const fetchGames = async () => {
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from("Game")
-      .select(`
-        game_id,
-        home_team:home_team ( team_id, name ),
-        away_team:away_team ( team_id, name ),
-        Play ( offense_team, defense_team, outcome, is_conversion, conv_points )
-      `)
-      .eq("league_id", currentLeague.league_id);
-
-    if (error) { console.error(error); setLoading(false); return; }
-
-    const formatted = data.map((g) => {
-      const gamePlays = g.Play || [];
-
-      const homePoints = pointsForTeam(gamePlays, g.home_team.team_id);
-      const awayPoints = pointsForTeam(gamePlays, g.away_team.team_id);
-
-      return {
-        game_id:     g.game_id,
-        home_team:   g.home_team,
-        away_team:   g.away_team,
-        home_points: homePoints,
-        away_points: awayPoints,
-        home_won:    homePoints > awayPoints,
-        away_won:    awayPoints > homePoints,
-      };
-    });
-
-    setGames(formatted.sort((a, b) => b.game_id - a.game_id));
-    setLoading(false);
-  };
+    return () => { cancelled = true; };
+  }, [leagueId]);
 
   const truncate = (str, n = 12) =>
     str?.length > n ? str.slice(0, n) + "…" : str;
@@ -128,14 +132,6 @@ export default function GameHistoryPage() {
                         </span>
                       </div>
                     </Link>
-                    {canFillPlayers && (
-                      <Link
-                        to={`/games/${g.game_id}/credits`}
-                        className="border-t border-slate-700 px-4 py-3 min-h-[44px] flex items-center justify-center text-xs font-bold uppercase tracking-wide text-amber-300 hover:bg-slate-800"
-                      >
-                        Fill in players
-                      </Link>
-                    )}
                   </div>
                 ))}
               </div>

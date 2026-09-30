@@ -812,6 +812,7 @@ export default function GamePage() {
             awayName={awayName}
             scoreFlash={scoreFlash}
             onOpenPlays={() => setShowPlays(true)}
+            onExit={() => { clearGame(); navigate('/'); }}
           />
         </div>
         {/* Sticky field + step bar */}
@@ -912,7 +913,14 @@ export default function GamePage() {
 
       {showPlays && (
         <div className="md:hidden fixed inset-0 z-40 bg-slate-800 flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 shrink-0">
+          <div className="flex items-center justify-between px-2 py-2 border-b border-slate-700 shrink-0">
+            <button
+              type="button"
+              onClick={() => { clearGame(); navigate('/'); }}
+              className="min-h-11 px-3 text-sm font-bold text-slate-200"
+            >
+              Save & Exit
+            </button>
             <span className="text-sm font-bold text-white">Plays</span>
             <button
               type="button"
@@ -932,6 +940,7 @@ export default function GamePage() {
               homePlayers={homePlayers}
               awayPlayers={awayPlayers}
               onEditCredit={handleEditCredit}
+              showHeader={false}
             />
           </div>
         </div>
