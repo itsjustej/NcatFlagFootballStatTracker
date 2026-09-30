@@ -347,7 +347,7 @@ export default function GameViewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { startGame, clearGame, currentGameId } = useLeague();
-  const { canDelete, canTrackGames } = useAuth();
+  const { canDelete, canTrackGames, canFillPlayers } = useAuth();
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
@@ -439,7 +439,7 @@ export default function GameViewPage() {
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            {canTrackGames && (
+            {canFillPlayers && (
               <Link
                 to={`/games/${id}/credits`}
                 className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg text-amber-300 text-sm font-semibold border border-amber-500/40 hover:bg-amber-500/10 transition-colors"

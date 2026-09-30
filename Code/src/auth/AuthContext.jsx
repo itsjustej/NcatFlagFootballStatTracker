@@ -25,6 +25,7 @@ export function AuthProvider({ children }) {
       isSocial: user?.role === 'social',
       canDelete: user?.role === 'admin',
       canTrackGames: user?.role === 'admin' || user?.role === 'worker',
+      canFillPlayers: user?.role === 'admin' || user?.role === 'worker',
       login,
       logout,
     }),

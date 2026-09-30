@@ -8,7 +8,7 @@ import { pointsForTeam } from "../utils/statsHelpers";
 
 export default function GameHistoryPage() {
   const { currentLeague } = useLeague();
-  const { canTrackGames } = useAuth();
+  const { canTrackGames, canFillPlayers } = useAuth();
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -128,7 +128,7 @@ export default function GameHistoryPage() {
                         </span>
                       </div>
                     </Link>
-                    {canTrackGames && (
+                    {canFillPlayers && (
                       <Link
                         to={`/games/${g.game_id}/credits`}
                         className="border-t border-slate-700 px-4 py-3 min-h-[44px] flex items-center justify-center text-xs font-bold uppercase tracking-wide text-amber-300 hover:bg-slate-800"

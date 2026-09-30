@@ -21,7 +21,7 @@ export default function LoginPage() {
     const success = login(username);
 
     if (!success) {
-      setError('Unknown username. Use "admin", "worker", or "social".');
+      setError('Unknown username. Type social.');
       return;
     }
 
