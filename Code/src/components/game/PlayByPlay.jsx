@@ -148,9 +148,13 @@ function DriveRow({ drive, homeName, awayName, defaultOpen, scrollRef, onEditCre
   return (
     <div
       className={card
-        ? 'border-b border-slate-700/60 min-w-0 md:rounded-2xl md:border md:border-slate-700/80 md:bg-slate-900/50 md:overflow-hidden'
+        ? 'min-w-0 md:min-h-min md:self-start'
         : 'border-b border-slate-700/60'}
       ref={defaultOpen ? scrollRef : null}
+    >
+    <div className={card
+      ? 'border-b border-slate-700/60 md:rounded-2xl md:border md:border-slate-700/80 md:bg-slate-900/50 md:overflow-hidden'
+      : undefined}
     >
       <button
         type="button"
@@ -210,6 +214,7 @@ function DriveRow({ drive, homeName, awayName, defaultOpen, scrollRef, onEditCre
           ))}
         </div>
       )}
+    </div>
     </div>
   );
 }
@@ -311,7 +316,7 @@ export default function PlayByPlay({
       <div
         ref={listRef}
         className={`flex-1 overflow-y-auto min-h-0 ${
-          columns > 1 ? 'md:grid md:grid-cols-2 md:gap-3 md:p-4 md:content-start md:items-start' : ''
+          columns > 1 ? 'md:grid md:grid-cols-2 md:auto-rows-max md:gap-3 md:p-4 md:content-start md:items-start' : ''
         }`}
       >
         {log.length === 0 ? (
