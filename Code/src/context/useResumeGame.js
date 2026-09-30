@@ -40,9 +40,12 @@ function isDriveComplete(lastPlay) {
 export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRight = true) {
   const { data: gameRow } = await supabase
     .from('Game')
-    .select('opening_possession, home_attacks_right, has_forty_yard')
+    .select('opening_possession, home_attacks_right, has_forty_yard, home_team, away_team')
     .eq('game_id', gameId)
     .single();
+
+  homeTeamId = homeTeamId ?? gameRow?.home_team;
+  awayTeamId = awayTeamId ?? gameRow?.away_team;
 
   const openingHomeAttacksRight = gameRow?.home_attacks_right !== false;
   const openingPossession = gameRow?.opening_possession === 'away' ? 'away' : 'home';

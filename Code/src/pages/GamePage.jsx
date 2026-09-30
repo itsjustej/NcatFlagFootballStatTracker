@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLeague } from '../context/LeagueContext';
 import { savePlay } from '../context/useSavePlay';
+import { useRemoteCreditSync } from '../utils/liveGame';
 import { creditsFromLogEntry, swapCreditName, updatePlayCredit } from '../utils/playCredit';
 import { resumeGame } from '../context/useResumeGame';
 import {
@@ -152,24 +153,37 @@ export default function GamePage() {
   const [latestDriveId, setLatestDriveId]       = useState(null);
   const [pulseStep, setPulseStep]             = useState(null);
   const [showPlays, setShowPlays]             = useState(false);
+  const [resumed, setResumed]                 = useState(undefined);
   const toastTimerRef                         = useRef(null);
   const prevStepRef                           = useRef(0);
 
   useEffect(() => {
-    if (!initialGameState || gs) return;
-    resumeGame(
-      initialGameState.gameId,
-      initialGameState.homeTeamId,
-      initialGameState.awayTeamId,
-      initialGameState.homeAttacksRight,
-    )
-      .then(resumed => setGs(resumed ?? initialGameState))
-      .catch(() => setGs(initialGameState));
-  }, [initialGameState]);
+    if (!currentGameId) {
+      setResumed(undefined);
+      return undefined;
+    }
+    let cancelled = false;
+    setResumed(undefined);
+    resumeGame(currentGameId)
+      .then((next) => { if (!cancelled) setResumed(next); })
+      .catch(() => { if (!cancelled) setResumed(null); });
+    return () => { cancelled = true; };
+  }, [currentGameId]);
+
+  useEffect(() => {
+    if (!currentGameId || gameLoading) return;
+    if (!initialGameState || initialGameState.gameId !== currentGameId) return;
+    if (resumed === undefined) return;
+    setGs((current) => (
+      current?.gameId === currentGameId ? current : (resumed ?? initialGameState)
+    ));
+  }, [currentGameId, gameLoading, initialGameState, resumed]);
 
   useEffect(() => {
     if (!gameLoading && !currentGameId && !exitingRef.current) navigate('/start-game');
   }, [currentGameId, gameLoading, navigate, exitingRef]);
+
+  useRemoteCreditSync(gs?.gameId, gs?.log, setGs);
 
   const homeName = game?.homeName ?? '';
   const awayName = game?.awayName ?? '';
@@ -752,9 +766,11 @@ export default function GamePage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (gameLoading) return <div className="flex h-screen items-center justify-center bg-slate-900 text-white text-sm">Loading game...</div>;
-  if (gameError)   return <div className="flex h-screen items-center justify-center bg-slate-900 text-red-400 text-sm">{gameError}</div>;
-  if (!gs)         return null;
+  if (gameError) return <div className="flex h-screen items-center justify-center bg-slate-900 text-red-400 text-sm">{gameError}</div>;
+  if (!gs) {
+    if (!gameLoading && !currentGameId) return null;
+    return <div className="flex h-screen items-center justify-center bg-slate-900 text-white text-sm">Loading game...</div>;
+  }
 
   return (
     <div className="flex flex-col md:flex-row h-[100dvh] overflow-hidden bg-slate-900 text-white" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>

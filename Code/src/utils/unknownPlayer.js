@@ -6,16 +6,20 @@ import { UNKNOWN_PLAYER_NAME, isUnknownPlayer } from './playerName';
  * tracker knows who to credit. The same player can fill more than one
  * role on a play (passer and receiver, for example).
  */
-export async function ensureUnknownPlayers(teamIds) {
+export async function ensureUnknownPlayers(teamIds, alreadyLoaded) {
   const ids = [...new Set(teamIds.map(Number).filter((id) => Number.isFinite(id)))];
   const byTeam = new Map();
   if (!ids.length) return byTeam;
 
-  const { data: existing, error } = await supabase
-    .from('Player')
-    .select('player_id, name, team_id')
-    .in('team_id', ids);
-  if (error) throw error;
+  let existing = alreadyLoaded;
+  if (!existing) {
+    const { data, error } = await supabase
+      .from('Player')
+      .select('player_id, name, team_id')
+      .in('team_id', ids);
+    if (error) throw error;
+    existing = data;
+  }
 
   for (const player of existing || []) {
     if (!isUnknownPlayer(player) || byTeam.has(player.team_id)) continue;

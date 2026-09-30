@@ -60,8 +60,8 @@ export function useGame(gameId) {
               opening_possession,
               home_attacks_right,
               has_forty_yard,
-              home:Team!home_team(team_id, name),
-              away:Team!away_team(team_id, name)
+              home:Team!home_team(team_id, name, Player(player_id, name, team_id)),
+              away:Team!away_team(team_id, name, Player(player_id, name, team_id))
             `)
             .eq('game_id', gameId)
             .single(),
@@ -78,19 +78,14 @@ export function useGame(gameId) {
           awayName:   gameRow.away.name,
         };
 
-        // 2. Players for both teams
-        const { data: players, error: playerErr } = await supabase
-          .from('Player')
-          .select('player_id, name, team_id')
-          .in('team_id', [gameInfo.homeTeamId, gameInfo.awayTeamId]);
-
-        if (playerErr) throw playerErr;
-
-        const rosterPlayers = [...(players || [])];
-        const unknownByTeam = await ensureUnknownPlayers([
-          gameInfo.homeTeamId,
-          gameInfo.awayTeamId,
-        ]);
+        const rosterPlayers = [
+          ...(gameRow.home.Player || []),
+          ...(gameRow.away.Player || []),
+        ];
+        const unknownByTeam = await ensureUnknownPlayers(
+          [gameInfo.homeTeamId, gameInfo.awayTeamId],
+          rosterPlayers,
+        );
         for (const unknown of unknownByTeam.values()) {
           if (rosterPlayers.some((p) => p.player_id === unknown.player_id)) continue;
           rosterPlayers.push(unknown);

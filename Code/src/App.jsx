@@ -15,12 +15,15 @@ import SettingsPage from "./pages/SettingsPage";
 import StatsPage from "./pages/StatsPage";
 import GameHistoryPage from "./pages/GameHistoryPage";
 import GameViewPage from "./pages/GameViewPage";
+import FillPlayersPage from "./pages/FillPlayersPage";
 import DebugPage from "./pages/DebugPage";
 
 export default function App() {
   const location = useLocation();
 
-  const hideNavbar = location.pathname === "/game" || location.pathname === "/login";
+  const hideNavbar = location.pathname === "/game"
+    || location.pathname === "/login"
+    || /^\/games\/[^/]+\/credits$/.test(location.pathname);
 
   return (
     <>
@@ -40,6 +43,7 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
 
           <Route element={<RequireStaff />}>
+            <Route path="/games/:id/credits" element={<FillPlayersPage />} />
             <Route path="/start-game" element={<StartGamePage />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/game" element={<GamePage />} />

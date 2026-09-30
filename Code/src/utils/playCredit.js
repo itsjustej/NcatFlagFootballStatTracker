@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { playerFirstName } from './playerName';
+import { isUnknownPlayer, playerFirstName } from './playerName';
 
 export const CREDIT_ROLES = ['passer', 'rusher', 'receiver', 'defender', 'interceptor'];
 
@@ -15,6 +15,10 @@ const OFFENSE_ROLES = new Set(['passer', 'rusher', 'receiver']);
 
 export function isOffenseRole(role) {
   return OFFENSE_ROLES.has(role);
+}
+
+export function playNeedsPlayers(entry) {
+  return (entry?.credits || []).some((credit) => isUnknownPlayer(credit?.playerName ?? ''));
 }
 
 export function sortCredits(credits) {

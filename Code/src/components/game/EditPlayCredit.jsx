@@ -67,12 +67,17 @@ function CreditPicker({ role, credit, players, selectedId, takenIds, accent, dis
   );
 }
 
-export default function EditPlayCredit({ entry, homePlayers, awayPlayers, onSave, onClose }) {
+export default function EditPlayCredit({ entry, homePlayers, awayPlayers, onSave, onClose, focusMissing = false }) {
   const [draft, setDraft] = useState(() =>
     Object.fromEntries((entry.credits || []).map((c) => [c.role, String(c.playerId)])),
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showFilled, setShowFilled] = useState(false);
+
+  const missing = (entry.credits || []).filter((credit) => isUnknownPlayer(credit.playerName));
+  const filled = (entry.credits || []).filter((credit) => !isUnknownPlayer(credit.playerName));
+  const visible = focusMissing && !showFilled && missing.length ? missing : (entry.credits || []);
 
   const changed = (entry.credits || []).some((c) => draft[c.role] !== String(c.playerId));
 
@@ -123,11 +128,10 @@ export default function EditPlayCredit({ entry, homePlayers, awayPlayers, onSave
       >
         <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
           <div className="min-w-0">
-            <h2 id="edit-credit-title" className="text-lg font-bold text-white">Edit credit</h2>
+            <h2 id="edit-credit-title" className="text-lg font-bold text-white">
+              {focusMissing && missing.length ? 'Fill in players' : 'Edit credit'}
+            </h2>
             <p className="text-sm text-slate-300 mt-1 leading-snug">{entry.description}</p>
-            <p className="text-[11px] text-slate-500 mt-2">
-              Changes who the play is credited to. The result and yardage stay the same.
-            </p>
           </div>
           <button
             type="button"
@@ -140,7 +144,7 @@ export default function EditPlayCredit({ entry, homePlayers, awayPlayers, onSave
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pb-3 flex flex-col gap-4">
-          {(entry.credits || []).map((credit) => {
+          {visible.map((credit) => {
             const takenIds = new Set(
               Object.entries(draft)
                 .filter(([role]) => role !== credit.role)
@@ -160,10 +164,19 @@ export default function EditPlayCredit({ entry, homePlayers, awayPlayers, onSave
               />
             );
           })}
+          {focusMissing && missing.length > 0 && filled.length > 0 && !showFilled && (
+            <button
+              type="button"
+              onClick={() => setShowFilled(true)}
+              className="min-h-11 text-sm font-semibold text-slate-300"
+            >
+              Change the other players
+            </button>
+          )}
           {error && <p className="text-sm text-red-400">{error}</p>}
         </div>
 
-        <div className="flex gap-2 px-5 py-4 border-t border-slate-700">
+        <div className="flex gap-2 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-700">
           <button
             type="button"
             onClick={handleSave}

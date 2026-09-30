@@ -102,29 +102,41 @@ export default function GameHistoryPage() {
             <div className="p-4">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {games.map((g) => (
-                  <Link
+                  <div
                     key={g.game_id}
-                    to={`/games/${g.game_id}`}
-                    className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-4 hover:border-slate-500 hover:bg-slate-900 transition-colors flex flex-col gap-3 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col hover:border-slate-500 transition-colors"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`truncate flex-1 text-sm ${g.home_won ? "text-green-400 font-bold" : "text-white font-medium"}`}>
-                        {truncate(g.home_team.name)}
-                      </span>
-                      <span className={`font-bold tabular-nums shrink-0 ${g.home_won ? "text-green-400 text-xl" : "text-white text-lg"}`}>
-                        {g.home_points}
-                      </span>
-                    </div>
+                    <Link
+                      to={`/games/${g.game_id}`}
+                      className="p-4 flex flex-col gap-3 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`truncate flex-1 text-sm ${g.home_won ? "text-green-400 font-bold" : "text-white font-medium"}`}>
+                          {truncate(g.home_team.name)}
+                        </span>
+                        <span className={`font-bold tabular-nums shrink-0 ${g.home_won ? "text-green-400 text-xl" : "text-white text-lg"}`}>
+                          {g.home_points}
+                        </span>
+                      </div>
 
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`truncate flex-1 text-sm ${g.away_won ? "text-green-400 font-bold" : "text-white font-medium"}`}>
-                        {truncate(g.away_team.name)}
-                      </span>
-                      <span className={`font-bold tabular-nums shrink-0 ${g.away_won ? "text-green-400 text-xl" : "text-white text-lg"}`}>
-                        {g.away_points}
-                      </span>
-                    </div>
-                  </Link>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`truncate flex-1 text-sm ${g.away_won ? "text-green-400 font-bold" : "text-white font-medium"}`}>
+                          {truncate(g.away_team.name)}
+                        </span>
+                        <span className={`font-bold tabular-nums shrink-0 ${g.away_won ? "text-green-400 text-xl" : "text-white text-lg"}`}>
+                          {g.away_points}
+                        </span>
+                      </div>
+                    </Link>
+                    {canTrackGames && (
+                      <Link
+                        to={`/games/${g.game_id}/credits`}
+                        className="border-t border-slate-700 px-4 py-3 min-h-[44px] flex items-center justify-center text-xs font-bold uppercase tracking-wide text-amber-300 hover:bg-slate-800"
+                      >
+                        Fill in players
+                      </Link>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
