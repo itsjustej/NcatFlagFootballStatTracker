@@ -92,62 +92,74 @@ export async function savePlay(gs, entry, { passer, receiver, defender, rusher, 
 
     const newYardLine = resolveNewYardLine(gs, entry, outcome);
 
-    const { data: play, error: playErr } = await supabase
-      .from('Play')
-      .insert({
-        game_id:         gs.gameId,
-        offense_team:    offenseTeamId,
-        defense_team:    defenseTeamId,
-        play_type:       playType,
-        outcome,
-        first_half:      entry.half === 1,
-        overtime:        entry.half === 3,
-        is_conversion:   isConversion,
-        conv_points:     isConversion ? convPoints : null,
-        home_good_play:  homeGoodPlay,
-        penalty_team_id: penaltyTeamId ? parseInt(penaltyTeamId, 10) : null,
-        yard_line:       entry.yardLine,
-        new_yard_line:   newYardLine,
-        down:            entry.down,
-        distance:        entry.distance,
-      })
-      .select()
-      .single();
-
-    if (playErr) throw playErr;
+    const playRow = {
+      game_id:         gs.gameId,
+      offense_team:    offenseTeamId,
+      defense_team:    defenseTeamId,
+      play_type:       playType,
+      outcome,
+      first_half:      entry.half === 1,
+      overtime:        entry.half === 3,
+      is_conversion:   isConversion,
+      conv_points:     isConversion ? convPoints : null,
+      home_good_play:  homeGoodPlay,
+      penalty_team_id: penaltyTeamId ? parseInt(penaltyTeamId, 10) : null,
+      yard_line:       entry.yardLine,
+      new_yard_line:   newYardLine,
+      down:            entry.down,
+      distance:        entry.distance,
+    };
 
     const participants = [];
     if (passer) {
-      participants.push({
-        play_id: play.play_id,
-        player_id: parseInt(passer.id, 10),
-        role: 'passer',
-      });
+      participants.push({ player_id: parseInt(passer.id, 10), role: 'passer' });
     }
     if (receiver) {
-      participants.push({
-        play_id: play.play_id,
-        player_id: parseInt(receiver.id, 10),
-        role: 'receiver',
-      });
+      participants.push({ player_id: parseInt(receiver.id, 10), role: 'receiver' });
     }
     if (defender) {
       participants.push({
-        play_id: play.play_id,
         player_id: parseInt(defender.id, 10),
         role: participantRole(outcome, 'defender'),
       });
     }
     if (rusher) {
-      participants.push({
-        play_id: play.play_id,
-        player_id: parseInt(rusher.id, 10),
-        role: 'rusher',
-      });
+      participants.push({ player_id: parseInt(rusher.id, 10), role: 'rusher' });
     }
 
+    const { data: playId, error: rpcErr } = await supabase.rpc('log_live_play', {
+      p_game_id: playRow.game_id,
+      p_offense_team: playRow.offense_team,
+      p_defense_team: playRow.defense_team,
+      p_play_type: playRow.play_type,
+      p_outcome: playRow.outcome,
+      p_first_half: playRow.first_half,
+      p_overtime: playRow.overtime,
+      p_is_conversion: playRow.is_conversion,
+      p_conv_points: playRow.conv_points,
+      p_home_good_play: playRow.home_good_play,
+      p_penalty_team_id: playRow.penalty_team_id,
+      p_yard_line: playRow.yard_line,
+      p_new_yard_line: playRow.new_yard_line,
+      p_down: playRow.down,
+      p_distance: playRow.distance,
+      p_participants: participants,
+    });
+
+    if (!rpcErr && playId) return { play_id: playId };
+
+    const { data: play, error: playErr } = await supabase
+      .from('Play')
+      .insert(playRow)
+      .select('play_id')
+      .single();
+
+    if (playErr) throw playErr;
+
     if (participants.length > 0) {
-      const { error: partErr } = await supabase.from('Participants').insert(participants);
+      const { error: partErr } = await supabase
+        .from('Participants')
+        .insert(participants.map((row) => ({ ...row, play_id: play.play_id })));
       if (partErr) throw partErr;
     }
 

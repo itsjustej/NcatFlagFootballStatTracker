@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { possessionColor } from "../../constants/teamColors";
 import { isUnknownPlayer, playerFirstName } from "../../utils/playerName";
 
@@ -153,12 +153,48 @@ export default function PreSnap({
   awayName,
   onJerseyUpdate,
   pulse = false,
+  hideDefense = false,
+  collapsible = false,
+  playCount = 0,
 }) {
   const offColor = possessionColor(possession);
   const defColor = possessionColor(possession === 'home' ? 'away' : 'home');
   const offTeam  = possession === 'home' ? homeName : awayName;
   const defTeam  = possession === 'home' ? awayName : homeName;
-  const showDefense = !!selectedOffender;
+  const showDefense = !!selectedOffender && !hideDefense;
+  const [rosterOpen, setRosterOpen] = useState(() => !(collapsible && selectedOffender));
+
+  useEffect(() => {
+    if (!collapsible) return;
+    setRosterOpen(!selectedOffender);
+  }, [collapsible, possession, selectedOffender?.id, playCount]);
+
+  function pickOffender(player) {
+    const clearing = selectedOffender?.id === player.id;
+    onSelectOffender(player);
+    if (collapsible) setRosterOpen(clearing);
+  }
+
+  if (collapsible && !rosterOpen) {
+    return (
+      <button
+        type="button"
+        onClick={() => setRosterOpen(true)}
+        className="card-panel w-full min-h-12 flex items-center justify-between gap-3 px-3 py-2 text-left"
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: offColor }} />
+          <span className="text-[11px] font-bold uppercase tracking-widest shrink-0" style={{ color: offColor }}>
+            QB
+          </span>
+          <span className="text-sm font-bold text-white truncate">
+            {selectedOffender ? playerFirstName(selectedOffender.name) : 'Pick passer'}
+          </span>
+        </span>
+        <span className="text-xs font-bold text-slate-300 shrink-0">Change</span>
+      </button>
+    );
+  }
 
   return (
     <div className={`card-panel flex flex-col gap-3 ${pulse ? 'step-pulse' : ''}`}>
@@ -173,7 +209,7 @@ export default function PreSnap({
               player={selectedOffender}
               selected
               accentColor={offColor}
-              onClick={() => onSelectOffender(selectedOffender)}
+              onClick={() => pickOffender(selectedOffender)}
               onJerseyUpdate={onJerseyUpdate}
               compact
             />
@@ -181,6 +217,15 @@ export default function PreSnap({
             <span className="ml-auto text-[10px] text-blue-400/90 font-medium animate-pulse">
               Select ball carrier →
             </span>
+          )}
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setRosterOpen(false)}
+              className="ml-auto min-h-9 px-2 text-xs font-bold text-slate-300"
+            >
+              Hide
+            </button>
           )}
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -190,7 +235,7 @@ export default function PreSnap({
               player={p}
               selected={selectedOffender?.id === p.id}
               accentColor={offColor}
-              onClick={() => onSelectOffender(p)}
+              onClick={() => pickOffender(p)}
               onJerseyUpdate={onJerseyUpdate}
             />
           ))}

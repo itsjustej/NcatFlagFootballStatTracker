@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { possessionColor } from '../../constants/teamColors';
 import { playerFirstName } from '../../utils/playerName';
@@ -16,7 +16,109 @@ function rosterFor(role, entry, homePlayers, awayPlayers) {
   return side === 'home' ? homePlayers : awayPlayers;
 }
 
-function CreditPicker({ role, credit, players, selectedId, takenIds, accent, disabled, onSelect }) {
+const ASK = {
+  passer: 'Who threw it?',
+  rusher: 'Who ran it?',
+  receiver: 'Who caught it?',
+  defender: 'Who tagged them?',
+  interceptor: 'Who picked it off?',
+};
+
+function NameButton({ player, accent, disabled, onClick }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="min-h-16 flex flex-col items-center justify-center rounded-xl border border-white/10 bg-slate-800 active:scale-95 disabled:opacity-30"
+    >
+      <span className="text-base font-black leading-none" style={{ color: accent }}>
+        {player.number != null ? player.number : '—'}
+      </span>
+      <span className="mt-1 text-[11px] font-bold text-white leading-tight text-center px-1 truncate w-full">
+        {playerFirstName(player.name)}
+      </span>
+    </button>
+  );
+}
+
+function QuickFill({
+  entry,
+  credit,
+  players,
+  recent,
+  taken,
+  step,
+  total,
+  nextAsk,
+  error,
+  onPick,
+  onClear,
+  onClose,
+  onEditOthers,
+}) {
+  const ask = ASK[credit.role] ?? (ROLE_LABELS[credit.role] || credit.role);
+  const accent = possessionColor(sideForRole(credit.role, entry.drivePossession));
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900 text-white flex flex-col">
+      <div className="shrink-0 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 border-b border-slate-800">
+        <div className="flex items-center justify-between gap-3">
+          <button type="button" onClick={onClose} className="min-h-11 text-sm font-bold text-slate-300">
+            Close
+          </button>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+            {step} of {total}
+          </span>
+        </div>
+        <h2 className="text-2xl font-black leading-tight mt-1">{ask}</h2>
+        <p className="text-sm text-slate-300 mt-1 line-clamp-2">{entry.description}</p>
+        {nextAsk && <p className="text-xs font-semibold text-slate-500 mt-1">Next: {nextAsk}</p>}
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 py-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {credit.role === 'defender' && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="w-full min-h-12 mb-3 rounded-xl border border-slate-600 font-bold text-slate-100"
+          >
+            No flag pull
+          </button>
+        )}
+        {recent.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 mb-2">
+            {recent.map((player) => (
+              <NameButton
+                key={`recent-${player.id}`}
+                player={player}
+                accent={accent}
+                disabled={taken.has(player.id)}
+                onClick={() => onPick(player)}
+              />
+            ))}
+          </div>
+        )}
+        <div className="grid grid-cols-3 gap-2">
+          {players.map((player) => (
+            <NameButton
+              key={player.id}
+              player={player}
+              accent={accent}
+              disabled={taken.has(player.id)}
+              onClick={() => onPick(player)}
+            />
+          ))}
+        </div>
+        {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
+        <button type="button" onClick={onEditOthers} className="mt-4 min-h-11 text-sm font-semibold text-slate-400">
+          Change a name already set
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CreditPicker({ role, credit, players, selectedId, takenIds, accent, disabled, allowClear, onSelect }) {
   const pool = useMemo(() => {
     const list = players ?? [];
     if (credit && !list.some((p) => p.id === String(credit.playerId))) {
@@ -34,6 +136,22 @@ function CreditPicker({ role, credit, players, selectedId, takenIds, accent, dis
         {ROLE_LABELS[role] ?? role}
       </p>
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        {allowClear && (
+          <button
+            type="button"
+            disabled={disabled}
+            aria-pressed={!selectedId}
+            onClick={() => onSelect('')}
+            className="min-h-14 flex items-center justify-center rounded-xl border px-1 text-[12px] font-bold leading-tight text-center"
+            style={{
+              background: !selectedId ? accent : '#1e293b',
+              borderColor: !selectedId ? accent : 'rgba(255,255,255,0.12)',
+              color: '#fff',
+            }}
+          >
+            No flag pull
+          </button>
+        )}
         {pool.map((player) => {
           const selected = player.id === selectedId;
           const taken = takenIds.has(player.id) && !selected && !isUnknownPlayer(player);
@@ -43,7 +161,7 @@ function CreditPicker({ role, credit, players, selectedId, takenIds, accent, dis
               type="button"
               disabled={disabled || taken}
               aria-pressed={selected}
-              onClick={() => onSelect(player.id)}
+              onClick={() => onSelect(allowClear && selected ? '' : player.id)}
               className="min-h-14 flex flex-col items-center justify-center rounded-xl border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 background: selected ? accent : '#1e293b',
@@ -67,22 +185,116 @@ function CreditPicker({ role, credit, players, selectedId, takenIds, accent, dis
   );
 }
 
-export default function EditPlayCredit({ entry, homePlayers, awayPlayers, onSave, onClose, focusMissing = false }) {
+export default function EditPlayCredit({
+  entry,
+  homePlayers,
+  awayPlayers,
+  onSave,
+  onClose,
+  onFinished,
+  onRemember,
+  recentIds = [],
+  focusMissing = false,
+}) {
   const [draft, setDraft] = useState(() =>
     Object.fromEntries((entry.credits || []).map((c) => [c.role, String(c.playerId)])),
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showFilled, setShowFilled] = useState(false);
+  const [doneRoles, setDoneRoles] = useState([]);
+  const doneRef = useRef([]);
 
   const missing = (entry.credits || []).filter((credit) => isUnknownPlayer(credit.playerName));
   const filled = (entry.credits || []).filter((credit) => !isUnknownPlayer(credit.playerName));
   const visible = focusMissing && !showFilled && missing.length ? missing : (entry.credits || []);
+  const remaining = missing.filter((credit) => !doneRoles.includes(credit.role));
+  const current = remaining[0];
 
-  const changed = (entry.credits || []).some((c) => draft[c.role] !== String(c.playerId));
+  function commit(credit, player) {
+    if (doneRef.current.includes(credit.role)) return;
+    doneRef.current = [...doneRef.current, credit.role];
+    const change = player
+      ? {
+          role: credit.role,
+          fromPlayerId: credit.playerId,
+          toPlayerId: Number(player.id),
+          fromName: credit.playerName,
+          toPlayer: player,
+        }
+      : {
+          role: credit.role,
+          fromPlayerId: credit.playerId,
+          fromName: credit.playerName,
+          remove: true,
+        };
+    if (player) onRemember?.(player.id);
+    const still = missing.filter((item) => item.role !== credit.role && !doneRoles.includes(item.role));
+    setDoneRoles((prev) => [...prev, credit.role]);
+    setDraft((prev) => ({ ...prev, [credit.role]: player ? String(player.id) : '' }));
+    setError('');
+    onSave([change]).then(() => {
+      if (still.length === 0) onFinished?.(entry);
+    }).catch((err) => {
+      doneRef.current = doneRef.current.filter((role) => role !== credit.role);
+      setDoneRoles((prev) => prev.filter((role) => role !== credit.role));
+      setError(err.message || 'Could not save');
+    });
+  }
+
+  if (focusMissing && !showFilled && missing.length) {
+    if (!current) {
+      return (
+        <div className="fixed inset-0 z-50 bg-slate-900 text-white flex items-center justify-center">
+          <p className="text-sm font-semibold text-slate-300">Saving…</p>
+        </div>
+      );
+    }
+    const roster = (rosterFor(current.role, entry, homePlayers, awayPlayers) || [])
+      .filter((player) => !isUnknownPlayer(player));
+    const recent = recentIds
+      .map((id) => roster.find((player) => player.id === String(id)))
+      .filter(Boolean);
+    const recentSet = new Set(recent.map((player) => player.id));
+    const unknownIds = new Set(
+      missing.map((credit) => String(credit.playerId)),
+    );
+    const taken = new Set(
+      Object.entries(draft)
+        .filter(([role, id]) => role !== current.role && id && !unknownIds.has(String(id)))
+        .map(([, id]) => String(id)),
+    );
+    return (
+      <QuickFill
+        entry={entry}
+        credit={current}
+        players={roster.filter((player) => !recentSet.has(player.id))}
+        recent={recent}
+        taken={taken}
+        step={doneRoles.length + 1}
+        total={missing.length}
+        nextAsk={remaining[1] ? (ASK[remaining[1].role] ?? null) : null}
+        error={error}
+        onPick={(player) => commit(current, player)}
+        onClear={() => commit(current, null)}
+        onClose={onClose}
+        onEditOthers={() => setShowFilled(true)}
+      />
+    );
+  }
+
+  const changed = (entry.credits || []).some((c) => (draft[c.role] || '') !== String(c.playerId));
 
   async function handleSave() {
-    const changes = (entry.credits || [])
+    const removals = (entry.credits || [])
+      .filter((c) => c.role === 'defender' && !draft[c.role])
+      .map((c) => ({
+        role: c.role,
+        fromPlayerId: c.playerId,
+        fromName: c.playerName,
+        remove: true,
+      }));
+    const updates = (entry.credits || [])
       .filter((c) => draft[c.role] && draft[c.role] !== String(c.playerId))
       .map((c) => {
         const pool = rosterFor(c.role, entry, homePlayers, awayPlayers);
@@ -98,6 +310,7 @@ export default function EditPlayCredit({ entry, homePlayers, awayPlayers, onSave
           toPlayer,
         };
       });
+    const changes = [...updates, ...removals];
 
     if (!changes.length) {
       onClose();
@@ -160,6 +373,7 @@ export default function EditPlayCredit({ entry, homePlayers, awayPlayers, onSave
                 takenIds={takenIds}
                 accent={possessionColor(sideForRole(credit.role, entry.drivePossession))}
                 disabled={saving}
+                allowClear={credit.role === 'defender'}
                 onSelect={(id) => setDraft((prev) => ({ ...prev, [credit.role]: id }))}
               />
             );

@@ -36,10 +36,11 @@ const CONV_STEPS = [
   { id: 'receiver', label: 'Catch',    mobile: 'Catch',  short: '4' },
 ];
 
-export default function PlayStepBar({ gs, convStep, pulseStep }) {
+export default function PlayStepBar({ gs, convStep, pulseStep, shortFlow = false }) {
   const isConversion = gs?.playPhase === 'conversion';
-  const steps = isConversion ? CONV_STEPS : STEPS;
-  const active = getPlayStepIndex(gs, convStep);
+  const showResult = !shortFlow || gs?.playPhase === 'advance-down';
+  const steps = isConversion ? CONV_STEPS : (showResult ? STEPS : STEPS.slice(0, 3));
+  const active = Math.min(getPlayStepIndex(gs, convStep), steps.length - 1);
 
   return (
     <div className="px-4 py-2.5 border-b border-slate-700/60 bg-slate-900/80">

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import PlayByPlay from '../components/game/PlayByPlay';
 import EditPlayCredit from '../components/game/EditPlayCredit';
-import { fetchGameData } from './GameViewPage';
-import { updatePlayCredit, playNeedsPlayers, ROLE_LABELS } from '../utils/playCredit';
+import { fetchGameData, fetchPlayBundle, mergeLivePlay, removeLivePlay } from './GameViewPage';
+import { updatePlayCredit, removePlayCredit, playNeedsPlayers, ROLE_LABELS, swapCreditName, stripDefenderFromDescription } from '../utils/playCredit';
 import { isUnknownPlayer } from '../utils/playerName';
 import { useLivePlays } from '../utils/liveGame';
 import { possessionColor, TEAM_COLORS } from '../constants/teamColors';
@@ -65,7 +65,10 @@ export default function FillPlayersPage() {
   const [error, setError] = useState('');
   const [view, setView] = useState('queue');
   const [editing, setEditing] = useState(null);
+  const [recentIds, setRecentIds] = useState([]);
   const loadedRef = useRef(false);
+  const dataRef = useRef(null);
+  const inflightRef = useRef(new Map());
 
   const reload = useCallback(async () => {
     try {
@@ -87,19 +90,104 @@ export default function FillPlayersPage() {
     reload();
   }, [reload]);
 
-  const connected = useLivePlays(gameId, reload);
+  const pullPlay = useCallback((playId) => {
+    const previous = inflightRef.current.get(playId) || Promise.resolve();
+    const job = previous
+      .catch(() => {})
+      .then(() => fetchPlayBundle(playId))
+      .then((row) => {
+        setData((current) => {
+          if (!current) return current;
+          const next = mergeLivePlay(current, row);
+          if (!next) {
+            queueMicrotask(() => reload());
+            return current;
+          }
+          return next;
+        });
+      })
+      .catch(() => reload());
+    inflightRef.current.set(playId, job);
+    job.finally(() => {
+      if (inflightRef.current.get(playId) === job) inflightRef.current.delete(playId);
+    });
+  }, [reload]);
+
+  const onLive = useCallback((event) => {
+    if (!event || event.kind === 'reload' || !event.playId) {
+      reload();
+      return;
+    }
+    if (event.kind === 'delete') {
+      setData((current) => {
+        if (!current) return current;
+        const next = removeLivePlay(current, event.playId);
+        if (!next) {
+          queueMicrotask(() => reload());
+          return current;
+        }
+        return next;
+      });
+      return;
+    }
+    pullPlay(event.playId);
+  }, [pullPlay, reload]);
+
+  const connected = useLivePlays(gameId, onLive);
+  dataRef.current = data;
+
+  const remember = useCallback((playerId) => {
+    const key = String(playerId);
+    setRecentIds((prev) => [key, ...prev.filter((id) => id !== key)].slice(0, 8));
+  }, []);
+
+  const handleFinished = useCallback((entry) => {
+    const log = dataRef.current?.log || [];
+    const next = [...log].reverse().filter(playNeedsPlayers).find((item) => item.playId !== entry.playId);
+    setEditing(next ?? null);
+  }, []);
 
   const handleEditCredit = useCallback(async (entry, changes) => {
-    for (const change of changes) {
-      await updatePlayCredit({
-        playId: entry.playId,
-        role: change.role,
-        fromPlayerId: change.fromPlayerId,
-        toPlayerId: change.toPlayerId,
-      });
-    }
-    await reload();
-  }, [reload]);
+    await Promise.all(changes.map((change) => (
+      change.remove
+        ? removePlayCredit({
+            playId: entry.playId,
+            role: change.role,
+            playerId: change.fromPlayerId,
+          })
+        : updatePlayCredit({
+            playId: entry.playId,
+            role: change.role,
+            fromPlayerId: change.fromPlayerId,
+            toPlayerId: change.toPlayerId,
+          })
+    )));
+
+    setData((current) => {
+      if (!current) return current;
+      let description = entry.description;
+      let credits = (entry.credits || []).map((credit) => ({ ...credit }));
+      for (const change of changes) {
+        if (change.remove) {
+          description = stripDefenderFromDescription(description, change.fromName);
+          credits = credits.filter((credit) => credit.role !== change.role);
+          continue;
+        }
+        description = swapCreditName(description, change.role, change.fromName, change.toPlayer.name);
+        credits = credits.map((credit) => (
+          credit.role === change.role
+            ? { ...credit, playerId: change.toPlayerId, playerName: change.toPlayer.name }
+            : credit
+        ));
+      }
+      return {
+        ...current,
+        log: current.log.map((item) => (
+          item.playId === entry.playId ? { ...item, description, credits } : item
+        )),
+      };
+    });
+  }, []);
 
   if (loading && !data) {
     return (
@@ -122,50 +210,33 @@ export default function FillPlayersPage() {
   const newest = log[log.length - 1];
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-slate-900 text-white">
-      <header className="shrink-0 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 border-b border-slate-800">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <Link
-            to={`/games/${gameId}`}
-            className="min-h-11 inline-flex items-center text-sm font-semibold text-slate-300"
-          >
-            ← Back
-          </Link>
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-300">
-            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-amber-300'}`} />
+    <div className="flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden bg-slate-900 text-white">
+      <header className="shrink-0 flex items-center gap-2 px-3 min-h-14 py-2 border-b border-slate-800 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <Link
+          to={`/games/${gameId}`}
+          className="min-h-11 inline-flex items-center text-sm font-bold text-slate-300"
+        >
+          ←
+        </Link>
+        <div className="flex-1 min-w-0 text-center">
+          <p className="text-sm font-black truncate">
+            <span style={{ color: TEAM_COLORS.home.muted }}>{homeName}</span>
+            {' '}{finalHome}–{finalAway}{' '}
+            <span style={{ color: TEAM_COLORS.away.muted }}>{awayName}</span>
+          </p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${connected ? 'bg-emerald-400' : 'bg-amber-300'}`} />
             {connected ? 'Live' : 'Connecting'}
-          </span>
+            {view === 'queue' && queue.length ? ` · ${queue.length} to fill` : ''}
+          </p>
         </div>
-
-        <div className="md:flex md:items-end md:justify-between md:gap-8">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 md:max-w-sm md:flex-1">
-          <p className="text-sm font-bold truncate" style={{ color: TEAM_COLORS.home.muted }}>{homeName}</p>
-          <p className="text-3xl font-black tabular-nums leading-none text-right">{finalHome}</p>
-          <p className="text-sm font-bold truncate" style={{ color: TEAM_COLORS.away.muted }}>{awayName}</p>
-          <p className="text-3xl font-black tabular-nums leading-none text-right">{finalAway}</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 mt-4 md:mt-0 md:w-80 md:shrink-0">
-          <button
-            type="button"
-            onClick={() => setView('queue')}
-            className={`min-h-11 rounded-xl text-sm font-bold transition-colors ${
-              view === 'queue' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            To fill{queue.length ? ` · ${queue.length}` : ''}
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('all')}
-            className={`min-h-11 rounded-xl text-sm font-bold transition-colors ${
-              view === 'all' ? 'bg-slate-200 text-slate-950' : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            All plays
-          </button>
-        </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setView(view === 'queue' ? 'all' : 'queue')}
+          className="min-h-11 text-xs font-bold text-slate-200"
+        >
+          {view === 'queue' ? 'All plays' : 'To fill'}
+        </button>
       </header>
 
       {view === 'queue' ? (
@@ -221,6 +292,9 @@ export default function FillPlayersPage() {
           awayPlayers={awayRoster}
           onClose={() => setEditing(null)}
           onSave={(changes) => handleEditCredit(editing, changes)}
+          onFinished={handleFinished}
+          onRemember={remember}
+          recentIds={recentIds}
           focusMissing
         />
       )}

@@ -6,8 +6,17 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+html, body, #root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   @apply bg-slate-900 m-0 min-h-[100dvh];
+}
+
+button, a {
+  touch-action: manipulation;
 }
 
 ::-webkit-scrollbar {

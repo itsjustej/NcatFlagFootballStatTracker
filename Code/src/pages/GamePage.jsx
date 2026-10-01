@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLeague } from '../context/LeagueContext';
 import { savePlay } from '../context/useSavePlay';
 import { useRemoteCreditSync } from '../utils/liveGame';
-import { creditsFromLogEntry, swapCreditName, updatePlayCredit } from '../utils/playCredit';
+import { creditsFromLogEntry, removePlayCredit, stripDefenderFromDescription, swapCreditName, updatePlayCredit } from '../utils/playCredit';
 import { resumeGame } from '../context/useResumeGame';
 import {
   firstDownYard,
@@ -18,7 +18,7 @@ import {
   otStartYard,
   otHomeAttacksRight,
 } from '../gameLogic';
-import { playerFirstName } from '../utils/playerName';
+import { isUnknownPlayer, playerFirstName } from '../utils/playerName';
 import HalftimeConfirmDialog from '../components/game/HalftimeConfirmDialog';
 import OtBallDialog from '../components/game/OtBallDialog';
 import PlayStepBar, { getPlayStepIndex } from '../components/game/PlayStepBar';
@@ -26,6 +26,7 @@ import UndoToast from '../components/game/UndoToast';
 import FieldSpot    from '../components/game/FieldSpot';
 import PreSnap      from '../components/game/PreSnap';
 import PlayControls from '../components/game/PlayControls';
+import CoopPlayBar from '../components/game/CoopPlayBar';
 import Scoreboard   from '../components/game/Scoreboard';
 import PlayByPlay   from '../components/game/PlayByPlay';
 
@@ -40,7 +41,7 @@ function addPlay(log, entry) {
 
 function snapshotLastPasser(s) {
   const prev = s.lastPasser ?? { home: null, away: null };
-  if (s.playType === 'pass' && s.selectedOffender) {
+  if ((s.playType === 'pass' || s.playType === 'rush') && s.selectedOffender) {
     return { ...prev, [s.possession]: s.selectedOffender };
   }
   return prev;
@@ -153,6 +154,7 @@ export default function GamePage() {
   const [latestDriveId, setLatestDriveId]       = useState(null);
   const [pulseStep, setPulseStep]             = useState(null);
   const [showPlays, setShowPlays]             = useState(false);
+  const [coopMode, setCoopMode]               = useState(() => localStorage.getItem('coopMode') !== '0');
   const [resumed, setResumed]                 = useState(undefined);
   const toastTimerRef                         = useRef(null);
   const prevStepRef                           = useRef(0);
@@ -257,6 +259,16 @@ export default function GamePage() {
     let description = entry.description;
     let credits = (entry.credits || []).map((c) => ({ ...c }));
     for (const change of changes) {
+      if (change.remove) {
+        await removePlayCredit({
+          playId: entry.playId,
+          role: change.role,
+          playerId: change.fromPlayerId,
+        });
+        description = stripDefenderFromDescription(description, change.fromName);
+        credits = credits.filter((c) => c.role !== change.role);
+        continue;
+      }
       await updatePlayCredit({
         playId: entry.playId,
         role: change.role,
@@ -420,14 +432,96 @@ export default function GamePage() {
     setGs(s => ({ ...s, selectedDefender: s.selectedDefender?.id === p.id ? null : p }));
   }, []);
 
+  const toggleCoop = useCallback(() => {
+    setCoopMode((on) => {
+      const next = !on;
+      localStorage.setItem('coopMode', next ? '1' : '0');
+      if (next) setGs((s) => (s ? { ...s, selectedDefender: null } : s));
+      return next;
+    });
+  }, []);
+
   const handlePlayType = useCallback((t) => {
     setGsWithHistory((s) => {
       const spot      = s.newSpot ?? s.yardLine;
-      const offFirst  = playerFirstName(s.selectedOffender?.name, 'Runner');
-      const defFirst  = playerFirstName(s.selectedDefender?.name);
+      const offenseList = (s.possession === 'home' ? homePlayers : awayPlayers) ?? [];
+      const defenseList = (s.possession === 'home' ? awayPlayers : homePlayers) ?? [];
+      const unknownDefense = defenseList.find((player) => isUnknownPlayer(player)) ?? null;
+      const unknownOffense = offenseList.find((player) => isUnknownPlayer(player)) ?? null;
+      const defenderPlayer = coopMode ? unknownDefense : (s.selectedDefender ?? null);
+      const rushPlayer = coopMode ? unknownOffense : (s.selectedOffender ?? null);
+      const namedRunner = t === 'rush' ? rushPlayer : s.selectedOffender;
+      const offFirst  = playerFirstName(namedRunner?.name, t === 'rush' ? 'Runner' : 'QB');
+      const defFirst  = playerFirstName(defenderPlayer?.name);
       const tackleStr = defFirst ? ` (tackled by ${defFirst})` : '';
-      const _rusher   = t === 'rush' ? (s.selectedOffender ?? null) : null;
-      const _defender = s.selectedDefender ?? null;
+      const _rusher   = t === 'rush' ? rushPlayer : null;
+      const _defender = defenderPlayer;
+
+      if (t === 'incomplete' && coopMode) {
+        const passer = s.selectedOffender ?? unknownOffense;
+        const qbFirst = playerFirstName(passer?.name, 'QB');
+        const newDown = s.down + 1;
+        const driveResult = newDown > 4 ? 'Turnover on Downs' : undefined;
+        const _outcome = newDown > 4 ? 'turnover_on_downs' : 'incomplete';
+        const entry = {
+          ...baseEntry(s),
+          description: `${qbFirst} throws incompletion`,
+          yardsGained: 0,
+          homeScore: s.homeScore,
+          awayScore: s.awayScore,
+          driveResult,
+          _playType: 'pass',
+          _outcome,
+          _passer: passer,
+        };
+        return { ...s, ...afterNormalPlay({ ...s, playType: 'pass' }, s.yardLine, false, newDown), log: addPlay(s.log, entry) };
+      }
+
+      if (t === 'interception' && coopMode) {
+        const spotHere = s.newSpot ?? s.yardLine;
+        const newPoss = s.possession === 'home' ? 'away' : 'home';
+        const passer = s.selectedOffender ?? unknownOffense;
+        const qbFirst = playerFirstName(passer?.name, 'QB');
+        const pickFirst = playerFirstName(unknownDefense?.name, 'Unknown');
+        const withType = { ...s, playType: 'pass' };
+        const isPick6 = isTouchdown(spotHere, newPoss, s.homeAttacksRight, s.hasFortyYard);
+        if (isPick6) {
+          const newHome = newPoss === 'home' ? s.homeScore + 6 : s.homeScore;
+          const newAway = newPoss === 'away' ? s.awayScore + 6 : s.awayScore;
+          const entry = {
+            ...baseEntry(s),
+            description: `${qbFirst} throws interception to ${pickFirst} for a touchdown`,
+            yardsGained: 0,
+            homeScore: newHome,
+            awayScore: newAway,
+            driveResult: 'Pick 6',
+            _playType: 'pass',
+            _outcome: 'pick_6',
+            _passer: passer,
+            _defender: unknownDefense,
+          };
+          return enterConversionPhase(withType, {
+            homeScore: newHome,
+            awayScore: newAway,
+            yardLine: spotHere,
+            possession: newPoss,
+            log: addPlay(s.log, entry),
+          });
+        }
+        const entry = {
+          ...baseEntry(s),
+          description: `${qbFirst} throws interception to ${pickFirst}`,
+          yardsGained: 0,
+          homeScore: s.homeScore,
+          awayScore: s.awayScore,
+          driveResult: 'Interception',
+          _playType: 'pass',
+          _outcome: 'interception',
+          _passer: passer,
+          _defender: unknownDefense,
+        };
+        return { ...s, ...afterPossessionFlip(withType, spotHere, newPoss), log: addPlay(s.log, entry) };
+      }
 
       if (t === 'rush') {
         if (isSafety(spot, s.possession, s.homeAttacksRight, s.hasFortyYard)) {
@@ -437,14 +531,14 @@ export default function GamePage() {
           const newYard     = kickoffYard(newPoss, s.homeAttacksRight, s.hasFortyYard);
           const yds         = yardsGained(s.yardLine, spot, s.possession, s.homeAttacksRight);
           const entry = { ...baseEntry(s), description: `${offFirst} rushed for a safety`, yardsGained: yds, homeScore: newHome, awayScore: newAway, driveResult: 'Safety', _playType: 'rush', _outcome: 'safety', _rusher, _defender };
-          return { ...s, homeScore: newHome, awayScore: newAway, ...afterPossessionFlip(s, newYard, newPoss), log: addPlay(s.log, entry) };
+          return { ...s, homeScore: newHome, awayScore: newAway, ...afterPossessionFlip({ ...s, playType: 'rush' }, newYard, newPoss), log: addPlay(s.log, entry) };
         }
         if (isTouchdown(spot, s.possession, s.homeAttacksRight, s.hasFortyYard)) {
           const newHome     = s.possession === 'home' ? s.homeScore + 6 : s.homeScore;
           const newAway     = s.possession === 'away' ? s.awayScore + 6 : s.awayScore;
           const yds         = yardsGained(s.yardLine, spot, s.possession, s.homeAttacksRight);
           const entry = { ...baseEntry(s), description: `${offFirst} rushed for a touchdown`, yardsGained: yds, homeScore: newHome, awayScore: newAway, driveResult: 'Touchdown', _playType: 'rush', _outcome: 'td', _rusher, _defender };
-          return enterConversionPhase(s, {
+          return enterConversionPhase({ ...s, playType: 'rush' }, {
             homeScore: newHome,
             awayScore: newAway,
             yardLine: spot,
@@ -457,7 +551,31 @@ export default function GamePage() {
         const driveResult = newDown > 4 ? 'Turnover on Downs' : undefined;
         const _outcome    = newDown > 4 ? 'turnover_on_downs' : 'complete';
         const entry = { ...baseEntry(s), description: `${offFirst} rushed for ${yds} yard${yds !== 1 ? 's' : ''}${fd ? ' for a first down' : ''}${tackleStr}`, yardsGained: yds, homeScore: s.homeScore, awayScore: s.awayScore, driveResult, _playType: 'rush', _outcome, _rusher, _defender };
-        return { ...s, ...afterNormalPlay(s, spot, fd, newDown), log: addPlay(s.log, entry) };
+        return { ...s, ...afterNormalPlay({ ...s, playType: 'rush' }, spot, fd, newDown), log: addPlay(s.log, entry) };
+      }
+
+      if (t === 'pass' && coopMode) {
+        const passer = s.selectedOffender ?? unknownOffense;
+        const receiver = unknownOffense;
+        const recFirst = playerFirstName(receiver?.name, 'Unknown');
+        const qbFirst = playerFirstName(passer?.name, 'QB');
+        const withType = { ...s, playType: 'pass' };
+        const result = buildPassEntry(
+          withType, spot, qbFirst, recFirst, yardsGained(s.yardLine, spot, s.possession, s.homeAttacksRight),
+          tackleStr, passer, receiver, _defender,
+        );
+        if (result.type === 'safety') {
+          return { ...s, homeScore: result.newHome, awayScore: result.newAway, ...afterPossessionFlip(withType, result.newYard, result.newPoss), log: addPlay(s.log, result.entry) };
+        }
+        if (result.type === 'td') {
+          return enterConversionPhase(withType, {
+            homeScore: result.newHome,
+            awayScore: result.newAway,
+            yardLine: spot,
+            log: addPlay(s.log, result.entry),
+          });
+        }
+        return { ...withType, ...afterNormalPlay(withType, spot, result.fd, result.newDown), log: addPlay(s.log, result.entry) };
       }
 
       if (t === 'pass') return { ...s, playType: t, playPhase: 'pass-receiver' };
@@ -511,7 +629,7 @@ export default function GamePage() {
 
       return s;
     });
-  }, [homeName, awayName]);
+  }, [homeName, awayName, homePlayers, awayPlayers, coopMode]);
 
   const handlePassReceiver = useCallback((p) => {
     setGs(s => ({ ...s, selectedReceiver: p, playPhase: 'pass-result' }));
@@ -773,7 +891,7 @@ export default function GamePage() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-[100dvh] overflow-hidden bg-slate-900 text-white" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="flex flex-col md:flex-row h-[100dvh] max-w-[100vw] overflow-hidden bg-slate-900 text-white" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       {otPrompt && (
         <OtBallDialog
           homeName={homeName}
@@ -801,8 +919,8 @@ export default function GamePage() {
         />
       )}
 
-      <div className="flex-1 min-w-0 min-h-0 flex flex-col relative">
-        <div className="md:hidden shrink-0 border-b border-slate-800">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col relative overflow-hidden">
+        <div className="md:hidden shrink-0 border-b border-slate-800 pt-[env(safe-area-inset-top)]">
           <Scoreboard
             gs={gs}
             canUndo={history.length > 0}
@@ -813,12 +931,16 @@ export default function GamePage() {
             scoreFlash={scoreFlash}
             onOpenPlays={() => setShowPlays(true)}
             onExit={() => { clearGame(); navigate('/'); }}
+            coop={coopMode}
+            onToggleCoop={toggleCoop}
           />
         </div>
-        {/* Sticky field + step bar */}
-        <div className="sticky top-0 z-20 bg-slate-900 border-b border-slate-800 shrink-0">
-          <PlayStepBar gs={gs} convStep={convStep} pulseStep={pulseStep} />
-          <div className="px-4 py-3">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pb-[env(safe-area-inset-bottom)]">
+        <div className="sticky top-0 z-20 bg-slate-900 border-b border-slate-800">
+          {(!coopMode || gs.playPhase === 'conversion') && (
+            <PlayStepBar gs={gs} convStep={convStep} pulseStep={pulseStep} shortFlow={coopMode} />
+          )}
+          <div className="px-3 sm:px-4 py-2 sm:py-3">
             <FieldSpot
               yardLine={gs.yardLine}
               distance={gs.distance}
@@ -833,11 +955,20 @@ export default function GamePage() {
               disabled={gs.playPhase === 'conversion'}
             />
           </div>
+          {coopMode && gs.playPhase !== 'conversion' && (
+            <div className="px-3 sm:px-4 pb-2 sm:pb-3">
+              <CoopPlayBar
+                gs={gs}
+                homeName={homeName}
+                awayName={awayName}
+                onPlay={handlePlayType}
+                onAdvanceDown={handleAdvanceDown}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Scrollable play loop */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 flex flex-col gap-4 pb-6">
+          <div className="p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 pb-6">
             {gs.playPhase !== 'conversion' && (
               <PreSnap
                 possession={gs.possession}
@@ -851,9 +982,12 @@ export default function GamePage() {
                 awayName={awayName}
                 onJerseyUpdate={updateJersey}
                 pulse={activeStep === 0 && pulseStep === 0}
+                hideDefense={coopMode}
+                collapsible={coopMode}
+                playCount={gs.log.length}
               />
             )}
-            {(gs.selectedOffender || gs.playPhase === 'conversion') && (
+            {((!coopMode && gs.selectedOffender) || gs.playPhase === 'conversion') && (
               <PlayControls
                 gs={gs}
                 convStep={convStep}
@@ -896,6 +1030,8 @@ export default function GamePage() {
           homeName={homeName}
           awayName={awayName}
           scoreFlash={scoreFlash}
+          coop={coopMode}
+          onToggleCoop={toggleCoop}
         />
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           <PlayByPlay
@@ -912,7 +1048,7 @@ export default function GamePage() {
       </div>
 
       {showPlays && (
-        <div className="md:hidden fixed inset-0 z-40 bg-slate-800 flex flex-col">
+        <div className="md:hidden fixed inset-0 z-40 bg-slate-800 flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
           <div className="flex items-center justify-between px-2 py-2 border-b border-slate-700 shrink-0">
             <button
               type="button"

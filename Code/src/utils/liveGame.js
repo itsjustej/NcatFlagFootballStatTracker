@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { creditsFromParticipants, swapCreditName } from './playCredit';
+import { creditsFromParticipants, stripDefenderFromDescription, swapCreditName } from './playCredit';
 
 function sameCredits(left, right) {
   const a = left || [];
@@ -27,10 +27,16 @@ export function mergeRemoteCredits(entry, rows) {
   if (sameCredits(entry.credits, next)) return entry;
 
   let description = entry.description;
-  for (const credit of next) {
-    const prev = (entry.credits || []).find((item) => item.role === credit.role);
-    if (!prev || Number(prev.playerId) === Number(credit.playerId)) continue;
-    description = swapCreditName(description, credit.role, prev.playerName, credit.playerName);
+  for (const prev of entry.credits || []) {
+    const still = next.find((credit) => credit.role === prev.role);
+    if (!still) {
+      if (prev.role === 'defender') {
+        description = stripDefenderFromDescription(description, prev.playerName);
+      }
+      continue;
+    }
+    if (Number(still.playerId) === Number(prev.playerId)) continue;
+    description = swapCreditName(description, still.role, prev.playerName, still.playerName);
   }
   return { ...entry, description, credits: next };
 }
@@ -162,7 +168,11 @@ export function useRemoteCreditSync(gameId, log, setGs) {
   }, [gameId]);
 }
 
-/** Reload a game view whenever a play or a credit changes. */
+/**
+ * Tell the fill screen about one play as soon as it is saved.
+ * A new play is delivered immediately. Credit edits for a play already on
+ * screen are grouped for a few milliseconds so one play is fetched once.
+ */
 export function useLivePlays(gameId, onChange) {
   const [connected, setConnected] = useState(false);
   const onChangeRef = useRef(onChange);
@@ -171,26 +181,58 @@ export function useLivePlays(gameId, onChange) {
   useEffect(() => {
     if (!gameId) return undefined;
 
-    let timer = null;
-    const schedule = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => onChangeRef.current(), 300);
-    };
+    const waiting = new Map();
+
+    function deliver(event) {
+      onChangeRef.current(event);
+    }
+
+    function soon(playId) {
+      if (waiting.has(playId)) return;
+      waiting.set(playId, window.setTimeout(() => {
+        waiting.delete(playId);
+        deliver({ kind: 'play', playId });
+      }, 40));
+    }
+
+    function onPlay(payload) {
+      const playId = Number(payload.new?.play_id ?? payload.old?.play_id);
+      if (!playId) {
+        deliver({ kind: 'reload' });
+        return;
+      }
+      if (payload.eventType === 'DELETE') {
+        window.clearTimeout(waiting.get(playId));
+        waiting.delete(playId);
+        deliver({ kind: 'delete', playId });
+        return;
+      }
+      window.clearTimeout(waiting.get(playId));
+      waiting.delete(playId);
+      deliver({ kind: 'play', playId });
+    }
+
+    function onCredit(payload) {
+      const playId = Number(payload.new?.play_id ?? payload.old?.play_id);
+      if (!playId) return;
+      soon(playId);
+    }
 
     const channel = supabase
       .channel(`fill-players-${gameId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'Play', filter: `game_id=eq.${Number(gameId)}` },
-        schedule,
+        onPlay,
       )
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'Participants' }, schedule)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'Participants' }, onCredit)
       .subscribe((status) => {
         setConnected(status === 'SUBSCRIBED');
       });
 
     return () => {
-      window.clearTimeout(timer);
+      waiting.forEach((timer) => window.clearTimeout(timer));
+      waiting.clear();
       setConnected(false);
       supabase.removeChannel(channel);
     };

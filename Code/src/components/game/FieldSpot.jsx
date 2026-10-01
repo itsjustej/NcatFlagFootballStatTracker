@@ -63,7 +63,7 @@ export default function FieldSpot({
   return (
     <div className="select-none">
       <div
-        className={`relative w-full h-28 md:h-[8.5rem] cursor-crosshair overflow-hidden rounded-xl border border-green-950 ${
+        className={`relative w-full h-20 sm:h-28 md:h-[8.5rem] cursor-crosshair overflow-hidden rounded-xl border border-green-950 ${
           pulse ? 'field-pulse' : ''
         }`}
         onClick={handleClick}

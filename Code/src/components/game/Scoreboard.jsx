@@ -18,6 +18,8 @@ export default function Scoreboard({
   scoreFlash,
   onOpenPlays,
   onExit,
+  coop = false,
+  onToggleCoop,
 }) {
   const { homeScore, awayScore, half, down, distance, possession, yardLine, homeAttacksRight = true } = gs;
   const teamName = possession === 'home' ? homeName : awayName;
@@ -46,7 +48,7 @@ export default function Scoreboard({
     <div className="flex flex-col">
       <div className="flex items-stretch border-b border-slate-700">
         <div
-          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-2.5 md:py-4 gap-0.5 md:gap-1 px-1 transition-colors duration-300 ${
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1.5 md:py-4 gap-0.5 md:gap-1 px-1 transition-colors duration-300 ${
             possession === 'home' ? 'bg-slate-700/40' : ''
           }`}
         >
@@ -57,7 +59,7 @@ export default function Scoreboard({
             {homeName}
           </span>
           <span
-            className={`text-4xl md:text-5xl font-black text-white tabular-nums ${flashHome ? 'score-flash-home' : ''}`}
+            className={`text-3xl md:text-5xl font-black text-white tabular-nums ${flashHome ? 'score-flash-home' : ''}`}
           >
             {homeScore}
           </span>
@@ -86,7 +88,7 @@ export default function Scoreboard({
         </div>
 
         <div
-          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-2.5 md:py-4 gap-0.5 md:gap-1 px-1 transition-colors duration-300 ${
+          className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1.5 md:py-4 gap-0.5 md:gap-1 px-1 transition-colors duration-300 ${
             possession === 'away' ? 'bg-slate-700/40' : ''
           }`}
         >
@@ -97,14 +99,14 @@ export default function Scoreboard({
             {awayName}
           </span>
           <span
-            className={`text-4xl md:text-5xl font-black text-white tabular-nums ${flashAway ? 'score-flash-away' : ''}`}
+            className={`text-3xl md:text-5xl font-black text-white tabular-nums ${flashAway ? 'score-flash-away' : ''}`}
           >
             {awayScore}
           </span>
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 px-3 md:px-4 py-2 border-b border-slate-700 bg-slate-900/30">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 md:px-4 py-1.5 md:py-2 border-b border-slate-700 bg-slate-900/30">
         <div className="flex items-center gap-2 min-w-0">
           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: offColor }} />
           <span className="text-[12px] font-bold text-slate-300 truncate">
@@ -115,13 +117,25 @@ export default function Scoreboard({
             </span>
           </span>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <span
             className="text-[12px] font-black text-white px-2.5 py-1 rounded-full"
             style={{ background: TEAM_COLORS.home.primary }}
           >
             {downStr(down, distance)}
           </span>
+          {onToggleCoop && (
+            <button
+              type="button"
+              onClick={onToggleCoop}
+              aria-pressed={coop}
+              className={`min-h-9 px-2.5 rounded-lg text-xs font-bold ${
+                coop ? 'bg-amber-400 text-slate-950' : 'bg-slate-700 text-slate-200'
+              }`}
+            >
+              Co-op
+            </button>
+          )}
           {onOpenPlays && (
             <button
               type="button"
@@ -146,11 +160,17 @@ export default function Scoreboard({
         </div>
       </div>
 
+      {coop && (
+        <p className="hidden sm:block px-3 py-1.5 text-[11px] leading-snug text-amber-200 bg-amber-500/10 border-b border-slate-700">
+          Spot the ball and tap the play. The other phone fills in the names.
+        </p>
+      )}
+
       {onExit && (
         <button
           type="button"
           onClick={onExit}
-          className="md:hidden w-full min-h-11 text-sm font-bold text-slate-200 border-t border-slate-700"
+          className="md:hidden w-full min-h-10 text-sm font-bold text-slate-200 border-t border-slate-700"
         >
           Save & Exit
         </button>

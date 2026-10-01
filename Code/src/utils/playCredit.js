@@ -98,6 +98,30 @@ export function swapCreditName(description, role, oldName, newName) {
   return description;
 }
 
+/** Drop "(tackled by Name)" when a flag pull is cleared. */
+export function stripDefenderFromDescription(description, name) {
+  const first = playerFirstName(name);
+  if (!description || !first) return description;
+  const tackled = new RegExp(`\\s*\\(tackled by ${escapeRegExp(first)}\\)`, 'i');
+  return description.replace(tackled, '').replace(/\s{2,}/g, ' ').trim();
+}
+
+/** Remove one credit, such as a flag pull on a play that ran out of bounds. */
+export async function removePlayCredit({ playId, role, playerId }) {
+  const id = Number(playId);
+  const prevId = Number(playerId);
+  if (!id || !role || !prevId) throw new Error('Missing credit details');
+
+  const { error } = await supabase
+    .from('Participants')
+    .delete()
+    .eq('play_id', id)
+    .eq('role', role)
+    .eq('player_id', prevId);
+
+  if (error) throw new Error(error.message || 'Could not remove that credit');
+}
+
 /** Point one existing credit at a different player. Does not change the play result. */
 export async function updatePlayCredit({ playId, role, fromPlayerId, toPlayerId }) {
   const id = Number(playId);

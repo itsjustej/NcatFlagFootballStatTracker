@@ -16,7 +16,7 @@ import {
 import { cleanPlayerName, isUnknownPlayer, playerFirstName } from "../utils/playerName";
 import { ensureUnknownPlayers, withUnknownLast } from "../utils/unknownPlayer";
 import { sortByJersey } from "../context/useGame";
-import { creditsFromParticipants, updatePlayCredit } from "../utils/playCredit";
+import { creditsFromParticipants, removePlayCredit, updatePlayCredit } from "../utils/playCredit";
 import { playPeriod } from "../gameLogic";
 
 // ── Outcome → driveResult mapping (inverse of useSavePlay) ───────────────────
@@ -181,6 +181,10 @@ export async function fetchGameData(gameId) {
   const emptyBox = {
     homeName,
     awayName,
+    homeTeamId,
+    awayTeamId,
+    homeAttacksRight,
+    hasFortyYard,
     log: [],
     finalHome: 0,
     finalAway: 0,
@@ -307,6 +311,10 @@ export async function fetchGameData(gameId) {
   return {
     homeName,
     awayName,
+    homeTeamId,
+    awayTeamId,
+    homeAttacksRight,
+    hasFortyYard,
     log,
     finalHome: last?.homeScore ?? 0,
     finalAway: last?.awayScore ?? 0,
@@ -316,6 +324,140 @@ export async function fetchGameData(gameId) {
     homePlayers,
     awayPlayers,
     ...rosters,
+  };
+}
+
+const PLAY_WITH_CREDITS = `
+  *,
+  Participants(
+    play_id,
+    role,
+    player_id,
+    player:Player(player_id, name)
+  )
+`;
+
+export async function fetchPlayBundle(playId) {
+  const { data, error } = await supabase
+    .from('Play')
+    .select(PLAY_WITH_CREDITS)
+    .eq('play_id', playId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+function playParticipants(playRow) {
+  return (playRow.Participants || []).map((row) => ({
+    role: row.role,
+    player_id: row.player_id,
+    player_name: row.player?.name ?? '',
+  }));
+}
+
+function annotatePlay(playRow, data) {
+  const play = { ...playRow };
+  delete play.Participants;
+  const offenseIsHome = play.offense_team === data.homeTeamId;
+  play.offense_is_home = offenseIsHome;
+  play.offense_team_name = offenseIsHome ? data.homeName : data.awayName;
+  play.penalty_team_name = play.penalty_team_id
+    ? (play.penalty_team_id === data.homeTeamId ? data.homeName : data.awayName)
+    : null;
+  return { play, offenseIsHome };
+}
+
+function scoreAfterPlay(play, offenseIsHome, homeScore, awayScore) {
+  let home = homeScore;
+  let away = awayScore;
+  if (play.outcome === 'td' || play.outcome === 'safety') {
+    const points = play.outcome === 'td' ? 6 : 2;
+    if (offenseIsHome) home += points;
+    else away += points;
+  }
+  if (play.outcome === 'pick_6') {
+    if (offenseIsHome) away += 6;
+    else home += 6;
+  }
+  if (play.is_conversion && play.outcome === 'complete') {
+    const pts = play.conv_points ?? 0;
+    if (offenseIsHome) home += pts;
+    else away += pts;
+  }
+  return { home, away };
+}
+
+/** Add or refresh one play on a loaded game. Returns null when the full game should be reloaded. */
+export function mergeLivePlay(data, playRow) {
+  if (!data?.homeTeamId || !playRow?.play_id) return null;
+  const playId = Number(playRow.play_id);
+  const participants = playParticipants(playRow);
+  const { play, offenseIsHome } = annotatePlay(playRow, data);
+  const description = buildDescription(
+    play,
+    participants,
+    data.homeTeamId,
+    data.homeAttacksRight,
+    data.hasFortyYard,
+  );
+  const credits = creditsFromParticipants(participants);
+  const existing = (data.log || []).find((entry) => Number(entry.playId) === playId);
+  if (existing) {
+    return {
+      ...data,
+      log: data.log.map((entry) => (
+        Number(entry.playId) === playId ? { ...entry, description, credits } : entry
+      )),
+    };
+  }
+
+  const log = data.log || [];
+  const last = log[log.length - 1];
+  if (last && playId < Number(last.playId)) return null;
+
+  const possession = offenseIsHome ? 'home' : 'away';
+  const half = playPeriod(play);
+  const scored = scoreAfterPlay(play, offenseIsHome, last?.homeScore ?? 0, last?.awayScore ?? 0);
+  let driveId = last?.driveId ?? 1;
+  if (last && (last.drivePossession !== possession || last.half !== half)) driveId += 1;
+
+  const entry = {
+    id: String(playId),
+    playNumber: log.length + 1,
+    half,
+    down: play.down,
+    distance: play.distance,
+    yardLine: play.yard_line,
+    description,
+    yardsGained: yardsGainedForPlay(play, data.homeTeamId, data.homeAttacksRight, data.hasFortyYard),
+    homeScore: scored.home,
+    awayScore: scored.away,
+    driveId,
+    drivePossession: possession,
+    playId,
+    credits,
+  };
+
+  return {
+    ...data,
+    log: [...log, entry],
+    finalHome: scored.home,
+    finalAway: scored.away,
+  };
+}
+
+export function removeLivePlay(data, playId) {
+  if (!data?.log) return null;
+  const index = data.log.findIndex((entry) => Number(entry.playId) === Number(playId));
+  if (index === -1) return data;
+  if (index !== data.log.length - 1) return null;
+  const log = data.log.slice(0, -1);
+  const last = log[log.length - 1];
+  return {
+    ...data,
+    log,
+    finalHome: last?.homeScore ?? 0,
+    finalAway: last?.awayScore ?? 0,
   };
 }
 
@@ -363,27 +505,22 @@ export default function GameViewPage() {
   }, [id]);
 
   const handleEditCredit = useCallback(async (entry, changes) => {
-    let failure = null;
-    for (const change of changes) {
-      try {
-        await updatePlayCredit({
-          playId: entry.playId,
-          role: change.role,
-          fromPlayerId: change.fromPlayerId,
-          toPlayerId: change.toPlayerId,
-        });
-      } catch (err) {
-        failure = err;
-        break;
-      }
-    }
-    try {
-      const fresh = await fetchGameData(Number(id));
-      setData(fresh);
-    } catch (err) {
-      if (!failure) failure = err;
-    }
-    if (failure) throw failure;
+    await Promise.all(changes.map((change) => (
+      change.remove
+        ? removePlayCredit({
+            playId: entry.playId,
+            role: change.role,
+            playerId: change.fromPlayerId,
+          })
+        : updatePlayCredit({
+            playId: entry.playId,
+            role: change.role,
+            fromPlayerId: change.fromPlayerId,
+            toPlayerId: change.toPlayerId,
+          })
+    )));
+    const fresh = await fetchGameData(Number(id));
+    setData(fresh);
   }, [id]);
 
   if (loading) return (
