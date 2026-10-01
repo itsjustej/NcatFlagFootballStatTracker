@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
-import { isUnknownPlayer } from "../utils/playerName";
+import { cleanPlayerName, isUnknownPlayer } from "../utils/playerName";
 import TeamSelector from "../components/start-game/TeamSelector";
 
 export default function StartGamePage() {
@@ -12,8 +12,7 @@ export default function StartGamePage() {
   const [teams, setTeams]         = useState([]);
   const [teamA, setTeamA]         = useState(null);
   const [teamB, setTeamB]         = useState(null);
-  const [jerseyMapA, setJerseyMapA] = useState({}); // { player_id: jersey_number }
-  const [jerseyMapB, setJerseyMapB] = useState({});
+  const [jerseys, setJerseys] = useState({}); // { player_id: number | null }
   const [error, setError]               = useState("");
   const [isStarting, setIsStarting]     = useState(false);
   const [openingPossession, setOpeningPossession] = useState("home");
@@ -23,14 +22,25 @@ export default function StartGamePage() {
   useEffect(() => {
     if (!currentLeague) return;
     const fetchTeams = async () => {
-      const [teamsResult, playersResult] = await Promise.all([
+      const [teamsResult, playersResult, rosterResult] = await Promise.all([
         supabase.from("Team").select("*").eq("league_id", currentLeague.league_id),
         supabase.from("Player").select("player_id, name, team_id"),
+        supabase
+          .from("Roster")
+          .select("player_id, jersey, game_id")
+          .not("jersey", "is", null)
+          .order("game_id", { ascending: false }),
       ]);
       const { data: teamsData, error: teamsError } = teamsResult;
       const { data: playersData } = playersResult;
 
       if (teamsError) { console.error(teamsError); return; }
+      if (rosterResult.error) console.error(rosterResult.error);
+
+      const lastJersey = {};
+      for (const row of rosterResult.data || []) {
+        if (lastJersey[row.player_id] == null) lastJersey[row.player_id] = row.jersey;
+      }
 
       const formatted = teamsData.map(t => ({
         team_id: t.team_id,
@@ -41,36 +51,54 @@ export default function StartGamePage() {
       }));
 
       setTeams(formatted);
+      setJerseys(prev => {
+        const next = { ...prev };
+        for (const player of playersData || []) {
+          if (next[player.player_id] === undefined) {
+            next[player.player_id] = lastJersey[player.player_id] ?? null;
+          }
+        }
+        return next;
+      });
     };
     fetchTeams();
   }, [currentLeague]);
 
-  // Reset jersey maps when teams change
-  useEffect(() => {
-    if (!teamA) { setJerseyMapA({}); return; }
-    // Seed with jersey index from roster position so inputs aren't blank
-    setJerseyMapA(prev => {
-      const next = {};
-      teamA.players.forEach(p => { next[p.player_id] = prev[p.player_id] ?? null; });
-      return next;
-    });
-  }, [teamA]);
-
-  useEffect(() => {
-    if (!teamB) { setJerseyMapB({}); return; }
-    setJerseyMapB(prev => {
-      const next = {};
-      teamB.players.forEach(p => { next[p.player_id] = prev[p.player_id] ?? null; });
-      return next;
-    });
-  }, [teamB]);
-
-  const handleJerseyChangeA = (playerId, value) => {
-    setJerseyMapA(prev => ({ ...prev, [playerId]: value }));
+  const handleJerseyChange = (playerId, value) => {
+    setJerseys(prev => ({ ...prev, [playerId]: value }));
   };
 
-  const handleJerseyChangeB = (playerId, value) => {
-    setJerseyMapB(prev => ({ ...prev, [playerId]: value }));
+  const handleAddPlayer = async (teamId, rawName) => {
+    const name = cleanPlayerName(rawName);
+    if (!name || isUnknownPlayer(name)) {
+      setError("Enter a player name.");
+      return null;
+    }
+
+    setError("");
+    const { data, error: insertError } = await supabase
+      .from("Player")
+      .insert([{ name, team_id: teamId }])
+      .select("player_id, name")
+      .single();
+
+    if (insertError) {
+      setError(insertError.message || "Could not add that player.");
+      return null;
+    }
+
+    const player = { player_id: data.player_id, name: data.name };
+    const addToTeam = (team) => {
+      if (!team || team.team_id !== teamId) return team;
+      if (team.players.some((p) => p.player_id === player.player_id)) return team;
+      return { ...team, players: [...team.players, player] };
+    };
+
+    setTeams((prev) => prev.map(addToTeam));
+    setTeamA(addToTeam);
+    setTeamB(addToTeam);
+    setJerseys((prev) => ({ ...prev, [player.player_id]: null }));
+    return player.player_id;
   };
 
   const handleStartGame = async () => {
@@ -105,12 +133,12 @@ export default function StartGamePage() {
         ...teamA.players.map(p => ({
           game_id:   gameId,
           player_id: p.player_id,
-          jersey:    jerseyMapA[p.player_id] ?? null,
+          jersey:    jerseys[p.player_id] ?? null,
         })),
         ...teamB.players.map(p => ({
           game_id:   gameId,
           player_id: p.player_id,
-          jersey:    jerseyMapB[p.player_id] ?? null,
+          jersey:    jerseys[p.player_id] ?? null,
         })),
       ];
 
@@ -140,7 +168,7 @@ export default function StartGamePage() {
         <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2 mt-3">Start New Game</h1>
         <p className="text-slate-400 mb-8">
           {currentLeague
-            ? `${currentLeague.name} — Select teams and assign jersey numbers.`
+            ? `${currentLeague.name} — Pick the teams and enter jersey numbers. Two digits jumps to the next player. Numbers from the last game are filled in.`
             : 'Loading...'}
         </p>
 
@@ -154,15 +182,14 @@ export default function StartGamePage() {
           teams={teams}
           teamA={teamA}
           teamB={teamB}
-          jerseyMapA={jerseyMapA}
-          jerseyMapB={jerseyMapB}
+          jerseys={jerseys}
           openingPossession={openingPossession}
           homeAttacksRight={homeAttacksRight}
           hasFortyYard={hasFortyYard}
           onTeamASelect={setTeamA}
           onTeamBSelect={setTeamB}
-          onJerseyChangeA={handleJerseyChangeA}
-          onJerseyChangeB={handleJerseyChangeB}
+          onJerseyChange={handleJerseyChange}
+          onAddPlayer={handleAddPlayer}
           onOpeningPossessionChange={setOpeningPossession}
           onHomeAttacksRightChange={setHomeAttacksRight}
           onHasFortyYardChange={setHasFortyYard}

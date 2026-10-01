@@ -1,40 +1,214 @@
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   fieldLength,
   fieldMarkerLabel,
   fieldMarkerYards,
 } from '../../gameLogic';
 
-function JerseyInput({ value, onChange }) {
+function comparePlayers(a, b) {
+  const parts = (name) => String(name).trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const ap = parts(a.name);
+  const bp = parts(b.name);
+  const byFirst = (ap[0] || "").localeCompare(bp[0] || "");
+  if (byFirst !== 0) return byFirst;
+  return ap.slice(1).join(" ").localeCompare(bp.slice(1).join(" "));
+}
+
+function JerseyInput({ value, onChange, onAdvance, duplicate, inputRef, playerName }) {
   return (
     <input
-      type="number"
-      min={0}
-      max={99}
+      ref={inputRef}
+      inputMode="numeric"
+      enterKeyHint="next"
+      autoComplete="off"
+      maxLength={2}
       value={value ?? ""}
-      onChange={e => onChange(e.target.value === "" ? null : parseInt(e.target.value))}
-      onClick={e => e.target.select()}
-      onWheel={e => e.target.blur()}
+      aria-label={`Jersey number for ${playerName}`}
+      onFocus={(e) => e.target.select()}
+      onClick={(e) => e.target.select()}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+        onChange(raw === "" ? null : Number(raw));
+        if (raw.length === 2) requestAnimationFrame(onAdvance);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onAdvance();
+        }
+      }}
       placeholder="#"
-      className="w-16 min-h-11 text-center bg-slate-700 border border-slate-600 rounded-lg px-2 py-2 text-white text-base font-bold focus:outline-none focus:border-blue-400 tabular-nums"
+      title={duplicate ? "Another player already has this number" : "Type two digits to move on. Press Enter after one digit."}
+      className={`w-16 min-h-11 text-center bg-slate-700 border rounded-lg px-2 py-2 text-white text-lg font-bold focus:outline-none focus:border-blue-400 tabular-nums ${
+        duplicate ? "border-amber-400" : "border-slate-600"
+      }`}
     />
   );
 }
 
-function PlayerRosterRow({ player, jersey, onJerseyChange }) {
+function PlayerRosterRow({ player, jersey, duplicate, onJerseyChange, onAdvance, onFocus, inputRef }) {
   return (
-    <li className="flex items-center justify-between gap-3 py-2 border-b border-slate-700/50 last:border-0">
-      <div className="flex items-center gap-2 min-w-0">
+    <li className="flex items-center justify-between gap-3 py-1.5 border-b border-slate-700/50 last:border-0">
+      <button
+        type="button"
+        onClick={onFocus}
+        className="flex items-center gap-2 min-w-0 text-left flex-1"
+      >
         <span
-          className="text-xs font-black tabular-nums w-7 text-center shrink-0"
+          className="text-sm font-black tabular-nums w-8 text-center shrink-0"
           style={{ color: jersey != null ? '#60a5fa' : '#475569' }}
         >
           {jersey != null ? `#${jersey}` : '—'}
         </span>
-        <span className="text-slate-300 text-sm truncate">{player.name}</span>
-      </div>
-      <JerseyInput value={jersey} onChange={val => onJerseyChange(player.player_id, val)} />
+        <span className="text-slate-200 text-sm truncate">{player.name}</span>
+      </button>
+      <JerseyInput
+        inputRef={inputRef}
+        playerName={player.name}
+        value={jersey}
+        duplicate={duplicate}
+        onChange={(val) => onJerseyChange(player.player_id, val)}
+        onAdvance={onAdvance}
+      />
     </li>
+  );
+}
+
+function AddPlayerForm({ onAdd, onAdded }) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    try {
+      const id = await onAdd(trimmed);
+      if (id) {
+        setName("");
+        onAdded(id);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="flex gap-2 mt-3 pt-3 border-t border-slate-700">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Add a player"
+        aria-label="New player name"
+        className="flex-1 min-h-11 bg-slate-900 border border-slate-600 rounded-lg px-3 text-white text-sm focus:outline-none focus:border-blue-400"
+      />
+      <button
+        type="submit"
+        disabled={busy || !name.trim()}
+        className="min-h-11 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-40"
+      >
+        {busy ? "Adding…" : "Add"}
+      </button>
+    </form>
+  );
+}
+
+function TeamRoster({ team, jerseys, onJerseyChange, onAddPlayer }) {
+  const inputs = useRef({});
+  const refCallbacks = useRef({});
+  const [focusId, setFocusId] = useState(null);
+  const sorted = useMemo(
+    () => [...team.players].sort(comparePlayers),
+    [team.players],
+  );
+
+  const duplicateNumbers = useMemo(() => {
+    const counts = {};
+    for (const player of team.players) {
+      const number = jerseys[player.player_id];
+      if (number == null) continue;
+      counts[number] = (counts[number] || 0) + 1;
+    }
+    return new Set(
+      Object.entries(counts)
+        .filter(([, count]) => count > 1)
+        .map(([number]) => Number(number)),
+    );
+  }, [team.players, jerseys]);
+
+  const filled = team.players.filter((player) => jerseys[player.player_id] != null).length;
+
+  const refFor = (playerId) => {
+    if (!refCallbacks.current[playerId]) {
+      refCallbacks.current[playerId] = (el) => {
+        if (el) inputs.current[playerId] = el;
+        else delete inputs.current[playerId];
+      };
+    }
+    return refCallbacks.current[playerId];
+  };
+
+  const focusPlayer = (playerId) => {
+    const el = inputs.current[playerId];
+    if (!el) return false;
+    el.focus();
+    el.select();
+    el.scrollIntoView({ block: "nearest" });
+    return true;
+  };
+
+  const advanceFrom = (playerId) => {
+    const index = sorted.findIndex((player) => player.player_id === playerId);
+    const next = sorted[index + 1];
+    if (next) focusPlayer(next.player_id);
+  };
+
+  useEffect(() => {
+    if (focusId == null) return;
+    const el = inputs.current[focusId];
+    if (!el) return;
+    el.focus();
+    el.select();
+    el.scrollIntoView({ block: "nearest" });
+    setFocusId(null);
+  }, [focusId, sorted]);
+
+  return (
+    <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-1 gap-3">
+        <h3 className="text-white font-semibold truncate">{team.name}</h3>
+        <span className="text-[10px] text-slate-500 uppercase tracking-widest shrink-0">
+          {filled === team.players.length && team.players.length > 0
+            ? "✓ All set"
+            : `${filled}/${team.players.length} numbers`}
+        </span>
+      </div>
+      <p className="text-[11px] text-slate-500 mb-2">
+        Two digits moves to the next player. Enter does the same after one digit.
+      </p>
+      <ul>
+        {sorted.map((player) => {
+          const jersey = jerseys[player.player_id] ?? null;
+          return (
+            <PlayerRosterRow
+              key={player.player_id}
+              player={player}
+              jersey={jersey}
+              duplicate={jersey != null && duplicateNumbers.has(jersey)}
+              onJerseyChange={onJerseyChange}
+              onAdvance={() => advanceFrom(player.player_id)}
+              onFocus={() => focusPlayer(player.player_id)}
+              inputRef={refFor(player.player_id)}
+            />
+          );
+        })}
+      </ul>
+      <AddPlayerForm
+        onAdd={(name) => onAddPlayer(team.team_id, name)}
+        onAdded={setFocusId}
+      />
+    </div>
   );
 }
 
@@ -123,23 +297,20 @@ export default function TeamSelector({
   teams,
   teamA,
   teamB,
-  jerseyMapA,   // { player_id: number }
-  jerseyMapB,
+  jerseys,
   openingPossession,
   homeAttacksRight,
   hasFortyYard,
   onTeamASelect,
   onTeamBSelect,
-  onJerseyChangeA,
-  onJerseyChangeB,
+  onJerseyChange,
+  onAddPlayer,
   onOpeningPossessionChange,
   onHomeAttacksRightChange,
   onHasFortyYardChange,
   onNext,
   isLoading = false,
 }) {
-  const allASet = teamA?.players.every(p => jerseyMapA[p.player_id] != null);
-  const allBSet = teamB?.players.every(p => jerseyMapB[p.player_id] != null);
   const canStart = teamA && teamB && teamA.team_id !== teamB.team_id;
   const receivingIsAway = openingPossession === 'away';
   const receivingName = receivingIsAway
@@ -163,24 +334,12 @@ export default function TeamSelector({
           />
 
           {teamA && (
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-white font-semibold">{teamA.name}</h3>
-                <span className="text-[10px] text-slate-500 uppercase tracking-widest">
-                  {allASet ? '✓ All set' : 'Enter jersey #s'}
-                </span>
-              </div>
-              <ul className="space-y-0">
-                {teamA.players.map(p => (
-                  <PlayerRosterRow
-                    key={p.player_id}
-                    player={p}
-                    jersey={jerseyMapA[p.player_id] ?? null}
-                    onJerseyChange={onJerseyChangeA}
-                  />
-                ))}
-              </ul>
-            </div>
+            <TeamRoster
+              team={teamA}
+              jerseys={jerseys}
+              onJerseyChange={onJerseyChange}
+              onAddPlayer={onAddPlayer}
+            />
           )}
         </div>
 
@@ -196,24 +355,12 @@ export default function TeamSelector({
           />
 
           {teamB && (
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-white font-semibold">{teamB.name}</h3>
-                <span className="text-[10px] text-slate-500 uppercase tracking-widest">
-                  {allBSet ? '✓ All set' : 'Enter jersey #s'}
-                </span>
-              </div>
-              <ul className="space-y-0">
-                {teamB.players.map(p => (
-                  <PlayerRosterRow
-                    key={p.player_id}
-                    player={p}
-                    jersey={jerseyMapB[p.player_id] ?? null}
-                    onJerseyChange={onJerseyChangeB}
-                  />
-                ))}
-              </ul>
-            </div>
+            <TeamRoster
+              team={teamB}
+              jerseys={jerseys}
+              onJerseyChange={onJerseyChange}
+              onAddPlayer={onAddPlayer}
+            />
           )}
         </div>
 
