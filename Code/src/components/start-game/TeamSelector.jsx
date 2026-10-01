@@ -141,6 +141,11 @@ export default function TeamSelector({
   const allASet = teamA?.players.every(p => jerseyMapA[p.player_id] != null);
   const allBSet = teamB?.players.every(p => jerseyMapB[p.player_id] != null);
   const canStart = teamA && teamB && teamA.team_id !== teamB.team_id;
+  const receivingIsAway = openingPossession === 'away';
+  const receivingName = receivingIsAway
+    ? (teamB?.name ?? 'Away')
+    : (teamA?.name ?? 'Home');
+  const receivingAttacksRight = receivingIsAway ? !homeAttacksRight : homeAttacksRight;
 
   return (
     <div className="space-y-8 sm:space-y-10 pb-4">
@@ -230,7 +235,11 @@ export default function TeamSelector({
                 <button
                   key={value}
                   type="button"
-                  onClick={() => onOpeningPossessionChange(value)}
+                  onClick={() => {
+                    if (value === openingPossession) return;
+                    onOpeningPossessionChange(value);
+                    onHomeAttacksRightChange(!homeAttacksRight);
+                  }}
                   className={`text-left px-4 py-3 rounded-lg border transition ${
                     openingPossession === value
                       ? 'border-blue-500 bg-blue-600/20 text-white'
@@ -246,19 +255,19 @@ export default function TeamSelector({
 
           <div>
             <label className="block text-slate-300 text-sm font-medium mb-3">
-              Field direction (team name marks the end zone they attack)
+              Which way is {receivingName} going?
             </label>
             <div className="grid sm:grid-cols-2 gap-3">
               {[
-                { value: true,  label: 'Home attacks right', sub: `${teamA?.name ?? 'Home'} end zone on the right →` },
-                { value: false, label: 'Home attacks left',  sub: `← ${teamA?.name ?? 'Home'} end zone on the left` },
-              ].map(({ value, label, sub }) => (
+                { attacksRight: true,  label: `${receivingName} going right`, sub: `${receivingName} end zone on the right →` },
+                { attacksRight: false, label: `${receivingName} going left`,  sub: `← ${receivingName} end zone on the left` },
+              ].map(({ attacksRight, label, sub }) => (
                 <button
-                  key={String(value)}
+                  key={String(attacksRight)}
                   type="button"
-                  onClick={() => onHomeAttacksRightChange(value)}
+                  onClick={() => onHomeAttacksRightChange(receivingIsAway ? !attacksRight : attacksRight)}
                   className={`text-left px-4 py-3 rounded-lg border transition ${
-                    homeAttacksRight === value
+                    receivingAttacksRight === attacksRight
                       ? 'border-blue-500 bg-blue-600/20 text-white'
                       : 'border-slate-600 bg-slate-900/50 text-slate-300 hover:border-slate-500'
                   }`}
