@@ -34,16 +34,17 @@ function shortPlayerName(name) {
   return `${parts[0]} ${parts[lastIndex][0].toUpperCase()}.`;
 }
 
-function PlayerAvatar({ name }) {
-  const initials = (name || "?")
-    .split(" ")
-    .map(w => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+const RANK_STYLES = {
+  1: "bg-yellow-400 text-yellow-950",
+  2: "bg-slate-300 text-slate-800",
+  3: "bg-amber-700 text-amber-50",
+};
+
+function PlayerRank({ rank }) {
+  const medal = RANK_STYLES[rank] || "bg-slate-600 text-slate-200";
   return (
-    <div className="hidden sm:flex w-10 h-10 rounded-full bg-slate-600 items-center justify-center text-xs font-bold text-slate-200 shrink-0">
-      {initials}
+    <div className={`hidden sm:flex w-10 h-10 rounded-full items-center justify-center text-sm font-black tabular-nums shrink-0 ${medal}`}>
+      {rank}
     </div>
   );
 }
@@ -72,9 +73,9 @@ function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
         </div>
       </div>
       <div className="overflow-y-auto max-h-36 sm:max-h-[300px]">
-        {sorted.map((p) => (
+        {sorted.map((p, i) => (
           <div key={p.player_id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
-            <PlayerAvatar name={p.name} />
+            <PlayerRank rank={i + 1} />
             <div className="flex-1 min-w-0">
               <p className="hidden sm:block text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
               <PlayerName name={p.name} />
@@ -116,9 +117,9 @@ function PlayerLeaderCard({ title, shortTitle, players, valueKey, valueLabel, va
         </div>
       </div>
       <div className="overflow-y-auto max-h-36 sm:max-h-[300px]">
-        {sorted.map((p) => (
+        {sorted.map((p, i) => (
           <div key={p.player_id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
-            <PlayerAvatar name={p.name} />
+            <PlayerRank rank={i + 1} />
             <div className="flex-1 min-w-0">
               <p className="hidden sm:block text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
               <PlayerName name={p.name} />
