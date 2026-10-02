@@ -186,7 +186,8 @@ export default function TeamStats() {
         const tid = team.team_id;
         // eslint-disable-next-line eqeqeq
         const teamGames   = (games || []).filter(g => g.home_team == tid || g.away_team == tid);
-        const gamesPlayed = teamGames.length;
+        const playedGames = teamGames.filter((g) => !g.forfeit);
+        const gamesPlayed = playedGames.length;
 
         // eslint-disable-next-line eqeqeq
         const offPlays = (plays || []).filter(p => p.offense_team == tid && !p.is_conversion && p.play_type !== 'penalty');
@@ -195,7 +196,7 @@ export default function TeamStats() {
 
         // ── Scoring ────────────────────────────────────────────────────────
         const points = pointsForTeam(plays, tid);
-        const pointsAgainst = teamGames.reduce((sum, g) => {
+        const pointsAgainst = playedGames.reduce((sum, g) => {
           // eslint-disable-next-line eqeqeq
           const oppId = g.home_team == tid ? g.away_team : g.home_team;
           const gPlays = (plays || []).filter((p) => p.game_id === g.game_id);
@@ -231,7 +232,7 @@ export default function TeamStats() {
           (p) => fortyMap[p.game_id],
         );
 
-        const oppOffPlays = opponentOffPlaysForTeam(tid, teamGames, plays);
+        const oppOffPlays = opponentOffPlaysForTeam(tid, playedGames, plays);
         const successAgainst = computeOffenseSuccessRate(
           oppOffPlays,
           (p) => ghMap[p.game_id],
@@ -304,17 +305,17 @@ export default function TeamStats() {
         const conv3Pct      = conv3Attempts > 0 ? ((conv3Made / conv3Attempts) * 100).toFixed(1) : 0;
 
         // ── Per-game arrays for charts ─────────────────────────────────────
-        const pointsPerGame = teamGames.map(g => {
+        const pointsPerGame = playedGames.map(g => {
           const gPlays = (plays || []).filter(p => p.game_id === g.game_id);
           return pointsForTeam(gPlays, tid);
         });
-        const pointsAgainstPerGame = teamGames.map(g => {
+        const pointsAgainstPerGame = playedGames.map(g => {
           // eslint-disable-next-line eqeqeq
           const oppId  = g.home_team == tid ? g.away_team : g.home_team;
           const gPlays = (plays || []).filter(p => p.game_id === g.game_id);
           return pointsForTeam(gPlays, oppId);
         });
-        const yardsPerGame = teamGames.map(g => {
+        const yardsPerGame = playedGames.map(g => {
           // eslint-disable-next-line eqeqeq
           const gPlays = (plays || []).filter(p =>
             // eslint-disable-next-line eqeqeq
@@ -324,7 +325,7 @@ export default function TeamStats() {
           );
           return gPlays.reduce((s, p) => s + yg(p), 0);
         });
-        const yardsAgainstPerGame = teamGames.map(g => {
+        const yardsAgainstPerGame = playedGames.map(g => {
           // eslint-disable-next-line eqeqeq
           const oppId  = g.home_team == tid ? g.away_team : g.home_team;
           // eslint-disable-next-line eqeqeq
@@ -338,17 +339,34 @@ export default function TeamStats() {
         });
 
         // ── Record ─────────────────────────────────────────────────────────
-        const wins   = teamGames.filter((g, i) => pointsPerGame[i] > pointsAgainstPerGame[i]).length;
-        const losses = teamGames.filter((g, i) => pointsPerGame[i] < pointsAgainstPerGame[i]).length;
-        const ties   = teamGames.filter((g, i) => pointsPerGame[i] === pointsAgainstPerGame[i]).length;
-        const winPct = gamesPlayed > 0 ? ((wins / gamesPlayed) * 100).toFixed(1) : 0;
+        let wins = 0;
+        let losses = 0;
+        let ties = 0;
+        for (const game of teamGames) {
+          if (game.forfeit) {
+            // eslint-disable-next-line eqeqeq
+            if (game.home_team == tid) wins += 1;
+            else losses += 1;
+            continue;
+          }
+          const gamePlays = (plays || []).filter((p) => p.game_id === game.game_id);
+          const pf = pointsForTeam(gamePlays, tid);
+          // eslint-disable-next-line eqeqeq
+          const oppId = game.home_team == tid ? game.away_team : game.home_team;
+          const pa = pointsForTeam(gamePlays, oppId);
+          if (pf > pa) wins += 1;
+          else if (pf < pa) losses += 1;
+          else ties += 1;
+        }
+        const decisions = wins + losses + ties;
+        const winPct = decisions > 0 ? ((wins / decisions) * 100).toFixed(1) : 0;
 
         const thirdDownPct  = thirdDownPlays.length  > 0 ? (thirdDownConversions  / thirdDownPlays.length)  * 100 : 0;
         const fourthDownPct = fourthDownPlays.length > 0 ? (fourthDownConversions / fourthDownPlays.length) * 100 : 0;
 
         const { redZoneAttempts, redZoneScores, redZonePct } = computeRedZoneStats(
           tid,
-          teamGames,
+          playedGames,
           plays,
           (gameId) => ghMap[gameId],
           (gameId) => harMap[gameId],

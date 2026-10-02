@@ -55,6 +55,10 @@ async function fetchLeagueSeason(leagueId) {
 }
 
 /** One shared load for team stats, player stats, leaders, and the standings ticker. */
+export function invalidateLeagueSeason(leagueId) {
+  cached.delete(leagueId);
+}
+
 export function loadLeagueSeason(leagueId) {
   const hit = cached.get(leagueId);
   if (hit && Date.now() - hit.at < FRESH_MS) return Promise.resolve(hit.data);

@@ -22,25 +22,14 @@ export default function StartGamePage() {
   useEffect(() => {
     if (!currentLeague) return;
     const fetchTeams = async () => {
-      const [teamsResult, playersResult, rosterResult] = await Promise.all([
+      const [teamsResult, playersResult] = await Promise.all([
         supabase.from("Team").select("*").eq("league_id", currentLeague.league_id),
         supabase.from("Player").select("player_id, name, team_id"),
-        supabase
-          .from("Roster")
-          .select("player_id, jersey, game_id")
-          .not("jersey", "is", null)
-          .order("game_id", { ascending: false }),
       ]);
       const { data: teamsData, error: teamsError } = teamsResult;
       const { data: playersData } = playersResult;
 
       if (teamsError) { console.error(teamsError); return; }
-      if (rosterResult.error) console.error(rosterResult.error);
-
-      const lastJersey = {};
-      for (const row of rosterResult.data || []) {
-        if (lastJersey[row.player_id] == null) lastJersey[row.player_id] = row.jersey;
-      }
 
       const formatted = teamsData.map(t => ({
         team_id: t.team_id,
@@ -54,9 +43,7 @@ export default function StartGamePage() {
       setJerseys(prev => {
         const next = { ...prev };
         for (const player of playersData || []) {
-          if (next[player.player_id] === undefined) {
-            next[player.player_id] = lastJersey[player.player_id] ?? null;
-          }
+          if (next[player.player_id] === undefined) next[player.player_id] = null;
         }
         return next;
       });
@@ -168,7 +155,7 @@ export default function StartGamePage() {
         <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2 mt-3">Start New Game</h1>
         <p className="text-slate-400 mb-8">
           {currentLeague
-            ? `${currentLeague.name} — Pick the teams and enter jersey numbers. Two digits jumps to the next player. Numbers from the last game are filled in.`
+            ? `${currentLeague.name} — Pick the teams and enter jersey numbers. Two digits jumps to the next player.`
             : 'Loading...'}
         </p>
 

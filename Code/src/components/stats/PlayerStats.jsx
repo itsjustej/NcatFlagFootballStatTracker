@@ -25,7 +25,7 @@ const CATEGORIES = [
     played: (p) => p.passAttempts > 0,
     columns: [
       { key: 'passingYards', label: 'Yds' },
-      { key: 'completionPct', label: 'Comp %', render: (p) => `${fmt(p.completionPct)}% (${p.passCompletions}/${p.passAttempts})` },
+      { key: 'completionPct', label: 'Comp %', rate: true, render: (p) => `${fmt(p.completionPct)}% (${p.passCompletions}/${p.passAttempts})` },
       { key: 'passingTDs', label: 'TD' },
       { key: 'passExplosive', label: 'Expl.' },
       { key: 'interceptionsThrown', label: 'INT' },
@@ -40,7 +40,7 @@ const CATEGORIES = [
       { key: 'carries', label: 'Car' },
       { key: 'rushingTDs', label: 'TD' },
       { key: 'rushExplosive', label: 'Expl.' },
-      { key: 'yardsPerCarry', label: 'Yds/Car', render: (p) => fmt(p.yardsPerCarry) },
+      { key: 'yardsPerCarry', label: 'Yds/Car', rate: true, render: (p) => fmt(p.yardsPerCarry) },
     ],
   },
   {
@@ -52,7 +52,7 @@ const CATEGORIES = [
       { key: 'receptions', label: 'Rec' },
       { key: 'receivingTDs', label: 'TD' },
       { key: 'recExplosive', label: 'Expl.' },
-      { key: 'yardsPerReception', label: 'Yds/Rec', render: (p) => fmt(p.yardsPerReception) },
+      { key: 'yardsPerReception', label: 'Yds/Rec', rate: true, render: (p) => fmt(p.yardsPerReception) },
       { key: 'conversionsCaught', label: 'Conv' },
     ],
   },
@@ -79,6 +79,7 @@ export default function PlayerStats() {
   const [sortKey, setSortKey] = useState('name');
   const [sortAsc, setSortAsc] = useState(true);
   const [category, setCategory] = useState('passing');
+  const [perGame, setPerGame] = useState(false);
 
   const handleSort = (key) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -86,11 +87,31 @@ export default function PlayerStats() {
   };
 
   const activeCategory = CATEGORIES.find((item) => item.id === category) ?? CATEGORIES[0];
+
+  const statValue = (player, key) => {
+    const col = activeCategory.columns.find((item) => item.key === key);
+    const value = player[key];
+    if (perGame && col && !col.rate && typeof value === 'number') {
+      return player.gamesPlayed > 0 ? value / player.gamesPlayed : 0;
+    }
+    return value;
+  };
+
+  const cellText = (player, col) => {
+    if (col.rate && col.render) return col.render(player);
+    if (perGame && !col.rate && typeof player[col.key] === 'number') {
+      const value = statValue(player, col.key);
+      return typeof value === 'number' ? value.toFixed(1) : value;
+    }
+    return col.render ? col.render(player) : player[col.key];
+  };
+
   const visiblePlayers = activeCategory.played
     ? players.filter(activeCategory.played)
     : players;
   const sortedPlayers = [...visiblePlayers].sort((a, b) => {
-    const av = a[sortKey], bv = b[sortKey];
+    const av = statValue(a, sortKey);
+    const bv = statValue(b, sortKey);
     if (typeof av === 'string') return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
     return sortAsc ? av - bv : bv - av;
   });
@@ -234,16 +255,38 @@ export default function PlayerStats() {
       <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 border-b border-slate-700">
           <h2 className="text-2xl font-bold text-white shrink-0">Player Statistics</h2>
-          <div className="relative w-full sm:w-auto sm:min-w-[220px] shrink-0">
-            <select
-              className="w-full px-4 py-2.5 pr-10 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-              value={teamId}
-              onChange={e => setTeamId(e.target.value)}
-            >
-              <option value="">Select a team</option>
-              {teams.map(t => <option key={t.team_id} value={t.team_id}>{t.name}</option>)}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+          <div className="flex flex-col items-stretch sm:items-end gap-2 w-full sm:w-auto sm:min-w-[220px] shrink-0">
+            <div className="relative w-full">
+              <select
+                className="w-full px-4 py-2.5 pr-10 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                value={teamId}
+                onChange={e => setTeamId(e.target.value)}
+              >
+                <option value="">Select a team</option>
+                {teams.map(t => <option key={t.team_id} value={t.team_id}>{t.name}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+            </div>
+            <div className="flex rounded-lg border border-slate-600 overflow-hidden self-end">
+              <button
+                type="button"
+                onClick={() => setPerGame(false)}
+                className={`px-3 py-1.5 text-xs font-semibold ${
+                  perGame ? 'text-slate-400 hover:text-white' : 'bg-blue-600 text-white'
+                }`}
+              >
+                Totals
+              </button>
+              <button
+                type="button"
+                onClick={() => setPerGame(true)}
+                className={`px-3 py-1.5 text-xs font-semibold ${
+                  perGame ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Per game
+              </button>
+            </div>
           </div>
         </div>
 
@@ -311,7 +354,7 @@ export default function PlayerStats() {
                             index === 0 ? 'border-l border-slate-700/80' : ''
                           } ${index === activeCategory.columns.length - 1 ? 'pr-3' : ''}`}
                         >
-                          {col.render ? col.render(p) : p[col.key]}
+                          {cellText(p, col)}
                         </td>
                       ))}
                     </tr>

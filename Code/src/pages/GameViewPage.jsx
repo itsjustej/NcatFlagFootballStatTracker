@@ -110,6 +110,7 @@ export async function fetchGameData(gameId) {
     .from('Game')
     .select(`
       game_id,
+      forfeit,
       home_attacks_right,
       has_forty_yard,
       home:Team!home_team(
@@ -198,6 +199,7 @@ export async function fetchGameData(gameId) {
       .filter((p) => p.team_id === gameRow.away.team_id)
       .map((p) => computePlayerBoxStats(p, [], [], homeTeamId, homeAttacksRight, hasFortyYard)),
     ...rosters,
+    forfeit: gameRow.forfeit === true,
   };
 
   if (!plays.length) return emptyBox;
@@ -324,6 +326,7 @@ export async function fetchGameData(gameId) {
     homePlayers,
     awayPlayers,
     ...rosters,
+    forfeit: gameRow.forfeit === true,
   };
 }
 
@@ -538,6 +541,7 @@ export default function GameViewPage() {
   const {
     homeName, awayName, log, finalHome, finalAway, periodScores,
     homeStats, awayStats, homePlayers, awayPlayers, homeRoster, awayRoster,
+    forfeit,
   } = data;
 
   const handleResume = () => {
@@ -577,7 +581,7 @@ export default function GameViewPage() {
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            {canFillPlayers && (
+            {canFillPlayers && !forfeit && (
               <Link
                 to={`/games/${id}/credits`}
                 className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg text-amber-300 text-sm font-semibold border border-amber-500/40 hover:bg-amber-500/10 transition-colors"
@@ -585,7 +589,7 @@ export default function GameViewPage() {
                 Fill in players
               </Link>
             )}
-            {canTrackGames && (
+            {canTrackGames && !forfeit && (
               <button
                 type="button"
                 onClick={handleResume}
@@ -602,10 +606,12 @@ export default function GameViewPage() {
           <div className="grid grid-cols-3 items-center gap-4">
             <div className="text-center">
               <p className="text-[11px] font-black uppercase tracking-widest text-[#3b82f6] mb-1">{homeName}</p>
-              <p className="text-5xl font-black text-white tabular-nums">{finalHome}</p>
+              <p className="text-5xl font-black text-white tabular-nums">{forfeit ? "W" : finalHome}</p>
             </div>
             <div className="flex justify-center">
-              {log.length ? (
+              {forfeit ? (
+                <p className="text-slate-400 text-xs font-black uppercase tracking-widest text-center">Forfeit</p>
+              ) : log.length ? (
                 <div
                   className="grid items-center gap-x-3 gap-y-1 text-center"
                   style={{ gridTemplateColumns: `repeat(${periodScores.length}, minmax(1.75rem, auto))` }}
@@ -632,11 +638,17 @@ export default function GameViewPage() {
             </div>
             <div className="text-center">
               <p className="text-[11px] font-black uppercase tracking-widest text-[#C9A84C] mb-1">{awayName}</p>
-              <p className="text-5xl font-black text-white tabular-nums">{finalAway}</p>
+              <p className="text-5xl font-black text-white tabular-nums">{forfeit ? "L" : finalAway}</p>
             </div>
           </div>
         </div>
 
+        {forfeit ? (
+          <p className="text-sm text-slate-400">
+            This result is in the standings only. It does not count as a game played, and it does not change averages or power rankings.
+          </p>
+        ) : (
+        <>
         <div className="flex bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden shrink-0">
           <ViewTab label="Plays" icon={List} active={tab === "plays"} onClick={() => setTab("plays")} />
           <ViewTab label="Team" icon={BarChart3} active={tab === "team"} onClick={() => setTab("team")} />
@@ -681,6 +693,8 @@ export default function GameViewPage() {
             </div>
           )}
         </div>
+        </>
+        )}
 
       </div>
 

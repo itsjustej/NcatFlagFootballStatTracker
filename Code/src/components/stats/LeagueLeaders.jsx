@@ -250,7 +250,7 @@ export default function LeagueLeaders() {
       // ── PLAYER STATS ──────────────────────────────────────────────────────
       const teamHasPlayed = (teamId) => (games || []).some(
         // eslint-disable-next-line eqeqeq
-        (g) => g.home_team == teamId || g.away_team == teamId,
+        (g) => !g.forfeit && (g.home_team == teamId || g.away_team == teamId),
       );
 
       const computedPlayers = (players || [])
@@ -289,7 +289,7 @@ export default function LeagueLeaders() {
 
         const round2 = (n) => Math.round(n * 100) / 100;
         const passingFanPts = round2(passingTDs * 4 + passingYards / 25 - interceptionsThrown);
-        const rushingFanPts = round2(rushingTDs * 4 + rushingYards * 0.1);
+        const rushingFanPts = round2(rushingTDs * 2 + rushingYards * 0.1);
         const receivingFanPts = round2(receivingTDs * 4 + receivingYards * 0.1 + receptions);
 
         const interceptions    = countPlayerInterceptions(pid, participants, plays);
@@ -324,7 +324,7 @@ export default function LeagueLeaders() {
       const computedTeams = (teams || []).filter((team) => teamHasPlayed(team.team_id)).map(team => {
         const tid = team.team_id;
         // eslint-disable-next-line eqeqeq
-        const teamGames  = (games || []).filter(g => g.home_team == tid || g.away_team == tid);
+        const teamGames  = (games || []).filter(g => !g.forfeit && (g.home_team == tid || g.away_team == tid));
         const gamesPlayed = teamGames.length;
 
         // eslint-disable-next-line eqeqeq

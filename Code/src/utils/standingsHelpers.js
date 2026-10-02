@@ -6,6 +6,11 @@ export function formatRecord(wins, losses, ties = 0) {
   return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
 }
 
+/** A forfeit updates the record only. The winner is stored as the home team. */
+export function isForfeitGame(game) {
+  return game?.forfeit === true;
+}
+
 /** League standings sorted by win %, then point differential. */
 export function computeLeagueStandings(teams, games, plays) {
   const leagueGameIds = new Set((games || []).map((g) => g.game_id));
@@ -16,29 +21,39 @@ export function computeLeagueStandings(teams, games, plays) {
     const teamGames = (games || []).filter(
       (g) => g.home_team == tid || g.away_team == tid,
     );
-    const gamesPlayed = teamGames.length;
+    const playedGames = teamGames.filter((g) => !isForfeitGame(g));
+    const gamesPlayed = playedGames.length;
 
-    const pointsPerGame = teamGames.map((g) => {
+    const pointsPerGame = playedGames.map((g) => {
       const gp = leaguePlays.filter((p) => p.game_id === g.game_id);
       return pointsForTeam(gp, tid);
     });
 
-    const pointsAgainstPerGame = teamGames.map((g) => {
+    const pointsAgainstPerGame = playedGames.map((g) => {
       const oppId = g.home_team == tid ? g.away_team : g.home_team;
       const gp = leaguePlays.filter((p) => p.game_id === g.game_id);
       return pointsForTeam(gp, oppId);
     });
 
-    const wins = teamGames.filter(
-      (g, i) => pointsPerGame[i] > pointsAgainstPerGame[i],
-    ).length;
-    const losses = teamGames.filter(
-      (g, i) => pointsPerGame[i] < pointsAgainstPerGame[i],
-    ).length;
-    const ties = teamGames.filter(
-      (g, i) => pointsPerGame[i] === pointsAgainstPerGame[i],
-    ).length;
-    const winPct = gamesPlayed > 0 ? wins / gamesPlayed : 0;
+    let wins = 0;
+    let losses = 0;
+    let ties = 0;
+    for (const game of teamGames) {
+      if (isForfeitGame(game)) {
+        if (game.home_team == tid) wins += 1;
+        else losses += 1;
+        continue;
+      }
+      const gp = leaguePlays.filter((p) => p.game_id === game.game_id);
+      const pf = pointsForTeam(gp, tid);
+      const oppId = game.home_team == tid ? game.away_team : game.home_team;
+      const pa = pointsForTeam(gp, oppId);
+      if (pf > pa) wins += 1;
+      else if (pf < pa) losses += 1;
+      else ties += 1;
+    }
+    const decisions = wins + losses + ties;
+    const winPct = decisions > 0 ? wins / decisions : 0;
     const pointsFor = pointsPerGame.reduce((sum, n) => sum + n, 0);
     const pointsAgainst = pointsAgainstPerGame.reduce((sum, n) => sum + n, 0);
 
@@ -55,7 +70,7 @@ export function computeLeagueStandings(teams, games, plays) {
       pointDiff: pointsFor - pointsAgainst,
       record: formatRecord(wins, losses, ties),
     };
-  }).filter((row) => row.gamesPlayed > 0);
+  }).filter((row) => row.wins + row.losses + row.ties > 0);
 
   rows.sort((a, b) => {
     if (b.winPct !== a.winPct) return b.winPct - a.winPct;
@@ -78,7 +93,8 @@ function clampMargin(margin) {
  * Ratings are centered so teams that have played average 0.
  */
 export function computePowerRankings(teams, games, plays) {
-  const standings = computeLeagueStandings(teams, games, plays);
+  const standings = computeLeagueStandings(teams, games, plays)
+    .filter((row) => row.gamesPlayed > 0);
   if (standings.length === 0) return [];
 
   const leagueGameIds = new Set((games || []).map((g) => g.game_id));
@@ -87,6 +103,7 @@ export function computePowerRankings(teams, games, plays) {
 
   const matchups = [];
   for (const game of games || []) {
+    if (isForfeitGame(game)) continue;
     const home = String(game.home_team);
     const away = String(game.away_team);
     if (!playedIds.has(home) || !playedIds.has(away)) continue;
