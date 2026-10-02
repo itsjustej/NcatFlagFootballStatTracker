@@ -11,7 +11,7 @@ export function isForfeitGame(game) {
   return game?.forfeit === true;
 }
 
-/** League standings sorted by win %, then point differential. */
+/** League standings sorted by win %, then wins, then fewer losses, then point differential. */
 export function computeLeagueStandings(teams, games, plays) {
   const leagueGameIds = new Set((games || []).map((g) => g.game_id));
   const leaguePlays = (plays || []).filter((p) => leagueGameIds.has(p.game_id));
@@ -74,6 +74,8 @@ export function computeLeagueStandings(teams, games, plays) {
 
   rows.sort((a, b) => {
     if (b.winPct !== a.winPct) return b.winPct - a.winPct;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    if (a.losses !== b.losses) return a.losses - b.losses;
     if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
     return a.name.localeCompare(b.name);
   });
