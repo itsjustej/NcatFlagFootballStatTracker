@@ -40,11 +40,10 @@ export default function StartGamePage() {
       }));
 
       setTeams(formatted);
-      setJerseys(prev => {
-        const next = { ...prev };
-        for (const player of playersData || []) {
-          if (next[player.player_id] === undefined) next[player.player_id] = null;
-        }
+      // A new game never inherits jersey numbers. Ignore anything already in state.
+      setJerseys(() => {
+        const next = {};
+        for (const player of playersData || []) next[player.player_id] = null;
         return next;
       });
     };

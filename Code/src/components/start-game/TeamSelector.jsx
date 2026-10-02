@@ -14,17 +14,33 @@ function comparePlayers(a, b) {
   return ap.slice(1).join(" ").localeCompare(bp.slice(1).join(" "));
 }
 
-function JerseyInput({ value, onChange, onAdvance, duplicate, inputRef, playerName }) {
+function JerseyInput({ value, onChange, onAdvance, duplicate, inputRef, playerName, playerId }) {
+  const [editable, setEditable] = useState(false);
   return (
     <input
       ref={inputRef}
       inputMode="numeric"
       enterKeyHint="next"
       autoComplete="off"
+      autoCorrect="off"
+      spellCheck={false}
+      readOnly={!editable}
+      name={`new-game-jersey-${playerId}`}
       maxLength={2}
       value={value ?? ""}
-      aria-label={`Jersey number for ${playerName}`}
-      onFocus={(e) => e.target.select()}
+      aria-label={`This game's jersey for ${playerName}`}
+      data-1p-ignore="true"
+      data-lpignore="true"
+      data-form-type="other"
+      onPointerDown={(e) => {
+        setEditable(true);
+        e.target.readOnly = false;
+      }}
+      onFocus={(e) => {
+        setEditable(true);
+        e.target.readOnly = false;
+        e.target.select();
+      }}
       onClick={(e) => e.target.select()}
       onChange={(e) => {
         const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
@@ -65,6 +81,7 @@ function PlayerRosterRow({ player, jersey, duplicate, onJerseyChange, onAdvance,
       <JerseyInput
         inputRef={inputRef}
         playerName={player.name}
+        playerId={player.player_id}
         value={jersey}
         duplicate={duplicate}
         onChange={(val) => onJerseyChange(player.player_id, val)}
@@ -187,6 +204,7 @@ function TeamRoster({ team, jerseys, onJerseyChange, onAddPlayer }) {
       <p className="text-[11px] text-slate-500 mb-2">
         Two digits moves to the next player. Enter does the same after one digit.
       </p>
+      <form autoComplete="off" onSubmit={(e) => e.preventDefault()}>
       <ul>
         {sorted.map((player) => {
           const jersey = jerseys[player.player_id] ?? null;
@@ -204,6 +222,7 @@ function TeamRoster({ team, jerseys, onJerseyChange, onAddPlayer }) {
           );
         })}
       </ul>
+      </form>
       <AddPlayerForm
         onAdd={(name) => onAddPlayer(team.team_id, name)}
         onAdded={setFocusId}
