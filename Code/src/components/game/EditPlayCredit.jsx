@@ -1,9 +1,11 @@
 import { useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { possessionColor } from '../../constants/teamColors';
+import { sortByJersey } from '../../context/useGame';
 import { playerFirstName } from '../../utils/playerName';
 import { isOffenseRole, ROLE_LABELS } from '../../utils/playCredit';
 import { isUnknownPlayer } from '../../utils/playerName';
+import { withUnknownLast } from '../../utils/unknownPlayer';
 
 function sideForRole(role, drivePossession) {
   const offenseSide = drivePossession === 'away' ? 'away' : 'home';
@@ -25,6 +27,7 @@ const ASK = {
 };
 
 function NameButton({ player, accent, disabled, onClick }) {
+  const unknown = isUnknownPlayer(player);
   return (
     <button
       type="button"
@@ -32,10 +35,12 @@ function NameButton({ player, accent, disabled, onClick }) {
       onClick={onClick}
       className="min-h-16 flex flex-col items-center justify-center rounded-xl border border-white/10 bg-slate-800 active:scale-95 disabled:opacity-30"
     >
-      <span className="text-base font-black leading-none" style={{ color: accent }}>
-        {player.number != null ? player.number : '—'}
-      </span>
-      <span className="mt-1 text-[11px] font-bold text-white leading-tight text-center px-1 truncate w-full">
+      {!unknown && (
+        <span className="text-base font-black leading-none" style={{ color: accent }}>
+          {player.number != null ? player.number : '—'}
+        </span>
+      )}
+      <span className={`${unknown ? '' : 'mt-1 '}text-[11px] font-bold text-white leading-tight text-center px-1 truncate w-full`}>
         {playerFirstName(player.name)}
       </span>
     </button>
@@ -46,7 +51,6 @@ function QuickFill({
   entry,
   credit,
   players,
-  recent,
   taken,
   step,
   total,
@@ -85,19 +89,6 @@ function QuickFill({
             No flag pull
           </button>
         )}
-        {recent.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 mb-2">
-            {recent.map((player) => (
-              <NameButton
-                key={`recent-${player.id}`}
-                player={player}
-                accent={accent}
-                disabled={taken.has(player.id)}
-                onClick={() => onPick(player)}
-              />
-            ))}
-          </div>
-        )}
         <div className="grid grid-cols-3 gap-2">
           {players.map((player) => (
             <NameButton
@@ -120,14 +111,11 @@ function QuickFill({
 
 function CreditPicker({ role, credit, players, selectedId, takenIds, accent, disabled, allowClear, onSelect }) {
   const pool = useMemo(() => {
-    const list = players ?? [];
+    const list = [...(players ?? [])];
     if (credit && !list.some((p) => p.id === String(credit.playerId))) {
-      return [
-        { id: String(credit.playerId), name: credit.playerName, number: null },
-        ...list,
-      ];
+      list.push({ id: String(credit.playerId), name: credit.playerName, number: null });
     }
-    return list;
+    return withUnknownLast(sortByJersey(list));
   }, [players, credit]);
 
   return (
@@ -192,8 +180,6 @@ export default function EditPlayCredit({
   onSave,
   onClose,
   onFinished,
-  onRemember,
-  recentIds = [],
   focusMissing = false,
 }) {
   const [draft, setDraft] = useState(() =>
@@ -228,7 +214,6 @@ export default function EditPlayCredit({
           fromName: credit.playerName,
           remove: true,
         };
-    if (player) onRemember?.(player.id);
     const still = missing.filter((item) => item.role !== credit.role && !doneRoles.includes(item.role));
     setDoneRoles((prev) => [...prev, credit.role]);
     setDraft((prev) => ({ ...prev, [credit.role]: player ? String(player.id) : '' }));
@@ -250,12 +235,9 @@ export default function EditPlayCredit({
         </div>
       );
     }
-    const roster = (rosterFor(current.role, entry, homePlayers, awayPlayers) || [])
-      .filter((player) => !isUnknownPlayer(player));
-    const recent = recentIds
-      .map((id) => roster.find((player) => player.id === String(id)))
-      .filter(Boolean);
-    const recentSet = new Set(recent.map((player) => player.id));
+    const fullRoster = withUnknownLast(sortByJersey(
+      rosterFor(current.role, entry, homePlayers, awayPlayers) || [],
+    ));
     const unknownIds = new Set(
       missing.map((credit) => String(credit.playerId)),
     );
@@ -268,8 +250,7 @@ export default function EditPlayCredit({
       <QuickFill
         entry={entry}
         credit={current}
-        players={roster.filter((player) => !recentSet.has(player.id))}
-        recent={recent}
+        players={fullRoster}
         taken={taken}
         step={doneRoles.length + 1}
         total={missing.length}

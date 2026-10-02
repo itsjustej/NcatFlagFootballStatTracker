@@ -65,7 +65,6 @@ export default function FillPlayersPage() {
   const [error, setError] = useState('');
   const [view, setView] = useState('queue');
   const [editing, setEditing] = useState(null);
-  const [recentIds, setRecentIds] = useState([]);
   const loadedRef = useRef(false);
   const dataRef = useRef(null);
   const inflightRef = useRef(new Map());
@@ -135,11 +134,6 @@ export default function FillPlayersPage() {
 
   const connected = useLivePlays(gameId, onLive);
   dataRef.current = data;
-
-  const remember = useCallback((playerId) => {
-    const key = String(playerId);
-    setRecentIds((prev) => [key, ...prev.filter((id) => id !== key)].slice(0, 8));
-  }, []);
 
   const handleFinished = useCallback((entry) => {
     const log = dataRef.current?.log || [];
@@ -293,8 +287,6 @@ export default function FillPlayersPage() {
           onClose={() => setEditing(null)}
           onSave={(changes) => handleEditCredit(editing, changes)}
           onFinished={handleFinished}
-          onRemember={remember}
-          recentIds={recentIds}
           focusMissing
         />
       )}
