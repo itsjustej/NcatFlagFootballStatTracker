@@ -170,29 +170,30 @@ export default function GameHistoryPage() {
                 {games.map((g) => (
                   <div
                     key={g.game_id}
-                    className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col hover:border-slate-500 transition-colors"
+                    className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col h-full hover:border-slate-500 transition-colors"
                   >
                     <Link
                       to={`/games/${g.game_id}`}
-                      className="p-4 flex flex-col gap-3 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                      className="p-4 flex flex-col h-full hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                     >
-                      {g.forfeit && (
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Forfeit</p>
-                      )}
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2 h-7">
                         <span className={`truncate flex-1 text-sm ${g.home_won ? "text-green-400 font-bold" : "text-white font-medium"}`}>
                           {truncate(g.home_team.name)}
                         </span>
-                        <span className={`font-bold tabular-nums shrink-0 ${g.home_won ? "text-green-400 text-xl" : "text-white text-lg"}`}>
+                        <span className={`w-8 text-right font-bold tabular-nums shrink-0 text-xl leading-none ${g.home_won ? "text-green-400" : "text-white"}`}>
                           {g.forfeit ? "W" : g.home_points}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between gap-2">
+                      <p className="h-4 my-1.5 text-center text-[10px] font-black uppercase tracking-widest text-slate-500 leading-4">
+                        {g.forfeit ? "Forfeit" : "\u00a0"}
+                      </p>
+
+                      <div className="flex items-center justify-between gap-2 h-7">
                         <span className={`truncate flex-1 text-sm ${g.away_won ? "text-green-400 font-bold" : "text-white font-medium"}`}>
                           {truncate(g.away_team.name)}
                         </span>
-                        <span className={`font-bold tabular-nums shrink-0 ${g.away_won ? "text-green-400 text-xl" : "text-white text-lg"}`}>
+                        <span className={`w-8 text-right font-bold tabular-nums shrink-0 text-xl leading-none ${g.away_won ? "text-green-400" : "text-white"}`}>
                           {g.forfeit ? "L" : g.away_points}
                         </span>
                       </div>

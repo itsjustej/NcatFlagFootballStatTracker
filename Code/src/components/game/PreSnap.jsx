@@ -188,7 +188,14 @@ export default function PreSnap({
             QB
           </span>
           <span className="text-sm font-bold text-white truncate">
-            {selectedOffender ? playerFirstName(selectedOffender.name) : 'Pick passer'}
+            {selectedOffender ? (
+              <>
+                {selectedOffender.number != null && !isUnknownPlayer(selectedOffender) && (
+                  <span className="md:hidden tabular-nums">#{selectedOffender.number} </span>
+                )}
+                {playerFirstName(selectedOffender.name)}
+              </>
+            ) : 'Pick passer'}
           </span>
         </span>
         <span className="text-xs font-bold text-slate-300 shrink-0">Change</span>
