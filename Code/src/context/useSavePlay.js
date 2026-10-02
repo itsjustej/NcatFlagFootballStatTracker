@@ -117,7 +117,7 @@ export async function savePlay(gs, entry, { passer, receiver, defender, rusher, 
     if (receiver) {
       participants.push({ player_id: parseInt(receiver.id, 10), role: 'receiver' });
     }
-    if (defender) {
+    if (defender && outcome !== 'td') {
       participants.push({
         player_id: parseInt(defender.id, 10),
         role: participantRole(outcome, 'defender'),

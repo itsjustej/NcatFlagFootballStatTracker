@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { possessionColor } from '../../constants/teamColors';
 import { sortByJersey } from '../../context/useGame';
 import { playerFirstName } from '../../utils/playerName';
-import { isOffenseRole, ROLE_LABELS } from '../../utils/playCredit';
+import { creditsNeedingPlayers, isOffenseRole, isOffensiveTouchdown, ROLE_LABELS } from '../../utils/playCredit';
 import { isUnknownPlayer } from '../../utils/playerName';
 import { withUnknownLast } from '../../utils/unknownPlayer';
 
@@ -191,9 +191,12 @@ export default function EditPlayCredit({
   const [doneRoles, setDoneRoles] = useState([]);
   const doneRef = useRef([]);
 
-  const missing = (entry.credits || []).filter((credit) => isUnknownPlayer(credit.playerName));
-  const filled = (entry.credits || []).filter((credit) => !isUnknownPlayer(credit.playerName));
-  const visible = focusMissing && !showFilled && missing.length ? missing : (entry.credits || []);
+  const credits = (entry.credits || []).filter(
+    (credit) => !(credit.role === 'defender' && isOffensiveTouchdown(entry)),
+  );
+  const missing = creditsNeedingPlayers({ ...entry, credits });
+  const filled = credits.filter((credit) => !isUnknownPlayer(credit.playerName));
+  const visible = focusMissing && !showFilled && missing.length ? missing : credits;
   const remaining = missing.filter((credit) => !doneRoles.includes(credit.role));
   const current = remaining[0];
 

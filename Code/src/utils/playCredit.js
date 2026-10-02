@@ -17,8 +17,24 @@ export function isOffenseRole(role) {
   return OFFENSE_ROLES.has(role);
 }
 
+/** An offensive score. A pick-six is an interception, not a flag pull. */
+export function isOffensiveTouchdown(entry) {
+  if (entry?._outcome === 'td') return true;
+  const text = String(entry?.description || '');
+  if (/interception/i.test(text)) return false;
+  return /\btouchdown\b/i.test(text);
+}
+
+export function creditsNeedingPlayers(entry) {
+  return (entry?.credits || []).filter((credit) => {
+    if (!isUnknownPlayer(credit?.playerName ?? '')) return false;
+    if (credit.role === 'defender' && isOffensiveTouchdown(entry)) return false;
+    return true;
+  });
+}
+
 export function playNeedsPlayers(entry) {
-  return (entry?.credits || []).some((credit) => isUnknownPlayer(credit?.playerName ?? ''));
+  return creditsNeedingPlayers(entry).length > 0;
 }
 
 export function sortCredits(credits) {
@@ -53,10 +69,12 @@ export function creditsFromLogEntry(entry) {
   push('passer', entry._passer);
   push('receiver', entry._receiver);
   push('rusher', entry._rusher);
-  const defRole = entry._outcome === 'interception' || entry._outcome === 'pick_6'
-    ? 'interceptor'
-    : 'defender';
-  push(defRole, entry._defender);
+  if (entry._outcome !== 'td') {
+    const defRole = entry._outcome === 'interception' || entry._outcome === 'pick_6'
+      ? 'interceptor'
+      : 'defender';
+    push(defRole, entry._defender);
+  }
   return sortCredits(credits);
 }
 

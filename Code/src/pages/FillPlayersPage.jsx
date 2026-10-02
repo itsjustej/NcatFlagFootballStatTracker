@@ -3,8 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import PlayByPlay from '../components/game/PlayByPlay';
 import EditPlayCredit from '../components/game/EditPlayCredit';
 import { fetchGameData, fetchPlayBundle, mergeLivePlay, removeLivePlay } from './GameViewPage';
-import { updatePlayCredit, removePlayCredit, playNeedsPlayers, ROLE_LABELS, swapCreditName, stripDefenderFromDescription } from '../utils/playCredit';
-import { isUnknownPlayer } from '../utils/playerName';
+import { updatePlayCredit, removePlayCredit, creditsNeedingPlayers, playNeedsPlayers, ROLE_LABELS, swapCreditName, stripDefenderFromDescription } from '../utils/playCredit';
 import { useLivePlays } from '../utils/liveGame';
 import { possessionColor, TEAM_COLORS } from '../constants/teamColors';
 
@@ -16,7 +15,7 @@ function downStr(down, dist) {
 }
 
 function missingCredits(entry) {
-  return (entry.credits || []).filter((credit) => isUnknownPlayer(credit.playerName));
+  return creditsNeedingPlayers(entry);
 }
 
 function PlayCard({ entry, homeName, awayName, onFill }) {
