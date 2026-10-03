@@ -289,7 +289,7 @@ export default function LeagueLeaders() {
         const receivingTDs   = receiverData.filter(p => p.outcome === 'td').length;
 
         const round2 = (n) => Math.round(n * 100) / 100;
-        const passingFanPts = round2(passingTDs * 4 + passingYards / 25 - interceptionsThrown);
+        const passingFanPts = round2(passingTDs * 2.5 + passingYards / 25 - interceptionsThrown);
         const rushingFanPts = round2(rushingTDs * 2 + rushingYards * 0.1);
         const receivingFanPts = round2(receivingTDs * 4 + receivingYards * 0.1 + receptions);
 
