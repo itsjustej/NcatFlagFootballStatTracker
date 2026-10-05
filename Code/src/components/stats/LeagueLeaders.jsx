@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { loadLeagueSeason } from "../../utils/leagueSeason";
 import { useLeague } from "../../context/LeagueContext";
 import { isUnknownPlayer } from "../../utils/playerName";
@@ -79,12 +79,14 @@ function MobilePlayerIdentity({ rank, name, team, trailing = null }) {
 }
 
 function MobileStatStrip({ stats }) {
+  const dense = stats.length >= 4;
+  const cols = dense ? "grid-cols-4 gap-1" : stats.length > 1 ? "grid-cols-3 gap-1.5" : "grid-cols-1";
   return (
-    <div className={`mt-2.5 ml-11 grid gap-1.5 ${stats.length > 1 ? "grid-cols-3" : "grid-cols-1"}`}>
+    <div className={`mt-2.5 ml-11 grid ${cols}`}>
       {stats.map((stat) => (
-        <div key={stat.key} className="rounded-md bg-slate-800/90 px-2 py-1.5 text-center min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-none">{stat.label}</p>
-          <p className="mt-1 text-sm font-bold text-white tabular-nums leading-none">{stat.value}</p>
+        <div key={stat.key} className={`rounded-md bg-slate-800/90 text-center min-w-0 ${dense ? "px-0.5 py-1.5" : "px-2 py-1.5"}`}>
+          <p className={`font-bold uppercase text-slate-500 leading-none ${dense ? "text-[9px] tracking-wide" : "text-[10px] tracking-wider"}`}>{stat.label}</p>
+          <p className={`mt-1 font-bold text-white tabular-nums leading-none ${dense ? "text-xs" : "text-sm"}`}>{stat.value}</p>
         </div>
       ))}
     </div>
@@ -109,7 +111,7 @@ function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
           ))}
         </div>
       </div>
-      <div className="overflow-y-auto max-h-[28rem] lg:max-h-[300px]">
+      <div>
         {sorted.map((p, i) => (
           <div key={p.player_id} className="border-b border-slate-700/50 last:border-b-0">
             <div className="lg:hidden px-3 py-3">
@@ -117,7 +119,7 @@ function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
               <MobileStatStrip
                 stats={secondary.map(s => ({
                   key: s.key,
-                  label: s.label,
+                  label: secondary.length > 3 ? (s.short || s.label) : s.label,
                   value: statText(p, s),
                 }))}
               />
@@ -162,7 +164,7 @@ function PlayerLeaderCard({ title, players, valueKey, valueLabel, digits = 0, su
           <span className="w-14 text-right">{valueLabel}</span>
         </div>
       </div>
-      <div className="overflow-y-auto max-h-[28rem] lg:max-h-[300px]">
+      <div>
         {sorted.map((p, i) => (
           <div key={p.player_id} className="border-b border-slate-700/50 last:border-b-0">
             <div className="lg:hidden px-3 py-3">
@@ -244,12 +246,6 @@ function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lower
   );
 }
 
-function SectionHeader({ title }) {
-  return (
-    <h3 className="text-xs sm:text-sm font-bold text-slate-300 uppercase tracking-widest mb-2 sm:mb-4">{title}</h3>
-  );
-}
-
 const VIEWS = [
   { key: "players", label: "Individual" },
   { key: "offense", label: "Offense" },
@@ -276,12 +272,193 @@ function ViewToggle({ view, setView }) {
   );
 }
 
+const LEADER_TABS = {
+  players: [
+    {
+      key: "passing",
+      label: "Passing",
+      card: "player-multi",
+      title: "Passing",
+      sortKey: "passingFanPts",
+      secondary: [
+        { key: "completionPct", label: "COMP%", short: "CMP", digits: 0, suffix: "%" },
+        { key: "passingYpg", label: "YDS/G", short: "YPG", digits: 1 },
+        { key: "yardsPerAttempt", label: "YDS/A", short: "YPA", digits: 1 },
+        { key: "passingTdpg", label: "TD/G", short: "TD", digits: 1 },
+      ],
+    },
+    {
+      key: "rushing",
+      label: "Rushing",
+      card: "player-multi",
+      title: "Rushing",
+      sortKey: "rushingFanPts",
+      secondary: [
+        { key: "rushesPerGame", label: "RUSH/G", short: "RSH", digits: 1 },
+        { key: "rushingYpg", label: "YDS/G", short: "YPG", digits: 1 },
+        { key: "rushingTdpg", label: "TD/G", digits: 1 },
+      ],
+    },
+    {
+      key: "receiving",
+      label: "Receiving",
+      card: "player-multi",
+      title: "Receiving",
+      sortKey: "receivingFanPts",
+      secondary: [
+        { key: "receptionsPerGame", label: "REC/G", short: "REC", digits: 1 },
+        { key: "receivingYpg", label: "YDS/G", short: "YPG", digits: 1 },
+        { key: "receivingTdpg", label: "TD/G", digits: 1 },
+      ],
+    },
+    {
+      key: "flag-pulls",
+      label: "Flag Pulls",
+      card: "player",
+      title: "Flag Pulls",
+      valueKey: "flagPullsPerGame",
+      valueLabel: "PER G",
+      digits: 1,
+    },
+    {
+      key: "flag-pulls-loss",
+      label: "For Loss",
+      card: "player",
+      title: "Flag Pulls For Loss",
+      valueKey: "flagPullsForLossPerGame",
+      valueLabel: "PER G",
+      digits: 1,
+    },
+    {
+      key: "interceptions",
+      label: "Interceptions",
+      card: "player",
+      title: "Interceptions",
+      valueKey: "interceptionsPerGame",
+      valueLabel: "PER G",
+      digits: 1,
+    },
+  ],
+  offense: [
+    { key: "ppg", label: "Points", card: "team", title: "Points Per Game", valueKey: "ppg" },
+    { key: "pass-yds", label: "Pass Yards", card: "team", title: "Passing Yards / Game", valueKey: "passYpg" },
+    { key: "rush-yds", label: "Rush Yards", card: "team", title: "Rushing Yards / Game", valueKey: "rushYpg" },
+    { key: "total-yds", label: "Total Yards", card: "team", title: "Total Yards / Game", valueKey: "totalYpg" },
+    { key: "ypp", label: "Yards/Play", card: "team", title: "Yards Per Play", valueKey: "yardsPerPlay" },
+    { key: "comp", label: "Completion", card: "team", title: "Completion %", valueKey: "completionPct", suffix: "%" },
+    { key: "success", label: "Success", card: "team", title: "Success Rate", valueKey: "successFor", suffix: "%" },
+    { key: "explosive", label: "Explosive", card: "team", title: "Explosive Plays / Game", valueKey: "explosivePlays" },
+    { key: "conv1", label: "1-Point", card: "team", title: "1-Point %", valueKey: "conv1Pct", suffix: "%" },
+    { key: "conv2", label: "2-Point", card: "team", title: "2-Point %", valueKey: "conv2Pct", suffix: "%" },
+    { key: "conv3", label: "3-Point", card: "team", title: "3-Point %", valueKey: "conv3Pct", suffix: "%" },
+    {
+      key: "red-zone",
+      label: "Red Zone",
+      card: "team",
+      title: "Red Zone Success",
+      valueKey: "redZonePct",
+      suffix: "%",
+      minKey: "redZoneAttempts",
+      ratioKeys: { num: "redZoneScores", den: "redZoneAttempts" },
+    },
+  ],
+  defense: [
+    { key: "papg", label: "Pts Against", card: "team", title: "Points Against / Game", valueKey: "papg", lowerIsBetter: true },
+    { key: "pass-against", label: "Pass Against", card: "team", title: "Pass Yards Against / Game", valueKey: "passYpgAgainst", lowerIsBetter: true },
+    { key: "rush-against", label: "Rush Against", card: "team", title: "Rush Yards Against / Game", valueKey: "rushYpgAgainst", lowerIsBetter: true },
+    { key: "total-against", label: "Total Against", card: "team", title: "Total Yards Against / Game", valueKey: "totalYpgAgainst", lowerIsBetter: true },
+    { key: "ypp-against", label: "Yards/Play", card: "team", title: "Yards Per Play Against", valueKey: "yardsPerPlayAgainst", lowerIsBetter: true },
+    { key: "success-against", label: "Success", card: "team", title: "Success Rate Against", valueKey: "successAgainst", suffix: "%", lowerIsBetter: true },
+    { key: "explosive-against", label: "Explosive", card: "team", title: "Explosive Plays Allowed / Game", valueKey: "explosivePlaysAgainst", lowerIsBetter: true },
+    { key: "def-int", label: "Interceptions", card: "team", title: "Interceptions / Game", valueKey: "interceptions" },
+    { key: "def-tfl", label: "For Loss", card: "team", title: "Flag Pulls For Loss / Game", valueKey: "tflsForced" },
+  ],
+};
+
+function LeaderStatTabs({ options, value, onChange }) {
+  const scrollerRef = useRef(null);
+
+  useEffect(() => {
+    const active = scrollerRef.current?.querySelector('[data-active="true"]');
+    active?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [value, options]);
+
+  return (
+    <div
+      ref={scrollerRef}
+      className="flex gap-1.5 overflow-x-auto overscroll-x-contain px-3 sm:px-4 py-3 border-b border-slate-700"
+    >
+      {options.map((option) => {
+        const active = option.key === value;
+        return (
+          <button
+            key={option.key}
+            type="button"
+            data-active={active}
+            onClick={() => onChange(option.key)}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+              active ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-700"
+            }`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LeaderCard({ stat, playerStats, teamStats }) {
+  if (stat.card === "player-multi") {
+    return (
+      <PlayerMultiStatCard
+        title={stat.title}
+        players={playerStats}
+        sortKey={stat.sortKey}
+        secondary={stat.secondary}
+      />
+    );
+  }
+  if (stat.card === "player") {
+    return (
+      <PlayerLeaderCard
+        title={stat.title}
+        players={playerStats}
+        valueKey={stat.valueKey}
+        valueLabel={stat.valueLabel}
+        digits={stat.digits}
+      />
+    );
+  }
+  return (
+    <TeamLeaderCard
+      title={stat.title}
+      teams={teamStats}
+      valueKey={stat.valueKey}
+      digits={stat.digits}
+      suffix={stat.suffix}
+      lowerIsBetter={stat.lowerIsBetter}
+      minKey={stat.minKey}
+      ratioKeys={stat.ratioKeys}
+    />
+  );
+}
+
 export default function LeagueLeaders() {
   const { currentLeague } = useLeague();
   const [playerStats, setPlayerStats] = useState([]);
   const [teamStats, setTeamStats]     = useState([]);
   const [loading, setLoading]         = useState(true);
   const [view, setView]               = useState("players");
+  const [statKey, setStatKey]         = useState(LEADER_TABS.players[0].key);
+
+  const statOptions = LEADER_TABS[view];
+  const activeStat = statOptions.find((stat) => stat.key === statKey) || statOptions[0];
+
+  function changeView(next) {
+    setView(next);
+    setStatKey(LEADER_TABS[next][0].key);
+  }
 
   useEffect(() => {
     if (!currentLeague) return;
@@ -348,6 +525,7 @@ export default function LeagueLeaders() {
         const passingYards    = passerData.filter(p => p.play_type === 'pass' && isPassCompletionOutcome(p.outcome)).reduce((s, p) => s + yg(p), 0);
         const passingTDs      = passerData.filter(p => p.play_type === 'pass' && p.outcome === 'td').length;
         const completionPct   = passAttempts > 0 ? (passCompletions / passAttempts) * 100 : 0;
+        const yardsPerAttempt = passAttempts > 0 ? passingYards / passAttempts : 0;
 
         const rushingYards  = rusherData.reduce((s, p) => s + yg(p), 0);
         const rushes        = rusherData.length;
@@ -384,7 +562,7 @@ export default function LeagueLeaders() {
           name: String(player.name ?? '').trim(),
           team_name: team?.name || '',
           team_abbr: team?.abbreviation || team?.abbr || team?.name || '',
-          completionPct, passingFanPts, rushingFanPts, receivingFanPts,
+          completionPct, yardsPerAttempt, passingFanPts, rushingFanPts, receivingFanPts,
           passingYpg, passingTdpg,
           rushesPerGame: perGame(rushes),
           rushingYpg, rushingTdpg,
@@ -545,109 +723,13 @@ export default function LeagueLeaders() {
       <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 border-b border-slate-700">
           <h2 className="text-xl sm:text-2xl font-bold text-white shrink-0">League Leaders</h2>
-          <ViewToggle view={view} setView={setView} />
+          <ViewToggle view={view} setView={changeView} />
         </div>
 
-        <div className="p-2 sm:p-4 space-y-4 sm:space-y-8">
-      {view === "players" && (
-  <div>
-    <SectionHeader title="Player Leaders" />
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-      <PlayerMultiStatCard
-        title="Passing"
-        players={playerStats}
-        sortKey="passingFanPts"
-        secondary={[
-          { key: 'completionPct', label: 'COMP%', short: 'CMP', digits: 0, suffix: '%' },
-          { key: 'passingYpg', label: 'YDS/G', short: 'YPG', digits: 1 },
-          { key: 'passingTdpg', label: 'TD/G', digits: 1 },
-        ]}
-      />
-      <PlayerMultiStatCard
-        title="Rushing"
-        players={playerStats}
-        sortKey="rushingFanPts"
-        secondary={[
-          { key: 'rushesPerGame', label: 'RUSH/G', short: 'RSH', digits: 1 },
-          { key: 'rushingYpg', label: 'YDS/G', short: 'YPG', digits: 1 },
-          { key: 'rushingTdpg', label: 'TD/G', digits: 1 },
-        ]}
-      />
-      <PlayerMultiStatCard
-        title="Receiving"
-        players={playerStats}
-        sortKey="receivingFanPts"
-        secondary={[
-          { key: 'receptionsPerGame', label: 'REC/G', short: 'REC', digits: 1 },
-          { key: 'receivingYpg', label: 'YDS/G', short: 'YPG', digits: 1 },
-          { key: 'receivingTdpg', label: 'TD/G', digits: 1 },
-        ]}
-      />
-      <PlayerLeaderCard
-        title="Flag Pulls"
-        players={playerStats}
-        valueKey="flagPullsPerGame"
-        valueLabel="PER G"
-        digits={1}
-      />
-      <PlayerLeaderCard
-        title="Flag Pulls For Loss"
-        players={playerStats}
-        valueKey="flagPullsForLossPerGame"
-        valueLabel="PER G"
-        digits={1}
-      />
-      <PlayerLeaderCard
-        title="Interceptions"
-        players={playerStats}
-        valueKey="interceptionsPerGame"
-        valueLabel="PER G"
-        digits={1}
-      />
-    </div>
-  </div>
-)}
+        <LeaderStatTabs options={statOptions} value={activeStat.key} onChange={setStatKey} />
 
-      {view === "offense" && (
-        <div>
-          <SectionHeader title="Team Leaders — Offense" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-3 sm:mb-6">
-            <TeamLeaderCard title="Points Per Game"     teams={teamStats} valueKey="ppg" />
-            <TeamLeaderCard title="Passing Yards / Game"teams={teamStats} valueKey="passYpg" />
-            <TeamLeaderCard title="Rushing Yards / Game"teams={teamStats} valueKey="rushYpg" />
-            <TeamLeaderCard title="Total Yards / Game"  teams={teamStats} valueKey="totalYpg" />
-            <TeamLeaderCard title="Yards Per Play"      teams={teamStats} valueKey="yardsPerPlay" />
-            <TeamLeaderCard title="Completion %"        teams={teamStats} valueKey="completionPct"   suffix="%" />
-            <TeamLeaderCard title="Success Rate"        teams={teamStats} valueKey="successFor"      suffix="%" />
-            <TeamLeaderCard title="Explosive Plays / Game" teams={teamStats} valueKey="explosivePlays" />
-          </div>
-
-          <p className="text-slate-500 text-xs mb-4 uppercase tracking-wide">Conversions</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <TeamLeaderCard title="1-Point %" teams={teamStats} valueKey="conv1Pct" suffix="%" />
-            <TeamLeaderCard title="2-Point %" teams={teamStats} valueKey="conv2Pct" suffix="%" />
-            <TeamLeaderCard title="3-Point %" teams={teamStats} valueKey="conv3Pct" suffix="%" />
-            <TeamLeaderCard title="Red Zone Success" teams={teamStats} valueKey="redZonePct" suffix="%" minKey="redZoneAttempts" ratioKeys={{ num: 'redZoneScores', den: 'redZoneAttempts' }} />
-          </div>
-        </div>
-      )}
-
-      {view === "defense" && (
-        <div>
-          <SectionHeader title="Team Leaders — Defense" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <TeamLeaderCard title="Points Against / Game"      teams={teamStats} valueKey="papg"                lowerIsBetter />
-            <TeamLeaderCard title="Pass Yards Against / Game"  teams={teamStats} valueKey="passYpgAgainst"      lowerIsBetter />
-            <TeamLeaderCard title="Rush Yards Against / Game"  teams={teamStats} valueKey="rushYpgAgainst"      lowerIsBetter />
-            <TeamLeaderCard title="Total Yards Against / Game" teams={teamStats} valueKey="totalYpgAgainst"     lowerIsBetter />
-            <TeamLeaderCard title="Yards Per Play Against"     teams={teamStats} valueKey="yardsPerPlayAgainst" lowerIsBetter />
-            <TeamLeaderCard title="Success Rate Against"       teams={teamStats} valueKey="successAgainst"      suffix="%" lowerIsBetter />
-            <TeamLeaderCard title="Explosive Plays Allowed / Game" teams={teamStats} valueKey="explosivePlaysAgainst" lowerIsBetter />
-            <TeamLeaderCard title="Interceptions / Game"         teams={teamStats} valueKey="interceptions" />
-            <TeamLeaderCard title="Flag Pulls For Loss / Game"   teams={teamStats} valueKey="tflsForced" />
-          </div>
-        </div>
-      )}
+        <div className="p-2 sm:p-4">
+          <LeaderCard stat={activeStat} playerStats={playerStats} teamStats={teamStats} />
         </div>
       </div>
     </div>

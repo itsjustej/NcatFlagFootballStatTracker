@@ -25,6 +25,7 @@ const CATEGORIES = [
     played: (p) => p.passAttempts > 0,
     columns: [
       { key: 'passingYards', label: 'Yds' },
+      { key: 'yardsPerAttempt', label: 'Yds/Att', rate: true, render: (p) => fmt(p.yardsPerAttempt) },
       { key: 'completionPct', label: 'Comp %', rate: true, render: (p) => `${fmt(p.completionPct)}% (${p.passCompletions}/${p.passAttempts})` },
       { key: 'passingTDs', label: 'TD' },
       { key: 'passExplosive', label: 'Expl.' },
@@ -205,6 +206,7 @@ export default function PlayerStats() {
         const passingTDs         = passerData.filter(p => p.play_type === 'pass' && p.outcome === 'td').length;
         const interceptionsThrown= passerData.filter(p => isInterceptionOutcome(p.outcome)).length;
         const completionPct      = passAttempts > 0 ? (passCompletions / passAttempts) * 100 : 0;
+        const yardsPerAttempt    = passAttempts > 0 ? passingYards / passAttempts : 0;
         const passExplosive      = passerData
           .filter(p => p.play_type === 'pass' && isPassCompletionOutcome(p.outcome) && isExplosiveYards(yg(p), 'pass'))
           .length;
@@ -237,7 +239,7 @@ export default function PlayerStats() {
 
         return {
           player_id: pid, name: String(player.name ?? '').trim(), gamesPlayed,
-          passingYards, passCompletions, passAttempts, completionPct, passingTDs, passExplosive, interceptionsThrown,
+          passingYards, passCompletions, passAttempts, completionPct, yardsPerAttempt, passingTDs, passExplosive, interceptionsThrown,
           carries, rushingYards, rushingTDs, yardsPerCarry, rushExplosive,
           receptions, receivingYards, receivingTDs, yardsPerReception, recExplosive, conversionsCaught,
           interceptions, defensiveTDs, flagPulls, flagPullsForLoss,

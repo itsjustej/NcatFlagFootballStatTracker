@@ -365,6 +365,22 @@ export default function TeamStats() {
         const fourthDownPct = fourthDownPlays.length > 0 ? (fourthDownConversions / fourthDownPlays.length) * 100 : 0;
         const rate = (n) => (gamesPlayed > 0 ? (n / gamesPlayed).toFixed(1) : 0);
 
+        const playedGameIds = new Set(playedGames.map((g) => g.game_id));
+        const teamPenalties = (plays || []).filter((p) =>
+          // eslint-disable-next-line eqeqeq
+          p.play_type === 'penalty' && p.penalty_team_id == tid && playedGameIds.has(p.game_id)
+        );
+        const penaltyYardsFor = (list) => list.reduce((sum, p) => {
+          const gained = yg(p);
+          // eslint-disable-next-line eqeqeq
+          const charged = p.penalty_team_id == p.offense_team ? -gained : gained;
+          return sum + Math.max(0, charged);
+        }, 0);
+        // eslint-disable-next-line eqeqeq
+        const offensivePenalties = teamPenalties.filter((p) => p.penalty_team_id == p.offense_team);
+        // eslint-disable-next-line eqeqeq
+        const defensivePenalties = teamPenalties.filter((p) => p.penalty_team_id == p.defense_team);
+
         const { redZoneAttempts, redZoneScores, redZonePct } = computeRedZoneStats(
           tid,
           playedGames,
@@ -402,6 +418,10 @@ export default function TeamStats() {
           interceptionsThrown: rate(interceptionsThrown),
           tflsAllowed: rate(tflsAllowed),
           tflsForced: rate(tflsForced),
+          offPenaltiesPerGame: rate(offensivePenalties.length),
+          offPenaltyYardsPerGame: rate(penaltyYardsFor(offensivePenalties)),
+          defPenaltiesPerGame: rate(defensivePenalties.length),
+          defPenaltyYardsPerGame: rate(penaltyYardsFor(defensivePenalties)),
           thirdDownAttempts: thirdDownPlays.length, thirdDownConversions,
           thirdDownPct: thirdDownPct.toFixed(1),
           fourthDownAttempts: fourthDownPlays.length, fourthDownConversions,
@@ -516,6 +536,8 @@ export default function TeamStats() {
               <StatRow label="Rushing TDs / game" short="R-TD" value={stats.rushingTDs} rank={rank('rushingTDs')} total={rankedTotal} />
               <StatRow label="Interceptions thrown / game" short="INT" value={stats.interceptionsThrown} rank={rank('interceptionsThrown', true)} total={rankedTotal} />
               <StatRow label="TFLs allowed / game" short="TFL" value={stats.tflsAllowed} rank={rank('tflsAllowed', true)} total={rankedTotal} />
+              <StatRow label="Penalties per game" short="Pen/G" value={stats.offPenaltiesPerGame} rank={rank('offPenaltiesPerGame', true)} total={rankedTotal} />
+              <StatRow label="Penalty yards per game" short="Pen Yds" value={stats.offPenaltyYardsPerGame} rank={rank('offPenaltyYardsPerGame', true)} total={rankedTotal} />
             </div>
 
             <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-6">
@@ -536,6 +558,8 @@ export default function TeamStats() {
               <StatRow label="Rushing TDs against / game" short="R-TD" value={stats.rushingTDsAgainst} rank={rank('rushingTDsAgainst', true)} total={rankedTotal} />
               <StatRow label="Interceptions / game" short="INT" value={stats.interceptions} rank={rank('interceptions')} total={rankedTotal} />
               <StatRow label="TFLs forced / game" short="TFL" value={stats.tflsForced} rank={rank('tflsForced')} total={rankedTotal} />
+              <StatRow label="Penalties per game" short="Pen/G" value={stats.defPenaltiesPerGame} rank={rank('defPenaltiesPerGame', true)} total={rankedTotal} />
+              <StatRow label="Penalty yards per game" short="Pen Yds" value={stats.defPenaltyYardsPerGame} rank={rank('defPenaltyYardsPerGame', true)} total={rankedTotal} />
               </div>
           </div>
 
