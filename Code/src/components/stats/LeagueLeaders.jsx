@@ -40,10 +40,13 @@ const RANK_STYLES = {
   3: "bg-amber-700 text-amber-50",
 };
 
-function PlayerRank({ rank }) {
+function PlayerRank({ rank, compact = false }) {
   const medal = RANK_STYLES[rank] || "bg-slate-600 text-slate-200";
+  const size = compact
+    ? "flex w-5 h-5 sm:w-8 sm:h-8 text-[10px] sm:text-xs"
+    : "hidden sm:flex w-10 h-10 text-sm";
   return (
-    <div className={`hidden sm:flex w-10 h-10 rounded-full items-center justify-center text-sm font-black tabular-nums shrink-0 ${medal}`}>
+    <div className={`${size} rounded-full items-center justify-center font-black tabular-nums shrink-0 ${medal}`}>
       {rank}
     </div>
   );
@@ -154,7 +157,7 @@ function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lower
       <div className="space-y-1 sm:space-y-2">
         {sorted.map((t, i) => (
           <div key={t.team_id} className="flex items-center gap-1.5 sm:gap-3 px-1.5 py-1 sm:p-2 rounded bg-slate-700/40">
-            <span className="text-slate-400 text-[10px] sm:text-xs w-3 sm:w-5 text-center font-bold">{i + 1}</span>
+            <PlayerRank rank={i + 1} compact />
             <div className="flex-1 min-w-0">
               <p className="text-slate-200 text-[11px] sm:text-sm truncate">{t.name}</p>
             </div>
@@ -277,7 +280,6 @@ export default function LeagueLeaders() {
         const passCompletions = countPassCompletions(passerData.filter(p => p.play_type === 'pass'));
         const passingYards    = passerData.filter(p => p.play_type === 'pass' && isPassCompletionOutcome(p.outcome)).reduce((s, p) => s + yg(p), 0);
         const passingTDs      = passerData.filter(p => p.play_type === 'pass' && p.outcome === 'td').length;
-        const interceptionsThrown = passerData.filter(p => isInterceptionOutcome(p.outcome)).length;
         const completionPct   = passAttempts > 0 ? (passCompletions / passAttempts) * 100 : 0;
 
         const rushingYards  = rusherData.reduce((s, p) => s + yg(p), 0);
@@ -288,10 +290,19 @@ export default function LeagueLeaders() {
         const receivingYards = receiverData.filter(p => isReceivingOutcome(p.outcome)).reduce((s, p) => s + yg(p), 0);
         const receivingTDs   = receiverData.filter(p => p.outcome === 'td').length;
 
+        const gamesPlayed = gamesWithJersey.get(pid)?.size ?? 0;
+        const perGame = (total) => (gamesPlayed > 0 ? total / gamesPlayed : 0);
         const round2 = (n) => Math.round(n * 100) / 100;
-        const passingFanPts = round2(passingTDs * 2.5 + passingYards / 25 - interceptionsThrown);
-        const rushingFanPts = round2(rushingTDs * 2 + rushingYards * 0.1);
-        const receivingFanPts = round2(receivingTDs * 4 + receivingYards * 0.1 + receptions);
+        const passingYpg = perGame(passingYards);
+        const passingTdpg = perGame(passingTDs);
+        const rushingYpg = perGame(rushingYards);
+        const rushingTdpg = perGame(rushingTDs);
+        const receivingYpg = perGame(receivingYards);
+        const receivingTdpg = perGame(receivingTDs);
+        const leaderScore = (ypg, tdpg, yardsWeight) => round2(ypg * yardsWeight + tdpg * 2.5);
+        const passingFanPts = leaderScore(passingYpg, passingTdpg, 0.25);
+        const rushingFanPts = leaderScore(rushingYpg, rushingTdpg, 0.1);
+        const receivingFanPts = leaderScore(receivingYpg, receivingTdpg, 0.1);
 
         const interceptions    = countPlayerInterceptions(pid, participants, plays);
         const flagPulls        = defenderData.length;
@@ -301,21 +312,20 @@ export default function LeagueLeaders() {
           && yg(p) < 0
         ).length;
 
-        const gamesPlayed = gamesWithJersey.get(pid)?.size ?? 0;
-        const perGame = (total) => (gamesPlayed > 0 ? total / gamesPlayed : 0);
-
         return {
           player_id: pid,
           name: String(player.name ?? '').trim(),
           team_name: team?.name || '',
           team_abbr: team?.abbreviation || team?.abbr || team?.name || '',
-          passingYards, passingTDs, completionPct, passingFanPts,
-          rushingYards, rushes, rushingTDs, rushingFanPts,
-          receivingYards, receivingTDs, receptions, receivingFanPts,
-          passingYpg:   perGame(passingYards),
-          rushingYpg:   perGame(rushingYards),
-          receivingYpg: perGame(receivingYards),
-          interceptions, flagPulls, flagPullsForLoss,
+          completionPct, passingFanPts, rushingFanPts, receivingFanPts,
+          passingYpg, passingTdpg,
+          rushesPerGame: perGame(rushes),
+          rushingYpg, rushingTdpg,
+          receptionsPerGame: perGame(receptions),
+          receivingYpg, receivingTdpg,
+          interceptionsPerGame: perGame(interceptions),
+          flagPullsPerGame: perGame(flagPulls),
+          flagPullsForLossPerGame: perGame(flagPullsForLoss),
         };
       });
 
@@ -432,7 +442,10 @@ export default function LeagueLeaders() {
           totalYpgAgainst:  totalYardsAgainst / gamesPlayed,
           yardsPerPlay, yardsPerPlayAgainst,
           completionPct, successFor, successAgainst,
-          explosivePlays, explosivePlaysAgainst, interceptions, tflsForced,
+          explosivePlays: gamesPlayed > 0 ? explosivePlays / gamesPlayed : 0,
+          explosivePlaysAgainst: gamesPlayed > 0 ? explosivePlaysAgainst / gamesPlayed : 0,
+          interceptions: gamesPlayed > 0 ? interceptions / gamesPlayed : 0,
+          tflsForced: gamesPlayed > 0 ? tflsForced / gamesPlayed : 0,
           redZoneAttempts, redZoneScores, redZonePct,
           conv1Pct: conv1Attempts > 0 ? (conv1Made / conv1Attempts) * 100 : 0,
           conv2Pct: conv2Attempts > 0 ? (conv2Made / conv2Attempts) * 100 : 0,
@@ -480,8 +493,8 @@ export default function LeagueLeaders() {
         sortKey="passingFanPts"
         secondary={[
           { key: 'completionPct', label: 'COMP%', short: 'CMP', digits: 0, suffix: '%' },
-          { key: 'passingYards', label: 'YDS', digits: 0 },
-          { key: 'passingTDs', label: 'TD', digits: 0 },
+          { key: 'passingYpg', label: 'YDS/G', short: 'YPG', digits: 1 },
+          { key: 'passingTdpg', label: 'TD/G', digits: 1 },
         ]}
       />
       </div>
@@ -491,9 +504,9 @@ export default function LeagueLeaders() {
         players={playerStats}
         sortKey="rushingFanPts"
         secondary={[
-          { key: 'rushes', label: 'RUSH', digits: 0 },
-          { key: 'rushingYards', label: 'YDS', digits: 0 },
-          { key: 'rushingTDs', label: 'TD', digits: 0 },
+          { key: 'rushesPerGame', label: 'RUSH/G', short: 'RSH', digits: 1 },
+          { key: 'rushingYpg', label: 'YDS/G', short: 'YPG', digits: 1 },
+          { key: 'rushingTdpg', label: 'TD/G', digits: 1 },
         ]}
       />
       </div>
@@ -503,9 +516,9 @@ export default function LeagueLeaders() {
         players={playerStats}
         sortKey="receivingFanPts"
         secondary={[
-          { key: 'receptions', label: 'REC', digits: 0 },
-          { key: 'receivingYards', label: 'YDS', digits: 0 },
-          { key: 'receivingTDs', label: 'TD', digits: 0 },
+          { key: 'receptionsPerGame', label: 'REC/G', short: 'REC', digits: 1 },
+          { key: 'receivingYpg', label: 'YDS/G', short: 'YPG', digits: 1 },
+          { key: 'receivingTdpg', label: 'TD/G', digits: 1 },
         ]}
       />
       </div>
@@ -513,10 +526,10 @@ export default function LeagueLeaders() {
       <PlayerLeaderCard
         title="Flag Pulls"
         players={playerStats}
-        valueKey="flagPulls"
-        valueLabel="PULLS"
-        valueShort="FP"
-        digits={0}
+        valueKey="flagPullsPerGame"
+        valueLabel="PER G"
+        valueShort="/G"
+        digits={1}
       />
       </div>
       <div className="order-4 lg:order-5">
@@ -524,18 +537,20 @@ export default function LeagueLeaders() {
         title="Flag Pulls For Loss"
         shortTitle="For Loss"
         players={playerStats}
-        valueKey="flagPullsForLoss"
-        valueLabel="TFL"
-        digits={0}
+        valueKey="flagPullsForLossPerGame"
+        valueLabel="PER G"
+        valueShort="/G"
+        digits={1}
       />
       </div>
       <div className="order-6">
       <PlayerLeaderCard
         title="Interceptions"
         players={playerStats}
-        valueKey="interceptions"
-        valueLabel="INT"
-        digits={0}
+        valueKey="interceptionsPerGame"
+        valueLabel="PER G"
+        valueShort="/G"
+        digits={1}
       />
       </div>
     </div>
@@ -553,7 +568,7 @@ export default function LeagueLeaders() {
             <TeamLeaderCard title="Yards Per Play"      teams={teamStats} valueKey="yardsPerPlay" />
             <TeamLeaderCard title="Completion %"        teams={teamStats} valueKey="completionPct"   suffix="%" />
             <TeamLeaderCard title="Success Rate"        teams={teamStats} valueKey="successFor"      suffix="%" />
-            <TeamLeaderCard title="Explosive Plays" teams={teamStats} valueKey="explosivePlays" digits={0} />
+            <TeamLeaderCard title="Explosive Plays / Game" teams={teamStats} valueKey="explosivePlays" />
           </div>
 
           <p className="text-slate-500 text-xs mb-4 uppercase tracking-wide">Conversions</p>
@@ -576,9 +591,9 @@ export default function LeagueLeaders() {
             <TeamLeaderCard title="Total Yards Against / Game" teams={teamStats} valueKey="totalYpgAgainst"     lowerIsBetter />
             <TeamLeaderCard title="Yards Per Play Against"     teams={teamStats} valueKey="yardsPerPlayAgainst" lowerIsBetter />
             <TeamLeaderCard title="Success Rate Against"       teams={teamStats} valueKey="successAgainst"      suffix="%" lowerIsBetter />
-            <TeamLeaderCard title="Explosive Plays Allowed"    teams={teamStats} valueKey="explosivePlaysAgainst" digits={0} lowerIsBetter />
-            <TeamLeaderCard title="Interceptions"              teams={teamStats} valueKey="interceptions"       digits={0} />
-            <TeamLeaderCard title="Flag Pulls For Loss"        teams={teamStats} valueKey="tflsForced"          digits={0} />
+            <TeamLeaderCard title="Explosive Plays Allowed / Game" teams={teamStats} valueKey="explosivePlaysAgainst" lowerIsBetter />
+            <TeamLeaderCard title="Interceptions / Game"         teams={teamStats} valueKey="interceptions" />
+            <TeamLeaderCard title="Flag Pulls For Loss / Game"   teams={teamStats} valueKey="tflsForced" />
           </div>
         </div>
       )}

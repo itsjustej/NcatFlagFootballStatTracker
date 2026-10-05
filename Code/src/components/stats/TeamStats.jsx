@@ -363,6 +363,7 @@ export default function TeamStats() {
 
         const thirdDownPct  = thirdDownPlays.length  > 0 ? (thirdDownConversions  / thirdDownPlays.length)  * 100 : 0;
         const fourthDownPct = fourthDownPlays.length > 0 ? (fourthDownConversions / fourthDownPlays.length) * 100 : 0;
+        const rate = (n) => (gamesPlayed > 0 ? (n / gamesPlayed).toFixed(1) : 0);
 
         const { redZoneAttempts, redZoneScores, redZonePct } = computeRedZoneStats(
           tid,
@@ -389,12 +390,18 @@ export default function TeamStats() {
           yardsPerPlayAgainst: yardsPerPlayAgainst.toFixed(1),
           successFor:          successFor.toFixed(1),
           successAgainst:      successAgainst.toFixed(1),
-          explosivePlays, explosivePlaysAgainst,
+          explosivePlays: rate(explosivePlays),
+          explosivePlaysAgainst: rate(explosivePlaysAgainst),
           completionPct:        completionPct.toFixed(1),
           completionPctAgainst: completionPctAgainst.toFixed(1),
-          passingTDs, rushingTDs, passingTDsAgainst, rushingTDsAgainst,
-          interceptions, interceptionsThrown,
-          tflsAllowed, tflsForced,
+          passingTDs: rate(passingTDs),
+          rushingTDs: rate(rushingTDs),
+          passingTDsAgainst: rate(passingTDsAgainst),
+          rushingTDsAgainst: rate(rushingTDsAgainst),
+          interceptions: rate(interceptions),
+          interceptionsThrown: rate(interceptionsThrown),
+          tflsAllowed: rate(tflsAllowed),
+          tflsForced: rate(tflsForced),
           thirdDownAttempts: thirdDownPlays.length, thirdDownConversions,
           thirdDownPct: thirdDownPct.toFixed(1),
           fourthDownAttempts: fourthDownPlays.length, fourthDownConversions,
@@ -459,7 +466,7 @@ export default function TeamStats() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 border-b border-slate-700">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-white shrink-0">Team Statistics</h2>
-            <p className="hidden sm:block text-slate-400 text-sm mt-0.5">Season-wide stats, charts, and conversion data</p>
+            <p className="hidden sm:block text-slate-400 text-sm mt-0.5">Per-game stats, charts, and conversion rates</p>
           </div>
           <div className="relative w-full sm:w-auto sm:min-w-[220px] shrink-0">
             <select
@@ -503,12 +510,12 @@ export default function TeamStats() {
               <StatRow label="Plays per game" short="Plays" value={stats.playsPerGame} rank={rank('playsPerGame')} total={rankedTotal} />
               <StatRow label="Yards per play" short="YPP" value={stats.yardsPerPlay} rank={rank('yardsPerPlay')} total={rankedTotal} />
               <StatRow label="Success rate" short="Succ" value={`${stats.successFor}%`} rank={rank('successFor')} total={rankedTotal} isPercentage pctValue={stats.successFor} />
-              <StatRow label="Explosive plays" short="Expl" value={stats.explosivePlays} rank={rank('explosivePlays')} total={rankedTotal} />
+              <StatRow label="Explosive plays / game" short="Expl" value={stats.explosivePlays} rank={rank('explosivePlays')} total={rankedTotal} />
               <StatRow label="Completion %" short="Cmp%" value={`${stats.completionPct}%`} rank={rank('completionPct')} total={rankedTotal} isPercentage pctValue={stats.completionPct} />
-              <StatRow label="Passing TDs" short="P-TD" value={stats.passingTDs} rank={rank('passingTDs')} total={rankedTotal} />
-              <StatRow label="Rushing TDs" short="R-TD" value={stats.rushingTDs} rank={rank('rushingTDs')} total={rankedTotal} />
-              <StatRow label="Interceptions thrown" short="INT" value={stats.interceptionsThrown} rank={rank('interceptionsThrown', true)} total={rankedTotal} />
-              <StatRow label="TFLs allowed" short="TFL" value={stats.tflsAllowed} rank={rank('tflsAllowed', true)} total={rankedTotal} />
+              <StatRow label="Passing TDs / game" short="P-TD" value={stats.passingTDs} rank={rank('passingTDs')} total={rankedTotal} />
+              <StatRow label="Rushing TDs / game" short="R-TD" value={stats.rushingTDs} rank={rank('rushingTDs')} total={rankedTotal} />
+              <StatRow label="Interceptions thrown / game" short="INT" value={stats.interceptionsThrown} rank={rank('interceptionsThrown', true)} total={rankedTotal} />
+              <StatRow label="TFLs allowed / game" short="TFL" value={stats.tflsAllowed} rank={rank('tflsAllowed', true)} total={rankedTotal} />
             </div>
 
             <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-6">
@@ -523,12 +530,12 @@ export default function TeamStats() {
               <StatRow label="Plays per game against" short="Plays" value={stats.playsPerGameAgainst} rank={rank('playsPerGameAgainst', true)} total={rankedTotal} />
               <StatRow label="Yards per play against" short="YPP" value={stats.yardsPerPlayAgainst} rank={rank('yardsPerPlayAgainst', true)} total={rankedTotal} />
               <StatRow label="Success rate against" short="Succ" value={`${stats.successAgainst}%`} rank={rank('successAgainst', true)} total={rankedTotal} isPercentage pctValue={stats.successAgainst} />
-              <StatRow label="Explosive plays allowed" short="Expl" value={stats.explosivePlaysAgainst} rank={rank('explosivePlaysAgainst', true)} total={rankedTotal} />
+              <StatRow label="Explosive plays allowed / game" short="Expl" value={stats.explosivePlaysAgainst} rank={rank('explosivePlaysAgainst', true)} total={rankedTotal} />
               <StatRow label="Completion % against" short="Cmp%" value={`${stats.completionPctAgainst}%`} rank={rank('completionPctAgainst', true)} total={rankedTotal} isPercentage pctValue={stats.completionPctAgainst} />
-              <StatRow label="Passing TDs against" short="P-TD" value={stats.passingTDsAgainst} rank={rank('passingTDsAgainst', true)} total={rankedTotal} />
-              <StatRow label="Rushing TDs against" short="R-TD" value={stats.rushingTDsAgainst} rank={rank('rushingTDsAgainst', true)} total={rankedTotal} />
-              <StatRow label="Interceptions" short="INT" value={stats.interceptions} rank={rank('interceptions')} total={rankedTotal} />
-              <StatRow label="TFLs forced" short="TFL" value={stats.tflsForced} rank={rank('tflsForced')} total={rankedTotal} />
+              <StatRow label="Passing TDs against / game" short="P-TD" value={stats.passingTDsAgainst} rank={rank('passingTDsAgainst', true)} total={rankedTotal} />
+              <StatRow label="Rushing TDs against / game" short="R-TD" value={stats.rushingTDsAgainst} rank={rank('rushingTDsAgainst', true)} total={rankedTotal} />
+              <StatRow label="Interceptions / game" short="INT" value={stats.interceptions} rank={rank('interceptions')} total={rankedTotal} />
+              <StatRow label="TFLs forced / game" short="TFL" value={stats.tflsForced} rank={rank('tflsForced')} total={rankedTotal} />
               </div>
           </div>
 
