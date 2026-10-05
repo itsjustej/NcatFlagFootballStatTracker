@@ -40,13 +40,10 @@ const RANK_STYLES = {
   3: "bg-amber-700 text-amber-50",
 };
 
-function PlayerRank({ rank, compact = false }) {
+function RankBadge({ rank, className = "w-8 h-8 text-sm" }) {
   const medal = RANK_STYLES[rank] || "bg-slate-600 text-slate-200";
-  const size = compact
-    ? "flex w-5 h-5 sm:w-8 sm:h-8 text-[10px] sm:text-xs"
-    : "hidden sm:flex w-10 h-10 text-sm";
   return (
-    <div className={`${size} rounded-full items-center justify-center font-black tabular-nums shrink-0 ${medal}`}>
+    <div className={`flex rounded-full items-center justify-center font-black tabular-nums shrink-0 ${medal} ${className}`}>
       {rank}
     </div>
   );
@@ -54,9 +51,43 @@ function PlayerRank({ rank, compact = false }) {
 
 function PlayerName({ name }) {
   return (
-    <p className="text-slate-100 text-[11px] sm:text-sm font-semibold truncate">
+    <p className="text-slate-100 text-sm font-semibold truncate">
       {shortPlayerName(name)}
     </p>
+  );
+}
+
+function teamLabel(entry) {
+  return entry.team_name || entry.team_abbr || "";
+}
+
+function statText(entry, stat) {
+  return `${fmt(entry[stat.key], stat.digits ?? 0)}${stat.suffix || ""}`;
+}
+
+function MobilePlayerIdentity({ rank, name, team, trailing = null }) {
+  return (
+    <div className="flex items-center gap-3">
+      <RankBadge rank={rank} />
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-semibold text-slate-50 leading-snug">{shortPlayerName(name)}</p>
+        <p className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-slate-400 leading-snug">{team}</p>
+      </div>
+      {trailing}
+    </div>
+  );
+}
+
+function MobileStatStrip({ stats }) {
+  return (
+    <div className={`mt-2.5 ml-11 grid gap-1.5 ${stats.length > 1 ? "grid-cols-3" : "grid-cols-1"}`}>
+      {stats.map((stat) => (
+        <div key={stat.key} className="rounded-md bg-slate-800/90 px-2 py-1.5 text-center min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-none">{stat.label}</p>
+          <p className="mt-1 text-sm font-bold text-white tabular-nums leading-none">{stat.value}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -67,28 +98,43 @@ function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
 
   return (
     <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between gap-2 px-2 sm:px-4 py-2 sm:py-3 border-b border-slate-700">
-        <h3 className="text-[11px] sm:text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0 truncate">{title}</h3>
-        <div className="flex items-center gap-0.5 sm:gap-3 text-[9px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
+      <div className="lg:hidden px-3 py-3 border-b border-slate-700">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
+      </div>
+      <div className="hidden lg:flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-700">
+        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0 truncate">{title}</h3>
+        <div className="flex items-center gap-3 text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
           {secondary.map(s => (
-            <span key={s.key} className={`text-right ${s.label.length > 3 ? 'w-7 sm:w-14' : 'w-5 sm:w-10'}`}>{s.short || s.label}</span>
+            <span key={s.key} className={`text-right ${s.label.length > 3 ? "w-14" : "w-10"}`}>{s.short || s.label}</span>
           ))}
         </div>
       </div>
-      <div className="overflow-y-auto max-h-36 sm:max-h-[300px]">
+      <div className="overflow-y-auto max-h-[28rem] lg:max-h-[300px]">
         {sorted.map((p, i) => (
-          <div key={p.player_id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
-            <PlayerRank rank={i + 1} />
-            <div className="flex-1 min-w-0">
-              <p className="hidden sm:block text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
-              <PlayerName name={p.name} />
+          <div key={p.player_id} className="border-b border-slate-700/50 last:border-b-0">
+            <div className="lg:hidden px-3 py-3">
+              <MobilePlayerIdentity rank={i + 1} name={p.name} team={teamLabel(p)} />
+              <MobileStatStrip
+                stats={secondary.map(s => ({
+                  key: s.key,
+                  label: s.label,
+                  value: statText(p, s),
+                }))}
+              />
             </div>
-            <div className="flex items-center gap-0.5 sm:gap-3 shrink-0">
-              {secondary.map(s => (
-                <span key={s.key} className={`text-right text-slate-300 text-[11px] sm:text-sm tabular-nums ${s.label.length > 3 ? 'w-7 sm:w-14' : 'w-5 sm:w-10'}`}>
-                  {fmt(p[s.key], s.digits ?? 0)}{s.suffix || ''}
-                </span>
-              ))}
+            <div className="hidden lg:flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700/30">
+              <RankBadge rank={i + 1} className="w-10 h-10 text-sm" />
+              <div className="flex-1 min-w-0">
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
+                <PlayerName name={p.name} />
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                {secondary.map(s => (
+                  <span key={s.key} className={`text-right text-slate-300 text-sm tabular-nums ${s.label.length > 3 ? "w-14" : "w-10"}`}>
+                    {statText(p, s)}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         ))}
@@ -98,45 +144,68 @@ function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
   );
 }
 
-function PlayerLeaderCard({ title, shortTitle, players, valueKey, valueLabel, valueShort, digits = 0, suffix = "", secondary = [] }) {
+function PlayerLeaderCard({ title, players, valueKey, valueLabel, digits = 0, suffix = "", secondary = [] }) {
   const filtered = players.filter(p => p[valueKey] > 0);
   const sorted = [...filtered].sort((a, b) => b[valueKey] - a[valueKey]).slice(0, 10);
 
   return (
     <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between gap-2 px-2 sm:px-4 py-2 sm:py-3 border-b border-slate-700">
-        <h3 className="text-[11px] sm:text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0 truncate">
-          <span className="sm:hidden">{shortTitle || title}</span>
-          <span className="hidden sm:inline">{title}</span>
-        </h3>
-        <div className="flex items-center gap-1 sm:gap-4 text-[9px] sm:text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
+      <div className="lg:hidden px-3 py-3 border-b border-slate-700">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
+      </div>
+      <div className="hidden lg:flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-700">
+        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0 truncate">{title}</h3>
+        <div className="flex items-center gap-4 text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
           {secondary.map(s => (
-            <span key={s.key} className="w-8 sm:w-12 text-right">{s.short || s.label}</span>
+            <span key={s.key} className="w-12 text-right">{s.short || s.label}</span>
           ))}
-          <span className="w-8 sm:w-14 text-right">
-            <span className="sm:hidden">{valueShort || valueLabel}</span>
-            <span className="hidden sm:inline">{valueLabel}</span>
-          </span>
+          <span className="w-14 text-right">{valueLabel}</span>
         </div>
       </div>
-      <div className="overflow-y-auto max-h-36 sm:max-h-[300px]">
+      <div className="overflow-y-auto max-h-[28rem] lg:max-h-[300px]">
         {sorted.map((p, i) => (
-          <div key={p.player_id} className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b border-slate-700/50 last:border-b-0 hover:bg-slate-700/30">
-            <PlayerRank rank={i + 1} />
-            <div className="flex-1 min-w-0">
-              <p className="hidden sm:block text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
-              <PlayerName name={p.name} />
+          <div key={p.player_id} className="border-b border-slate-700/50 last:border-b-0">
+            <div className="lg:hidden px-3 py-3">
+              <MobilePlayerIdentity
+                rank={i + 1}
+                name={p.name}
+                team={teamLabel(p)}
+                trailing={(
+                  <div className="shrink-0 text-right pl-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-none">{valueLabel}</p>
+                    <p className="mt-1 text-lg font-bold text-white tabular-nums leading-none">
+                      {fmt(p[valueKey], digits)}{suffix}
+                    </p>
+                  </div>
+                )}
+              />
+              {secondary.length > 0 && (
+                <MobileStatStrip
+                  stats={secondary.map(s => ({
+                    key: s.key,
+                    label: s.short || s.label,
+                    value: statText(p, s),
+                  }))}
+                />
+              )}
             </div>
-            <div className="flex items-center gap-1 sm:gap-4 shrink-0">
-              {secondary.map(s => (
-                <span key={s.key} className="w-8 sm:w-12 text-right text-slate-300 text-[11px] sm:text-sm tabular-nums">
-                  {fmt(p[s.key], s.digits ?? 0)}{s.suffix || ''}
-                </span>
-              ))}
+            <div className="hidden lg:flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700/30">
+              <RankBadge rank={i + 1} className="w-10 h-10 text-sm" />
+              <div className="flex-1 min-w-0">
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
+                <PlayerName name={p.name} />
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                {secondary.map(s => (
+                  <span key={s.key} className="w-12 text-right text-slate-300 text-sm tabular-nums">
+                    {statText(p, s)}
+                  </span>
+                ))}
+              </div>
+              <span className="w-14 text-right text-white font-bold text-sm tabular-nums shrink-0">
+                {fmt(p[valueKey], digits)}{suffix}
+              </span>
             </div>
-            <span className="w-8 sm:w-14 text-right text-white font-bold text-[11px] sm:text-sm tabular-nums shrink-0">
-              {fmt(p[valueKey], digits)}{suffix}
-            </span>
           </div>
         ))}
         {sorted.length === 0 && <p className="text-slate-500 text-sm px-4 py-3">No data</p>}
@@ -152,18 +221,16 @@ function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lower
     lowerIsBetter ? a[valueKey] - b[valueKey] : b[valueKey] - a[valueKey]
   );
   return (
-    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-5 flex flex-col">
-      <h3 className="text-[11px] sm:text-sm font-bold text-white mb-1.5 sm:mb-3 uppercase tracking-wide leading-tight">{title}</h3>
-      <div className="space-y-1 sm:space-y-2">
+    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-3 sm:p-5 flex flex-col">
+      <h3 className="text-sm font-bold text-white mb-2.5 sm:mb-3 uppercase tracking-wide leading-snug">{title}</h3>
+      <div className="space-y-2">
         {sorted.map((t, i) => (
-          <div key={t.team_id} className="flex items-center gap-1.5 sm:gap-3 px-1.5 py-1 sm:p-2 rounded bg-slate-700/40">
-            <PlayerRank rank={i + 1} compact />
-            <div className="flex-1 min-w-0">
-              <p className="text-slate-200 text-[11px] sm:text-sm truncate">{t.name}</p>
-            </div>
-            <span className="text-white font-bold text-[11px] sm:text-sm shrink-0 text-right tabular-nums">
+          <div key={t.team_id} className="flex items-center gap-3 px-2.5 py-2 sm:p-2 rounded-lg bg-slate-700/40">
+            <RankBadge rank={i + 1} />
+            <p className="flex-1 min-w-0 text-slate-100 text-sm font-medium leading-snug">{t.name}</p>
+            <span className="text-white font-bold text-sm shrink-0 text-right tabular-nums">
               {ratioKeys && (
-                <span className="text-slate-400 font-medium text-[10px] sm:text-xs mr-1">
+                <span className="text-slate-400 font-medium text-xs mr-1.5">
                   {t[ratioKeys.num]}/{t[ratioKeys.den]}
                 </span>
               )}
@@ -485,8 +552,7 @@ export default function LeagueLeaders() {
       {view === "players" && (
   <div>
     <SectionHeader title="Player Leaders" />
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
-      <div className="order-1">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
       <PlayerMultiStatCard
         title="Passing"
         players={playerStats}
@@ -497,8 +563,6 @@ export default function LeagueLeaders() {
           { key: 'passingTdpg', label: 'TD/G', digits: 1 },
         ]}
       />
-      </div>
-      <div className="order-3 lg:order-2">
       <PlayerMultiStatCard
         title="Rushing"
         players={playerStats}
@@ -509,8 +573,6 @@ export default function LeagueLeaders() {
           { key: 'rushingTdpg', label: 'TD/G', digits: 1 },
         ]}
       />
-      </div>
-      <div className="order-5 lg:order-3">
       <PlayerMultiStatCard
         title="Receiving"
         players={playerStats}
@@ -521,38 +583,27 @@ export default function LeagueLeaders() {
           { key: 'receivingTdpg', label: 'TD/G', digits: 1 },
         ]}
       />
-      </div>
-      <div className="order-2 lg:order-4">
       <PlayerLeaderCard
         title="Flag Pulls"
         players={playerStats}
         valueKey="flagPullsPerGame"
         valueLabel="PER G"
-        valueShort="/G"
         digits={1}
       />
-      </div>
-      <div className="order-4 lg:order-5">
       <PlayerLeaderCard
         title="Flag Pulls For Loss"
-        shortTitle="For Loss"
         players={playerStats}
         valueKey="flagPullsForLossPerGame"
         valueLabel="PER G"
-        valueShort="/G"
         digits={1}
       />
-      </div>
-      <div className="order-6">
       <PlayerLeaderCard
         title="Interceptions"
         players={playerStats}
         valueKey="interceptionsPerGame"
         valueLabel="PER G"
-        valueShort="/G"
         digits={1}
       />
-      </div>
     </div>
   </div>
 )}
@@ -560,7 +611,7 @@ export default function LeagueLeaders() {
       {view === "offense" && (
         <div>
           <SectionHeader title="Team Leaders — Offense" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-3 sm:mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-3 sm:mb-6">
             <TeamLeaderCard title="Points Per Game"     teams={teamStats} valueKey="ppg" />
             <TeamLeaderCard title="Passing Yards / Game"teams={teamStats} valueKey="passYpg" />
             <TeamLeaderCard title="Rushing Yards / Game"teams={teamStats} valueKey="rushYpg" />
@@ -572,7 +623,7 @@ export default function LeagueLeaders() {
           </div>
 
           <p className="text-slate-500 text-xs mb-4 uppercase tracking-wide">Conversions</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <TeamLeaderCard title="1-Point %" teams={teamStats} valueKey="conv1Pct" suffix="%" />
             <TeamLeaderCard title="2-Point %" teams={teamStats} valueKey="conv2Pct" suffix="%" />
             <TeamLeaderCard title="3-Point %" teams={teamStats} valueKey="conv3Pct" suffix="%" />
@@ -584,7 +635,7 @@ export default function LeagueLeaders() {
       {view === "defense" && (
         <div>
           <SectionHeader title="Team Leaders — Defense" />
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <TeamLeaderCard title="Points Against / Game"      teams={teamStats} valueKey="papg"                lowerIsBetter />
             <TeamLeaderCard title="Pass Yards Against / Game"  teams={teamStats} valueKey="passYpgAgainst"      lowerIsBetter />
             <TeamLeaderCard title="Rush Yards Against / Game"  teams={teamStats} valueKey="rushYpgAgainst"      lowerIsBetter />
