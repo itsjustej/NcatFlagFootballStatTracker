@@ -1,6 +1,11 @@
 /** eslint-disable eqeqeq — Supabase team IDs may be string or number */
 
-import { pointsForTeam } from './statsHelpers';
+import {
+  pointsForTeam,
+  yardsGainedForPlay,
+  isPassCompletionOutcome,
+  isInterceptionOutcome,
+} from './statsHelpers';
 
 export function formatRecord(wins, losses, ties = 0) {
   return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
@@ -154,4 +159,99 @@ export function computePowerRankings(teams, games, plays) {
   });
 
   return rows.map((row, i) => ({ ...row, rank: i + 1 }));
+}
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+function gameYardContext(games) {
+  const home = new Map();
+  const attacks = new Map();
+  const forty = new Map();
+  for (const game of games || []) {
+    home.set(game.game_id, game.home_team);
+    attacks.set(game.game_id, game.home_attacks_right ?? true);
+    forty.set(game.game_id, game.has_forty_yard !== false);
+  }
+  return { home, attacks, forty };
+}
+
+function yardsOnPlay(play, ctx) {
+  return yardsGainedForPlay(
+    play,
+    ctx.home.get(play.game_id),
+    ctx.attacks.get(play.game_id),
+    ctx.forty.get(play.game_id),
+  );
+}
+
+/** Same weights as the passing and rushing leader scores, per game. */
+function unitScore(plays, yardsFn, gamesPlayed) {
+  let passYards = 0;
+  let rushYards = 0;
+  let passTd = 0;
+  let rushTd = 0;
+  let interceptions = 0;
+  for (const play of plays) {
+    if (play.is_conversion || play.play_type === 'penalty') continue;
+    if (play.play_type === 'pass' && isPassCompletionOutcome(play.outcome)) passYards += yardsFn(play);
+    if (play.play_type === 'rush') rushYards += yardsFn(play);
+    if (play.play_type === 'pass' && play.outcome === 'td') passTd += 1;
+    if (play.play_type === 'rush' && play.outcome === 'td') rushTd += 1;
+    if (isInterceptionOutcome(play.outcome)) interceptions += 1;
+  }
+  const per = (total) => total / gamesPlayed;
+  return round2(
+    per(passYards) * 0.25
+    + per(passTd) * 2.5
+    + per(rushYards) * 0.1
+    + per(rushTd) * 2.5
+    - per(interceptions) * 2.5,
+  );
+}
+
+/**
+ * One offense score and one defense score per team that has played a real game.
+ * Offense is what that team produced. Defense is the same score given up.
+ * A higher offense score is better. A lower defense score is better.
+ */
+function teamUnitScores(teams, games, plays) {
+  const ctx = gameYardContext(games);
+  const yardsFn = (play) => yardsOnPlay(play, ctx);
+
+  return (teams || []).map((team) => {
+    const tid = team.team_id;
+    const playedGames = (games || []).filter(
+      (game) => !isForfeitGame(game) && (game.home_team == tid || game.away_team == tid),
+    );
+    if (playedGames.length === 0) return null;
+    const playedIds = new Set(playedGames.map((game) => game.game_id));
+    const offensePlays = [];
+    const defensePlays = [];
+    for (const play of plays || []) {
+      if (!playedIds.has(play.game_id)) continue;
+      if (play.offense_team == tid) offensePlays.push(play);
+      if (play.defense_team == tid) defensePlays.push(play);
+    }
+    return {
+      team_id: tid,
+      name: team.name,
+      gamesPlayed: playedGames.length,
+      offense: unitScore(offensePlays, yardsFn, playedGames.length),
+      defense: unitScore(defensePlays, yardsFn, playedGames.length),
+    };
+  }).filter(Boolean);
+}
+
+export function computeOffenseRankings(teams, games, plays) {
+  const rows = teamUnitScores(teams, games, plays);
+  rows.sort((a, b) => b.offense - a.offense || a.name.localeCompare(b.name));
+  return rows.map((row, i) => ({ ...row, rank: i + 1, score: row.offense }));
+}
+
+export function computeDefenseRankings(teams, games, plays) {
+  const rows = teamUnitScores(teams, games, plays);
+  rows.sort((a, b) => a.defense - b.defense || a.name.localeCompare(b.name));
+  return rows.map((row, i) => ({ ...row, rank: i + 1, score: row.defense }));
 }

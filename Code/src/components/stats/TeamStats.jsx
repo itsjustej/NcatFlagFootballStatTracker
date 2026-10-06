@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  LineChart, Line, XAxis, YAxis, Legend, ResponsiveContainer, Tooltip
-} from "recharts";
+import React, { useState, useEffect } from "react";
 import { ChevronDown, TrendingUp, Shield, RefreshCw } from "lucide-react";
 import { useLeague } from "../../context/LeagueContext";
 import { loadLeagueSeason } from "../../utils/leagueSeason";
+import {
+  computeLeagueStandings,
+  computePowerRankings,
+  computeOffenseRankings,
+  computeDefenseRankings,
+} from "../../utils/standingsHelpers";
 
 import {
   yardsGainedForPlay,
@@ -100,6 +103,21 @@ function ConversionBar({ label, attempts, completions, rank, total }) {
 }
 
 // ---------------- RECORD CARD ---------------- //
+function ordinal(rank) {
+  const mod100 = rank % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13
+    ? "th"
+    : { 1: "st", 2: "nd", 3: "rd" }[rank % 10] || "th";
+  return `${rank}${suffix}`;
+}
+
+function placeColor(rank) {
+  if (rank === 1) return "text-yellow-400";
+  if (rank === 2) return "text-slate-300";
+  if (rank === 3) return "text-amber-600";
+  return "text-white";
+}
+
 function RecordCard({ label, value, color }) {
   return (
     <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-4 text-center">
@@ -145,6 +163,7 @@ export default function TeamStats() {
   const [teams, setTeams]       = useState([]);
   const [teamId, setTeamId]     = useState("");
   const [allStats, setAllStats] = useState({});
+  const [rankBoards, setRankBoards] = useState({ standings: [], power: [], offense: [], defense: [] });
   const [loading, setLoading]   = useState(false);
 
   // We need homeTeamId per game to compute direction-aware yards.
@@ -155,6 +174,7 @@ export default function TeamStats() {
     if (!currentLeague) return;
     setTeamId("");
     setAllStats({});
+    setRankBoards({ standings: [], power: [], offense: [], defense: [] });
 
     const fetchAll = async () => {
       setLoading(true);
@@ -304,40 +324,6 @@ export default function TeamStats() {
         const conv2Pct      = conv2Attempts > 0 ? ((conv2Made / conv2Attempts) * 100).toFixed(1) : 0;
         const conv3Pct      = conv3Attempts > 0 ? ((conv3Made / conv3Attempts) * 100).toFixed(1) : 0;
 
-        // ── Per-game arrays for charts ─────────────────────────────────────
-        const pointsPerGame = playedGames.map(g => {
-          const gPlays = (plays || []).filter(p => p.game_id === g.game_id);
-          return pointsForTeam(gPlays, tid);
-        });
-        const pointsAgainstPerGame = playedGames.map(g => {
-          // eslint-disable-next-line eqeqeq
-          const oppId  = g.home_team == tid ? g.away_team : g.home_team;
-          const gPlays = (plays || []).filter(p => p.game_id === g.game_id);
-          return pointsForTeam(gPlays, oppId);
-        });
-        const yardsPerGame = playedGames.map(g => {
-          // eslint-disable-next-line eqeqeq
-          const gPlays = (plays || []).filter(p =>
-            // eslint-disable-next-line eqeqeq
-            p.game_id === g.game_id && p.offense_team == tid &&
-            !p.is_conversion && p.play_type !== 'penalty' &&
-            (p.play_type === 'rush' || isPassCompletionOutcome(p.outcome))
-          );
-          return gPlays.reduce((s, p) => s + yg(p), 0);
-        });
-        const yardsAgainstPerGame = playedGames.map(g => {
-          // eslint-disable-next-line eqeqeq
-          const oppId  = g.home_team == tid ? g.away_team : g.home_team;
-          // eslint-disable-next-line eqeqeq
-          const gPlays = (plays || []).filter(p =>
-            // eslint-disable-next-line eqeqeq
-            p.game_id === g.game_id && p.offense_team == oppId &&
-            !p.is_conversion && p.play_type !== 'penalty' &&
-            (p.play_type === 'rush' || isPassCompletionOutcome(p.outcome))
-          );
-          return gPlays.reduce((s, p) => s + yg(p), 0);
-        });
-
         // ── Record ─────────────────────────────────────────────────────────
         let wins = 0;
         let losses = 0;
@@ -433,12 +419,16 @@ export default function TeamStats() {
           conv1Attempts, conv1Made, conv1Pct,
           conv2Attempts, conv2Made, conv2Pct,
           conv3Attempts, conv3Made, conv3Pct,
-          pointsPerGame, pointsAgainstPerGame,
-          yardsPerGame, yardsAgainstPerGame,
         };
       }
 
       setAllStats(computed);
+      setRankBoards({
+        standings: computeLeagueStandings(teamsData, games, plays),
+        power: computePowerRankings(teamsData, games, plays),
+        offense: computeOffenseRankings(teamsData, games, plays),
+        defense: computeDefenseRankings(teamsData, games, plays),
+      });
       setLoading(false);
     };
 
@@ -446,6 +436,16 @@ export default function TeamStats() {
   }, [currentLeague]);
 
   const stats = allStats[teamId];
+  const place = (rows) => {
+    // eslint-disable-next-line eqeqeq
+    const row = rows.find((team) => team.team_id == teamId);
+    if (!row) return { value: "—", color: "text-white" };
+    return { value: ordinal(row.rank), color: placeColor(row.rank) };
+  };
+  const standingsPlace = place(rankBoards.standings);
+  const powerPlace = place(rankBoards.power);
+  const offensePlace = place(rankBoards.offense);
+  const defensePlace = place(rankBoards.defense);
   const playedEntries = Object.entries(allStats).filter(([, s]) => s.gamesPlayed > 0);
   const rankedTotal = playedEntries.length;
 
@@ -462,31 +462,13 @@ export default function TeamStats() {
     return better + 1;
   };
 
-  const pointsChartData = useMemo(() => {
-    if (!stats) return [];
-    return stats.pointsPerGame.map((pf, i) => ({
-      game: `G${i + 1}`,
-      "Points For":     pf,
-      "Points Against": stats.pointsAgainstPerGame[i] ?? 0,
-    }));
-  }, [stats]);
-
-  const yardsChartData = useMemo(() => {
-    if (!stats) return [];
-    return stats.yardsPerGame.map((yf, i) => ({
-      game: `G${i + 1}`,
-      "Yards For":     yf,
-      "Yards Against": stats.yardsAgainstPerGame[i] ?? 0,
-    }));
-  }, [stats]);
-
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 border-b border-slate-700">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-white shrink-0">Team Statistics</h2>
-            <p className="hidden sm:block text-slate-400 text-sm mt-0.5">Per-game stats, charts, and conversion rates</p>
+            <p className="hidden sm:block text-slate-400 text-sm mt-0.5">Per-game stats and conversion rates</p>
           </div>
           <div className="relative w-full sm:w-auto sm:min-w-[220px] shrink-0">
             <select
@@ -514,7 +496,14 @@ export default function TeamStats() {
             <RecordCard label="WINS"   value={stats.wins}          color="text-green-400" />
             <RecordCard label="LOSSES" value={stats.losses}        color="text-red-400" />
             <RecordCard label="TIES"   value={stats.ties}          color="text-yellow-400" />
-            <RecordCard label="WIN %"  value={`${stats.winPct}%`} color="text-blue-400" />
+            <RecordCard label="WIN %"  value={`${stats.winPct}%`} color="text-white" />
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 sm:gap-4">
+            <RecordCard label="STANDINGS" value={standingsPlace.value} color={standingsPlace.color} />
+            <RecordCard label="POWER" value={powerPlace.value} color={powerPlace.color} />
+            <RecordCard label="OFFENSE" value={offensePlace.value} color={offensePlace.color} />
+            <RecordCard label="DEFENSE" value={defensePlace.value} color={defensePlace.color} />
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:gap-6">
@@ -587,38 +576,6 @@ export default function TeamStats() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-6">
-            <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-6">
-              <h3 className="text-white text-xs sm:text-base font-bold mb-2 sm:mb-4">POINTS PER GAME</h3>
-              <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch] h-36 sm:h-[250px]">
-              <ResponsiveContainer width="100%" height="100%" minWidth={240}>
-                <LineChart data={pointsChartData}>
-                  <XAxis dataKey="game" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" tick={{ fill: "white" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "none" }} />
-                  <Legend wrapperStyle={{ color: "white" }} />
-                  <Line type="monotone" dataKey="Points For"     stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
-                  <Line type="monotone" dataKey="Points Against" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-              </div>
-            </div>
-            <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-6">
-              <h3 className="text-white text-xs sm:text-base font-bold mb-2 sm:mb-4">YARDS PER GAME</h3>
-              <div className="overflow-x-auto overscroll-x-contain scroll-smooth [-webkit-overflow-scrolling:touch] h-36 sm:h-[250px]">
-              <ResponsiveContainer width="100%" height="100%" minWidth={240}>
-                <LineChart data={yardsChartData}>
-                  <XAxis dataKey="game" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" tick={{ fill: "white" }} />
-                  <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "none" }} />
-                  <Legend wrapperStyle={{ color: "white" }} />
-                  <Line type="monotone" dataKey="Yards For"     stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
-                  <Line type="monotone" dataKey="Yards Against" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
           </div>
         )}
       </div>

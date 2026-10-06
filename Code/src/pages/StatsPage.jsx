@@ -1,31 +1,22 @@
 import React, { useState } from "react";
-import { BarChart3, Users, Trophy } from "lucide-react";
+import { BarChart3, ListOrdered, Trophy, Users } from "lucide-react";
 
 import TeamStats from "../components/stats/TeamStats";
 import PlayerStats from "../components/stats/PlayerStats";
 import LeagueLeaders from "../components/stats/LeagueLeaders";
-import StandingsTicker from "../components/stats/StandingsTicker";
+import Rankings from "../components/stats/Rankings";
 
 export default function StatsPage() {
   const [tab, setTab] = useState("team");
-  const [standingsExpanded, setStandingsExpanded] = useState(() => {
-    try {
-      return localStorage.getItem("standingsTickerMinimized") !== "true";
-    } catch {
-      return true;
-    }
-  });
 
   return (
-    <div className={`bg-slate-900 pt-4 sm:pt-5 px-4 transition-[padding] duration-300 ${
-      standingsExpanded ? "pb-28 sm:pb-24" : "pb-20"
-    }`}>
+    <div className="bg-slate-900 pt-4 sm:pt-5 px-4 pb-8">
       <div className="max-w-6xl mx-auto space-y-6 sm:space-y-10">
 
         <header>
           <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">Season Statistics</h1>
           <p className="text-slate-400 text-sm sm:text-base">
-            View team-wide stats, player breakdowns, and league leaders.
+            View team-wide stats, player breakdowns, league leaders, and rankings.
           </p>
         </header>
 
@@ -33,17 +24,17 @@ export default function StatsPage() {
           <StatsTab label="Team Stats" shortLabel="Teams" icon={BarChart3} active={tab === "team"} onClick={() => setTab("team")} />
           <StatsTab label="Player Stats" shortLabel="Players" icon={Users} active={tab === "players"} onClick={() => setTab("players")} />
           <StatsTab label="League Leaders" shortLabel="Leaders" icon={Trophy} active={tab === "leaders"} onClick={() => setTab("leaders")} />
+          <StatsTab label="Rankings" shortLabel="Ranks" icon={ListOrdered} active={tab === "rankings"} onClick={() => setTab("rankings")} />
         </div>
 
         <section>
           {tab === "team" && <TeamStats />}
           {tab === "players" && <PlayerStats />}
           {tab === "leaders" && <LeagueLeaders />}
+          {tab === "rankings" && <Rankings />}
         </section>
 
       </div>
-
-      <StandingsTicker onExpandedChange={setStandingsExpanded} />
     </div>
   );
 }

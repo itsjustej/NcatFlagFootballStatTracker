@@ -13,6 +13,7 @@ import {
   countPlayerInterceptions,
   countPlayerDefensiveTDs,
   isExplosiveYards,
+  gamesPlayedByPlayer,
 } from "../../utils/statsHelpers";
 
 const fmt = (val, digits = 1) =>
@@ -158,15 +159,8 @@ export default function PlayerStats() {
       const playersData = season.players.filter(
         (p) => String(p.team_id) === String(teamId) && !isUnknownPlayer(p),
       );
-      const { plays, participants, games, roster } = season;
-      const leagueGameIds = new Set((games || []).map((g) => g.game_id));
-      const gamesWithJersey = new Map();
-      for (const row of roster || []) {
-        if (row.jersey == null || !leagueGameIds.has(row.game_id)) continue;
-        const ids = gamesWithJersey.get(row.player_id) ?? new Set();
-        ids.add(row.game_id);
-        gamesWithJersey.set(row.player_id, ids);
-      }
+      const { plays, participants, games } = season;
+      const gamesByPlayer = gamesPlayedByPlayer(participants, plays);
 
       // Build game→home map
       const ghMap = {};
@@ -197,7 +191,7 @@ export default function PlayerStats() {
 
         const yg = p => yardsGainedForPlay(p, ghMap[p.game_id], harMap[p.game_id], fortyMap[p.game_id]);
 
-        const gamesPlayed = gamesWithJersey.get(pid)?.size ?? 0;
+        const gamesPlayed = gamesByPlayer.get(Number(pid))?.size ?? 0;
 
         // Passing
         const passAttempts       = passerData.filter(p => p.play_type === 'pass').length;

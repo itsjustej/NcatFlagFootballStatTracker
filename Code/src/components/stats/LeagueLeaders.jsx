@@ -18,6 +18,7 @@ import {
   countExplosivePlays,
   computeRedZoneStats,
   pointsForTeam,
+  gamesPlayedByPlayer,
 } from "../../utils/statsHelpers";
 
 const fmt = (val, digits = 1) =>
@@ -97,14 +98,11 @@ function LeaderLine({ rank, name, detail, stats }) {
   );
 }
 
-function LeaderBoard({ title, rows }) {
+function LeaderBoard({ rows }) {
   const split = rows.length > 5;
   const columns = split ? [rows.slice(0, 5), rows.slice(5)] : [rows];
   return (
     <section className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-700">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
-      </div>
       {rows.length === 0 ? (
         <p className="text-slate-500 text-sm px-4 py-3">No data</p>
       ) : (
@@ -123,7 +121,7 @@ function LeaderBoard({ title, rows }) {
 }
 
 // Multi-stat player leader card — primary stat sorts/filters, secondary stats shown in columns
-function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
+function PlayerMultiStatCard({ players, sortKey, secondary = [] }) {
   const filtered = players.filter(p => p[sortKey] > 0);
   const sorted = [...filtered].sort((a, b) => b[sortKey] - a[sortKey]).slice(0, 10);
   const rows = sorted.map((player, index) => ({
@@ -136,10 +134,10 @@ function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
       value: statText(player, stat),
     })),
   }));
-  return <LeaderBoard title={title} rows={rows} />;
+  return <LeaderBoard rows={rows} />;
 }
 
-function PlayerLeaderCard({ title, players, valueKey, valueLabel, digits = 0, suffix = "", secondary = [] }) {
+function PlayerLeaderCard({ players, valueKey, valueLabel, digits = 0, suffix = "", secondary = [] }) {
   const filtered = players.filter(p => p[valueKey] > 0);
   const sorted = [...filtered].sort((a, b) => b[valueKey] - a[valueKey]).slice(0, 10);
   const rows = sorted.map((player, index) => ({
@@ -155,10 +153,10 @@ function PlayerLeaderCard({ title, players, valueKey, valueLabel, digits = 0, su
       { label: valueLabel, value: `${fmt(player[valueKey], digits)}${suffix}` },
     ],
   }));
-  return <LeaderBoard title={title} rows={rows} />;
+  return <LeaderBoard rows={rows} />;
 }
 
-function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lowerIsBetter = false, minKey = null, ratioKeys = null }) {
+function TeamLeaderCard({ teams, valueKey, digits = 1, suffix = "", lowerIsBetter = false, minKey = null, ratioKeys = null }) {
   let list = [...teams];
   if (minKey) list = list.filter((t) => (t[minKey] ?? 0) > 0);
   const sorted = list.sort((a, b) =>
@@ -171,7 +169,7 @@ function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lower
     detail: ratioKeys ? `${team[ratioKeys.num]}/${team[ratioKeys.den]}` : "",
     stats: [{ label: "", value: `${fmt(team[valueKey], digits)}${suffix}` }],
   }));
-  return <LeaderBoard title={title} rows={rows} />;
+  return <LeaderBoard rows={rows} />;
 }
 
 const VIEWS = [
@@ -206,20 +204,18 @@ const LEADER_TABS = {
       key: "passing",
       label: "Passing",
       card: "player-multi",
-      title: "Passing",
       sortKey: "passingFanPts",
       secondary: [
         { key: "completionPct", label: "COMP%", short: "CMP", digits: 0, suffix: "%" },
         { key: "passingYpg", label: "YDS/G", short: "YPG", digits: 1 },
         { key: "yardsPerAttempt", label: "YDS/A", short: "YPA", digits: 1 },
-        { key: "passingTdpg", label: "TD/G", short: "TD", digits: 1 },
+        { key: "passingTdpg", label: "TD/G", short: "TD/G", digits: 1 },
       ],
     },
     {
       key: "rushing",
       label: "Rushing",
       card: "player-multi",
-      title: "Rushing",
       sortKey: "rushingFanPts",
       secondary: [
         { key: "rushesPerGame", label: "RUSH/G", short: "RSH", digits: 1 },
@@ -231,7 +227,6 @@ const LEADER_TABS = {
       key: "receiving",
       label: "Receiving",
       card: "player-multi",
-      title: "Receiving",
       sortKey: "receivingFanPts",
       secondary: [
         { key: "receptionsPerGame", label: "REC/G", short: "REC", digits: 1 },
@@ -243,7 +238,6 @@ const LEADER_TABS = {
       key: "flag-pulls",
       label: "Flag Pulls",
       card: "player",
-      title: "Flag Pulls",
       valueKey: "flagPullsPerGame",
       valueLabel: "PER G",
       digits: 1,
@@ -252,7 +246,6 @@ const LEADER_TABS = {
       key: "flag-pulls-loss",
       label: "For Loss",
       card: "player",
-      title: "Flag Pulls For Loss",
       valueKey: "flagPullsForLossPerGame",
       valueLabel: "PER G",
       digits: 1,
@@ -261,29 +254,27 @@ const LEADER_TABS = {
       key: "interceptions",
       label: "Interceptions",
       card: "player",
-      title: "Interceptions",
       valueKey: "interceptionsPerGame",
       valueLabel: "PER G",
       digits: 1,
     },
   ],
   offense: [
-    { key: "ppg", label: "Points", card: "team", title: "Points Per Game", valueKey: "ppg" },
-    { key: "pass-yds", label: "Pass Yards", card: "team", title: "Passing Yards / Game", valueKey: "passYpg" },
-    { key: "rush-yds", label: "Rush Yards", card: "team", title: "Rushing Yards / Game", valueKey: "rushYpg" },
-    { key: "total-yds", label: "Total Yards", card: "team", title: "Total Yards / Game", valueKey: "totalYpg" },
-    { key: "ypp", label: "Yards/Play", card: "team", title: "Yards Per Play", valueKey: "yardsPerPlay" },
-    { key: "comp", label: "Completion", card: "team", title: "Completion %", valueKey: "completionPct", suffix: "%" },
-    { key: "success", label: "Success", card: "team", title: "Success Rate", valueKey: "successFor", suffix: "%" },
-    { key: "explosive", label: "Explosive", card: "team", title: "Explosive Plays / Game", valueKey: "explosivePlays" },
-    { key: "conv1", label: "1-Point", card: "team", title: "1-Point %", valueKey: "conv1Pct", suffix: "%" },
-    { key: "conv2", label: "2-Point", card: "team", title: "2-Point %", valueKey: "conv2Pct", suffix: "%" },
-    { key: "conv3", label: "3-Point", card: "team", title: "3-Point %", valueKey: "conv3Pct", suffix: "%" },
+    { key: "ppg", label: "Points", card: "team", valueKey: "ppg" },
+    { key: "pass-yds", label: "Pass Yards", card: "team", valueKey: "passYpg" },
+    { key: "rush-yds", label: "Rush Yards", card: "team", valueKey: "rushYpg" },
+    { key: "total-yds", label: "Total Yards", card: "team", valueKey: "totalYpg" },
+    { key: "ypp", label: "Yards/Play", card: "team", valueKey: "yardsPerPlay" },
+    { key: "comp", label: "Completion", card: "team", valueKey: "completionPct", suffix: "%" },
+    { key: "success", label: "Success", card: "team", valueKey: "successFor", suffix: "%" },
+    { key: "explosive", label: "Explosive", card: "team", valueKey: "explosivePlays" },
+    { key: "conv1", label: "1-Point", card: "team", valueKey: "conv1Pct", suffix: "%" },
+    { key: "conv2", label: "2-Point", card: "team", valueKey: "conv2Pct", suffix: "%" },
+    { key: "conv3", label: "3-Point", card: "team", valueKey: "conv3Pct", suffix: "%" },
     {
       key: "red-zone",
       label: "Red Zone",
       card: "team",
-      title: "Red Zone Success",
       valueKey: "redZonePct",
       suffix: "%",
       minKey: "redZoneAttempts",
@@ -291,15 +282,15 @@ const LEADER_TABS = {
     },
   ],
   defense: [
-    { key: "papg", label: "Pts Against", card: "team", title: "Points Against / Game", valueKey: "papg", lowerIsBetter: true },
-    { key: "pass-against", label: "Pass Against", card: "team", title: "Pass Yards Against / Game", valueKey: "passYpgAgainst", lowerIsBetter: true },
-    { key: "rush-against", label: "Rush Against", card: "team", title: "Rush Yards Against / Game", valueKey: "rushYpgAgainst", lowerIsBetter: true },
-    { key: "total-against", label: "Total Against", card: "team", title: "Total Yards Against / Game", valueKey: "totalYpgAgainst", lowerIsBetter: true },
-    { key: "ypp-against", label: "Yards/Play", card: "team", title: "Yards Per Play Against", valueKey: "yardsPerPlayAgainst", lowerIsBetter: true },
-    { key: "success-against", label: "Success", card: "team", title: "Success Rate Against", valueKey: "successAgainst", suffix: "%", lowerIsBetter: true },
-    { key: "explosive-against", label: "Explosive", card: "team", title: "Explosive Plays Allowed / Game", valueKey: "explosivePlaysAgainst", lowerIsBetter: true },
-    { key: "def-int", label: "Interceptions", card: "team", title: "Interceptions / Game", valueKey: "interceptions" },
-    { key: "def-tfl", label: "For Loss", card: "team", title: "Flag Pulls For Loss / Game", valueKey: "tflsForced" },
+    { key: "papg", label: "Pts Against", card: "team", valueKey: "papg", lowerIsBetter: true },
+    { key: "pass-against", label: "Pass Against", card: "team", valueKey: "passYpgAgainst", lowerIsBetter: true },
+    { key: "rush-against", label: "Rush Against", card: "team", valueKey: "rushYpgAgainst", lowerIsBetter: true },
+    { key: "total-against", label: "Total Against", card: "team", valueKey: "totalYpgAgainst", lowerIsBetter: true },
+    { key: "ypp-against", label: "Yards/Play", card: "team", valueKey: "yardsPerPlayAgainst", lowerIsBetter: true },
+    { key: "success-against", label: "Success", card: "team", valueKey: "successAgainst", suffix: "%", lowerIsBetter: true },
+    { key: "explosive-against", label: "Explosive", card: "team", valueKey: "explosivePlaysAgainst", lowerIsBetter: true },
+    { key: "def-int", label: "Interceptions", card: "team", valueKey: "interceptions" },
+    { key: "def-tfl", label: "For Loss", card: "team", valueKey: "tflsForced" },
   ],
 };
 
@@ -340,7 +331,6 @@ function LeaderCard({ stat, playerStats, teamStats }) {
   if (stat.card === "player-multi") {
     return (
       <PlayerMultiStatCard
-        title={stat.title}
         players={playerStats}
         sortKey={stat.sortKey}
         secondary={stat.secondary}
@@ -350,7 +340,6 @@ function LeaderCard({ stat, playerStats, teamStats }) {
   if (stat.card === "player") {
     return (
       <PlayerLeaderCard
-        title={stat.title}
         players={playerStats}
         valueKey={stat.valueKey}
         valueLabel={stat.valueLabel}
@@ -360,7 +349,6 @@ function LeaderCard({ stat, playerStats, teamStats }) {
   }
   return (
     <TeamLeaderCard
-      title={stat.title}
       teams={teamStats}
       valueKey={stat.valueKey}
       digits={stat.digits}
@@ -401,15 +389,8 @@ export default function LeagueLeaders() {
         setLoading(false);
         return;
       }
-      const { teams, players, games, plays, participants, roster } = season;
-      const leagueGameIds = new Set((games || []).map((g) => g.game_id));
-      const gamesWithJersey = new Map();
-      for (const row of roster || []) {
-        if (row.jersey == null || !leagueGameIds.has(row.game_id)) continue;
-        const ids = gamesWithJersey.get(row.player_id) ?? new Set();
-        ids.add(row.game_id);
-        gamesWithJersey.set(row.player_id, ids);
-      }
+      const { teams, players, games, plays, participants } = season;
+      const gamesByPlayer = gamesPlayedByPlayer(participants, plays);
 
       // Build game→home map
       const ghMap = {};
@@ -463,7 +444,7 @@ export default function LeagueLeaders() {
         const receivingYards = receiverData.filter(p => isReceivingOutcome(p.outcome)).reduce((s, p) => s + yg(p), 0);
         const receivingTDs   = receiverData.filter(p => p.outcome === 'td').length;
 
-        const gamesPlayed = gamesWithJersey.get(pid)?.size ?? 0;
+        const gamesPlayed = gamesByPlayer.get(Number(pid))?.size ?? 0;
         const perGame = (total) => (gamesPlayed > 0 ? total / gamesPlayed : 0);
         const round2 = (n) => Math.round(n * 100) / 100;
         const passingYpg = perGame(passingYards);
