@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import PlayByPlay from '../components/game/PlayByPlay';
+import PlayByPlay, { orderedPlays } from '../components/game/PlayByPlay';
 import EditPlayCredit from '../components/game/EditPlayCredit';
 import { fetchGameData, fetchPlayBundle, mergeLivePlay, removeLivePlay } from './GameViewPage';
-import { updatePlayCredit, removePlayCredit, creditsNeedingPlayers, playNeedsPlayers, ROLE_LABELS, swapCreditName, stripDefenderFromDescription } from '../utils/playCredit';
+import { updatePlayCredit, removePlayCredit, creditsNeedingPlayers, playNeedsPlayers, ROLE_LABELS, patchLogEntry } from '../utils/playCredit';
 import { useLivePlays } from '../utils/liveGame';
 import { possessionColor, TEAM_COLORS } from '../constants/teamColors';
 
@@ -135,9 +135,18 @@ export default function FillPlayersPage() {
   dataRef.current = data;
 
   const handleFinished = useCallback((entry) => {
-    const log = dataRef.current?.log || [];
-    const next = [...log].reverse().filter(playNeedsPlayers).find((item) => item.playId !== entry.playId);
-    setEditing(next ?? null);
+    const ordered = orderedPlays(dataRef.current?.log || []).reverse();
+    const start = ordered.findIndex((item) => (
+      item.id === entry.id || Number(item.playId) === Number(entry.playId)
+    ));
+    let next = null;
+    for (let i = Math.max(start, 0) + (start >= 0 ? 1 : 0); i < ordered.length; i += 1) {
+      if (playNeedsPlayers(ordered[i])) {
+        next = ordered[i];
+        break;
+      }
+    }
+    setEditing(next);
   }, []);
 
   const handleEditCredit = useCallback(async (entry, changes) => {
@@ -156,30 +165,9 @@ export default function FillPlayersPage() {
           })
     )));
 
-    setData((current) => {
-      if (!current) return current;
-      let description = entry.description;
-      let credits = (entry.credits || []).map((credit) => ({ ...credit }));
-      for (const change of changes) {
-        if (change.remove) {
-          description = stripDefenderFromDescription(description, change.fromName);
-          credits = credits.filter((credit) => credit.role !== change.role);
-          continue;
-        }
-        description = swapCreditName(description, change.role, change.fromName, change.toPlayer.name);
-        credits = credits.map((credit) => (
-          credit.role === change.role
-            ? { ...credit, playerId: change.toPlayerId, playerName: change.toPlayer.name }
-            : credit
-        ));
-      }
-      return {
-        ...current,
-        log: current.log.map((item) => (
-          item.playId === entry.playId ? { ...item, description, credits } : item
-        )),
-      };
-    });
+    setData((current) => (
+      current ? { ...current, log: patchLogEntry(current.log, entry, changes) } : current
+    ));
   }, []);
 
   if (loading && !data) {
@@ -199,8 +187,9 @@ export default function FillPlayersPage() {
   }
 
   const { homeName, awayName, log, finalHome, finalAway, homeRoster, awayRoster } = data;
-  const queue = [...log].reverse().filter(playNeedsPlayers);
-  const newest = log[log.length - 1];
+  const ordered = orderedPlays(log);
+  const queue = [...ordered].reverse().filter(playNeedsPlayers);
+  const newest = ordered[ordered.length - 1];
 
   return (
     <div className="flex h-[100dvh] max-w-[100vw] flex-col overflow-hidden bg-slate-900 text-white">
@@ -246,7 +235,7 @@ export default function FillPlayersPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            <div className="flex flex-col gap-2.5">
               {queue.map((entry) => (
                 <PlayCard
                   key={entry.id}
@@ -270,7 +259,6 @@ export default function FillPlayersPage() {
             awayPlayers={awayRoster}
             onEditCredit={handleEditCredit}
             emphasizeIncomplete
-            columns={2}
             showHeader={false}
             emptyDetail="Plays show up here as they are logged. Leave this screen open."
           />

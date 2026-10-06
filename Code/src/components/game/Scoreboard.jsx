@@ -160,9 +160,11 @@ export default function Scoreboard({
         </div>
       </div>
 
-      {coop && (
+      {onToggleCoop && (
         <p className="hidden sm:block px-3 py-1.5 text-[11px] leading-snug text-amber-200 bg-amber-500/10 border-b border-slate-700">
-          Spot the ball and tap the play. The other phone fills in the names.
+          {coop
+            ? 'Spot the ball and tap the play. The other phone fills in the names.'
+            : 'Spot the ball and tap the play. You fill in the names next.'}
         </p>
       )}
 

@@ -49,14 +49,6 @@ function RankBadge({ rank, className = "w-8 h-8 text-sm" }) {
   );
 }
 
-function PlayerName({ name }) {
-  return (
-    <p className="text-slate-100 text-sm font-semibold truncate">
-      {shortPlayerName(name)}
-    </p>
-  );
-}
-
 function teamLabel(entry) {
   return entry.team_name || entry.team_abbr || "";
 }
@@ -65,31 +57,68 @@ function statText(entry, stat) {
   return `${fmt(entry[stat.key], stat.digits ?? 0)}${stat.suffix || ""}`;
 }
 
-function MobilePlayerIdentity({ rank, name, team, trailing = null }) {
+function LeaderLine({ rank, name, detail, stats }) {
+  const single = stats.length <= 1;
   return (
-    <div className="flex items-center gap-3">
-      <RankBadge rank={rank} />
-      <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-semibold text-slate-50 leading-snug">{shortPlayerName(name)}</p>
-        <p className="mt-0.5 text-xs font-semibold uppercase tracking-wide text-slate-400 leading-snug">{team}</p>
+    <li className="px-2.5 py-2 sm:px-3.5 sm:py-2.5 border-b border-slate-800/80 last:border-b-0">
+      <div className="flex items-center gap-2">
+        <RankBadge rank={rank} className="w-6 h-6 text-[11px] sm:w-7 sm:h-7 sm:text-xs" />
+        <div className="min-w-0 flex-1 lg:flex-none lg:w-40">
+          <p className="text-[13px] sm:text-sm font-semibold text-slate-50 leading-tight truncate">{name}</p>
+          {detail && (
+            <p className="mt-0.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-400 leading-tight truncate">{detail}</p>
+          )}
+        </div>
+        {single && (
+          <span className="text-sm font-bold text-white tabular-nums shrink-0">{stats[0]?.value ?? "—"}</span>
+        )}
+        {!single && (
+          <div className="hidden lg:flex items-end gap-3 shrink-0">
+            {stats.map((stat) => (
+              <div key={stat.label} className="w-11 text-right">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500 leading-none">{stat.label}</p>
+                <p className="mt-1 text-sm font-semibold text-white tabular-nums leading-none">{stat.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-      {trailing}
-    </div>
+      {!single && (
+        <div className="lg:hidden mt-1.5 pl-8 grid grid-cols-2 gap-x-2 gap-y-0.5">
+          {stats.map((stat) => (
+            <p key={stat.label} className="text-[11px] leading-tight min-w-0 truncate">
+              <span className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{stat.label} </span>
+              <span className="font-semibold tabular-nums text-white">{stat.value}</span>
+            </p>
+          ))}
+        </div>
+      )}
+    </li>
   );
 }
 
-function MobileStatStrip({ stats }) {
-  const dense = stats.length >= 4;
-  const cols = dense ? "grid-cols-4 gap-1" : stats.length > 1 ? "grid-cols-3 gap-1.5" : "grid-cols-1";
+function LeaderBoard({ title, rows }) {
+  const split = rows.length > 5;
+  const columns = split ? [rows.slice(0, 5), rows.slice(5)] : [rows];
   return (
-    <div className={`mt-2.5 ml-11 grid ${cols}`}>
-      {stats.map((stat) => (
-        <div key={stat.key} className={`rounded-md bg-slate-800/90 text-center min-w-0 ${dense ? "px-0.5 py-1.5" : "px-2 py-1.5"}`}>
-          <p className={`font-bold uppercase text-slate-500 leading-none ${dense ? "text-[9px] tracking-wide" : "text-[10px] tracking-wider"}`}>{stat.label}</p>
-          <p className={`mt-1 font-bold text-white tabular-nums leading-none ${dense ? "text-xs" : "text-sm"}`}>{stat.value}</p>
+    <section className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-700">
+        <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-slate-500 text-sm px-4 py-3">No data</p>
+      ) : (
+        <div className={split ? "grid grid-cols-2 gap-px bg-slate-700/50" : ""}>
+          {columns.map((column, index) => (
+            <ol key={index} className="min-w-0 bg-slate-900/90">
+              {column.map((row) => (
+                <LeaderLine key={row.id} {...row} />
+              ))}
+            </ol>
+          ))}
         </div>
-      ))}
-    </div>
+      )}
+    </section>
   );
 }
 
@@ -97,123 +126,36 @@ function MobileStatStrip({ stats }) {
 function PlayerMultiStatCard({ title, players, sortKey, secondary = [] }) {
   const filtered = players.filter(p => p[sortKey] > 0);
   const sorted = [...filtered].sort((a, b) => b[sortKey] - a[sortKey]).slice(0, 10);
-
-  return (
-    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
-      <div className="lg:hidden px-3 py-3 border-b border-slate-700">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
-      </div>
-      <div className="hidden lg:flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-700">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0 truncate">{title}</h3>
-        <div className="flex items-center gap-3 text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
-          {secondary.map(s => (
-            <span key={s.key} className={`text-right ${s.label.length > 3 ? "w-14" : "w-10"}`}>{s.short || s.label}</span>
-          ))}
-        </div>
-      </div>
-      <div>
-        {sorted.map((p, i) => (
-          <div key={p.player_id} className="border-b border-slate-700/50 last:border-b-0">
-            <div className="lg:hidden px-3 py-3">
-              <MobilePlayerIdentity rank={i + 1} name={p.name} team={teamLabel(p)} />
-              <MobileStatStrip
-                stats={secondary.map(s => ({
-                  key: s.key,
-                  label: secondary.length > 3 ? (s.short || s.label) : s.label,
-                  value: statText(p, s),
-                }))}
-              />
-            </div>
-            <div className="hidden lg:flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700/30">
-              <RankBadge rank={i + 1} className="w-10 h-10 text-sm" />
-              <div className="flex-1 min-w-0">
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
-                <PlayerName name={p.name} />
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                {secondary.map(s => (
-                  <span key={s.key} className={`text-right text-slate-300 text-sm tabular-nums ${s.label.length > 3 ? "w-14" : "w-10"}`}>
-                    {statText(p, s)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
-        {sorted.length === 0 && <p className="text-slate-500 text-sm px-4 py-3">No data</p>}
-      </div>
-    </div>
-  );
+  const rows = sorted.map((player, index) => ({
+    id: player.player_id,
+    rank: index + 1,
+    name: shortPlayerName(player.name),
+    detail: teamLabel(player),
+    stats: secondary.map((stat) => ({
+      label: stat.short || stat.label,
+      value: statText(player, stat),
+    })),
+  }));
+  return <LeaderBoard title={title} rows={rows} />;
 }
 
 function PlayerLeaderCard({ title, players, valueKey, valueLabel, digits = 0, suffix = "", secondary = [] }) {
   const filtered = players.filter(p => p[valueKey] > 0);
   const sorted = [...filtered].sort((a, b) => b[valueKey] - a[valueKey]).slice(0, 10);
-
-  return (
-    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg overflow-hidden flex flex-col">
-      <div className="lg:hidden px-3 py-3 border-b border-slate-700">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wide">{title}</h3>
-      </div>
-      <div className="hidden lg:flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-700">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wide min-w-0 truncate">{title}</h3>
-        <div className="flex items-center gap-4 text-xs font-bold text-slate-500 uppercase tracking-wide shrink-0">
-          {secondary.map(s => (
-            <span key={s.key} className="w-12 text-right">{s.short || s.label}</span>
-          ))}
-          <span className="w-14 text-right">{valueLabel}</span>
-        </div>
-      </div>
-      <div>
-        {sorted.map((p, i) => (
-          <div key={p.player_id} className="border-b border-slate-700/50 last:border-b-0">
-            <div className="lg:hidden px-3 py-3">
-              <MobilePlayerIdentity
-                rank={i + 1}
-                name={p.name}
-                team={teamLabel(p)}
-                trailing={(
-                  <div className="shrink-0 text-right pl-1">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 leading-none">{valueLabel}</p>
-                    <p className="mt-1 text-lg font-bold text-white tabular-nums leading-none">
-                      {fmt(p[valueKey], digits)}{suffix}
-                    </p>
-                  </div>
-                )}
-              />
-              {secondary.length > 0 && (
-                <MobileStatStrip
-                  stats={secondary.map(s => ({
-                    key: s.key,
-                    label: s.short || s.label,
-                    value: statText(p, s),
-                  }))}
-                />
-              )}
-            </div>
-            <div className="hidden lg:flex items-center gap-3 px-4 py-2.5 hover:bg-slate-700/30">
-              <RankBadge rank={i + 1} className="w-10 h-10 text-sm" />
-              <div className="flex-1 min-w-0">
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wide truncate">{p.team_abbr || p.team_name}</p>
-                <PlayerName name={p.name} />
-              </div>
-              <div className="flex items-center gap-4 shrink-0">
-                {secondary.map(s => (
-                  <span key={s.key} className="w-12 text-right text-slate-300 text-sm tabular-nums">
-                    {statText(p, s)}
-                  </span>
-                ))}
-              </div>
-              <span className="w-14 text-right text-white font-bold text-sm tabular-nums shrink-0">
-                {fmt(p[valueKey], digits)}{suffix}
-              </span>
-            </div>
-          </div>
-        ))}
-        {sorted.length === 0 && <p className="text-slate-500 text-sm px-4 py-3">No data</p>}
-      </div>
-    </div>
-  );
+  const rows = sorted.map((player, index) => ({
+    id: player.player_id,
+    rank: index + 1,
+    name: shortPlayerName(player.name),
+    detail: teamLabel(player),
+    stats: [
+      ...secondary.map((stat) => ({
+        label: stat.short || stat.label,
+        value: statText(player, stat),
+      })),
+      { label: valueLabel, value: `${fmt(player[valueKey], digits)}${suffix}` },
+    ],
+  }));
+  return <LeaderBoard title={title} rows={rows} />;
 }
 
 function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lowerIsBetter = false, minKey = null, ratioKeys = null }) {
@@ -222,28 +164,14 @@ function TeamLeaderCard({ title, teams, valueKey, digits = 1, suffix = "", lower
   const sorted = list.sort((a, b) =>
     lowerIsBetter ? a[valueKey] - b[valueKey] : b[valueKey] - a[valueKey]
   );
-  return (
-    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-3 sm:p-5 flex flex-col">
-      <h3 className="text-sm font-bold text-white mb-2.5 sm:mb-3 uppercase tracking-wide leading-snug">{title}</h3>
-      <div className="space-y-2">
-        {sorted.map((t, i) => (
-          <div key={t.team_id} className="flex items-center gap-3 px-2.5 py-2 sm:p-2 rounded-lg bg-slate-700/40">
-            <RankBadge rank={i + 1} />
-            <p className="flex-1 min-w-0 text-slate-100 text-sm font-medium leading-snug">{t.name}</p>
-            <span className="text-white font-bold text-sm shrink-0 text-right tabular-nums">
-              {ratioKeys && (
-                <span className="text-slate-400 font-medium text-xs mr-1.5">
-                  {t[ratioKeys.num]}/{t[ratioKeys.den]}
-                </span>
-              )}
-              {fmt(t[valueKey], digits)}{suffix}
-            </span>
-          </div>
-        ))}
-        {sorted.length === 0 && <p className="text-slate-500 text-sm">No data</p>}
-      </div>
-    </div>
-  );
+  const rows = sorted.map((team, index) => ({
+    id: team.team_id,
+    rank: index + 1,
+    name: team.name,
+    detail: ratioKeys ? `${team[ratioKeys.num]}/${team[ratioKeys.den]}` : "",
+    stats: [{ label: "", value: `${fmt(team[valueKey], digits)}${suffix}` }],
+  }));
+  return <LeaderBoard title={title} rows={rows} />;
 }
 
 const VIEWS = [

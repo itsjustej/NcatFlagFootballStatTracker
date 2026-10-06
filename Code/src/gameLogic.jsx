@@ -127,8 +127,29 @@ export function distanceToFirst(yardLine, possession, homeAttacksRight = true, h
   return attacksIncreasing(possession, homeAttacksRight) ? fd - yardLine : yardLine - fd;
 }
 
-export function crossedFirstDown(oldYard, newYard, possession, homeAttacksRight = true, hasFortyYard = true) {
-  const fd = firstDownYard(oldYard, possession, homeAttacksRight, hasFortyYard);
+/**
+ * Yard where the yellow chain sits. A stored series target wins. Otherwise the
+ * line is the snap spot plus the distance to go, which is what the field draws.
+ */
+export function firstDownMarkerYard({
+  yardLine,
+  distance,
+  possession,
+  homeAttacksRight = true,
+  hasFortyYard = true,
+  fdTarget = null,
+} = {}) {
+  if (typeof fdTarget === 'number' && Number.isFinite(fdTarget)) return fdTarget;
+  const line = Number(yardLine);
+  const toGo = Number(distance);
+  if (Number.isFinite(line) && Number.isFinite(toGo)) {
+    return attacksIncreasing(possession, homeAttacksRight) ? line + toGo : line - toGo;
+  }
+  return firstDownYard(Number.isFinite(line) ? line : 0, possession, homeAttacksRight, hasFortyYard);
+}
+
+export function crossedFirstDown(oldYard, newYard, possession, homeAttacksRight = true, hasFortyYard = true, markerYard = null) {
+  const fd = markerYard ?? firstDownYard(oldYard, possession, homeAttacksRight, hasFortyYard);
   if (attacksIncreasing(possession, homeAttacksRight)) return newYard >= fd;
   return newYard <= fd;
 }

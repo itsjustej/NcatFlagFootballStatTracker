@@ -116,6 +116,44 @@ export function swapCreditName(description, role, oldName, newName) {
   return description;
 }
 
+/** Apply name edits onto one play without touching its place in the log. */
+export function applyCreditChanges(entry, changes) {
+  let description = entry?.description;
+  let credits = (entry?.credits || []).map((credit) => ({ ...credit }));
+  for (const change of changes || []) {
+    if (change.remove) {
+      description = stripDefenderFromDescription(description, change.fromName);
+      credits = credits.filter((credit) => credit.role !== change.role);
+      continue;
+    }
+    description = swapCreditName(description, change.role, change.fromName, change.toPlayer?.name);
+    credits = credits.map((credit) => (
+      credit.role === change.role
+        ? {
+            ...credit,
+            playerId: Number(change.toPlayerId),
+            playerName: change.toPlayer?.name ?? credit.playerName,
+          }
+        : credit
+    ));
+  }
+  return { description, credits };
+}
+
+function samePlay(item, entry) {
+  if (item?.id != null && entry?.id != null) return item.id === entry.id;
+  if (entry?.playId == null || item?.playId == null) return false;
+  return Number(item.playId) === Number(entry.playId);
+}
+
+/** Patch the current copy of a play so a second name save keeps the first. */
+export function patchLogEntry(log, entry, changes) {
+  return (log || []).map((item) => {
+    if (!samePlay(item, entry)) return item;
+    return { ...item, ...applyCreditChanges(item, changes) };
+  });
+}
+
 /** Drop "(tackled by Name)" when a flag pull is cleared. */
 export function stripDefenderFromDescription(description, name) {
   const first = playerFirstName(name);

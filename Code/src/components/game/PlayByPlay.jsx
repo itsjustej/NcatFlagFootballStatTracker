@@ -7,12 +7,31 @@ import { playNeedsPlayers } from '../../utils/playCredit';
 import CurrentPlayPreview from './CurrentPlayPreview';
 import EditPlayCredit from './EditPlayCredit';
 
+function sequenceValue(entry, index) {
+  const number = Number(entry?.playNumber);
+  if (Number.isFinite(number)) return number;
+  const id = Number(entry?.playId);
+  if (Number.isFinite(id)) return id;
+  return index;
+}
+
+/** Chronological play order. Name edits must not change this. */
+export function orderedPlays(log) {
+  return (log || [])
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => {
+      const delta = sequenceValue(a.entry, a.index) - sequenceValue(b.entry, b.index);
+      return delta || (a.index - b.index);
+    })
+    .map((item) => item.entry);
+}
+
 function buildDrives(log, currentHalf) {
   const map = new Map();
   const scoreAtStart = new Map();
   let prevHome = 0;
   let prevAway = 0;
-  for (const entry of log) {
+  for (const entry of orderedPlays(log)) {
     if (!scoreAtStart.has(entry.driveId)) {
       scoreAtStart.set(entry.driveId, { home: prevHome, away: prevAway });
     }
@@ -53,7 +72,16 @@ function buildDrives(log, currentHalf) {
     }
   }
 
-  return drives.sort((a, b) => b.driveId - a.driveId);
+  return drives.sort((a, b) => {
+    const aLast = a.plays[a.plays.length - 1];
+    const bLast = b.plays[b.plays.length - 1];
+    const delta = sequenceValue(bLast, 0) - sequenceValue(aLast, 0);
+    if (delta) return delta;
+    const aId = Number(a.driveId);
+    const bId = Number(b.driveId);
+    if (Number.isFinite(aId) && Number.isFinite(bId) && aId !== bId) return bId - aId;
+    return 0;
+  });
 }
 
 function downStr(down, dist) {
@@ -352,6 +380,8 @@ export default function PlayByPlay({
           awayPlayers={awayPlayers}
           onClose={() => setEditingId(null)}
           onSave={(changes) => onEditCredit(editing, changes)}
+          onFinished={() => setEditingId(null)}
+          focusMissing={playNeedsPlayers(editing)}
         />
       )}
     </div>

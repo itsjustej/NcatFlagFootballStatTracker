@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useLeague } from '../context/LeagueContext';
 import { savePlay } from '../context/useSavePlay';
 import { useRemoteCreditSync } from '../utils/liveGame';
-import { creditsFromLogEntry, removePlayCredit, stripDefenderFromDescription, swapCreditName, updatePlayCredit } from '../utils/playCredit';
+import { creditsFromLogEntry, patchLogEntry, playNeedsPlayers, removePlayCredit, updatePlayCredit } from '../utils/playCredit';
 import { resumeGame } from '../context/useResumeGame';
 import {
   firstDownYard,
+  firstDownMarkerYard,
   crossedFirstDown,
   isTouchdown,
   isSafety,
@@ -29,6 +30,8 @@ import PlayControls from '../components/game/PlayControls';
 import CoopPlayBar from '../components/game/CoopPlayBar';
 import Scoreboard   from '../components/game/Scoreboard';
 import PlayByPlay   from '../components/game/PlayByPlay';
+import EditPlayCredit from '../components/game/EditPlayCredit';
+import JerseyNumbers from '../components/game/JerseyNumbers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -138,7 +141,7 @@ export default function GamePage() {
   const {
     currentGameId, game, homePlayers, awayPlayers,
     initialGameState, gameLoading, gameError, exitingRef,
-    updateJersey, clearGame,
+    updateJersey, addPlayer, clearGame,
   } = useLeague();
 
   const [gs, setGs]                     = useState(null);
@@ -154,7 +157,11 @@ export default function GamePage() {
   const [latestDriveId, setLatestDriveId]       = useState(null);
   const [pulseStep, setPulseStep]             = useState(null);
   const [showPlays, setShowPlays]             = useState(false);
+  const [showJerseys, setShowJerseys]         = useState(false);
   const [coopMode, setCoopMode]               = useState(() => localStorage.getItem('coopMode') !== '0');
+  const [followUpId, setFollowUpId]           = useState(null);
+  const coopModeRef = useRef(coopMode);
+  coopModeRef.current = coopMode;
   const [resumed, setResumed]                 = useState(undefined);
   const toastTimerRef                         = useRef(null);
   const prevStepRef                           = useRef(0);
@@ -248,6 +255,9 @@ export default function GamePage() {
               ...s,
               log: s.log.map(e => (e.id === entryId ? { ...e, playId, credits } : e)),
             }));
+            if (!coopModeRef.current && playNeedsPlayers({ ...newEntry, credits })) {
+              setFollowUpId(entryId);
+            }
           }
         });
       }
@@ -256,8 +266,6 @@ export default function GamePage() {
   }, []);
 
   const handleEditCredit = useCallback(async (entry, changes) => {
-    let description = entry.description;
-    let credits = (entry.credits || []).map((c) => ({ ...c }));
     for (const change of changes) {
       if (change.remove) {
         await removePlayCredit({
@@ -265,8 +273,6 @@ export default function GamePage() {
           role: change.role,
           playerId: change.fromPlayerId,
         });
-        description = stripDefenderFromDescription(description, change.fromName);
-        credits = credits.filter((c) => c.role !== change.role);
         continue;
       }
       await updatePlayCredit({
@@ -275,21 +281,13 @@ export default function GamePage() {
         fromPlayerId: change.fromPlayerId,
         toPlayerId: change.toPlayerId,
       });
-      description = swapCreditName(description, change.role, change.fromName, change.toPlayer.name);
-      credits = credits.map((c) => (
-        c.role === change.role
-          ? { role: c.role, playerId: Number(change.toPlayerId), playerName: change.toPlayer.name }
-          : c
-      ));
     }
-    setGs((s) => ({
-      ...s,
-      log: s.log.map((e) => (e.id === entry.id ? { ...e, description, credits } : e)),
-    }));
+    setGs((s) => ({ ...s, log: patchLogEntry(s.log, entry, changes) }));
   }, []);
 
   const handleUndo = useCallback(() => {
     setUndoToast(null);
+    setFollowUpId(null);
     resetConvState();
     setHistory((h) => {
       if (h.length === 0) return h;
@@ -448,8 +446,8 @@ export default function GamePage() {
       const defenseList = (s.possession === 'home' ? awayPlayers : homePlayers) ?? [];
       const unknownDefense = defenseList.find((player) => isUnknownPlayer(player)) ?? null;
       const unknownOffense = offenseList.find((player) => isUnknownPlayer(player)) ?? null;
-      const defenderPlayer = coopMode ? unknownDefense : (s.selectedDefender ?? null);
-      const rushPlayer = coopMode ? unknownOffense : (s.selectedOffender ?? null);
+      const defenderPlayer = unknownDefense;
+      const rushPlayer = unknownOffense;
       const namedRunner = t === 'rush' ? rushPlayer : s.selectedOffender;
       const offFirst  = playerFirstName(namedRunner?.name, t === 'rush' ? 'Runner' : 'QB');
       const defFirst  = playerFirstName(defenderPlayer?.name);
@@ -457,7 +455,7 @@ export default function GamePage() {
       const _rusher   = t === 'rush' ? rushPlayer : null;
       const _defender = defenderPlayer;
 
-      if (t === 'incomplete' && coopMode) {
+      if (t === 'incomplete') {
         const passer = s.selectedOffender ?? unknownOffense;
         const qbFirst = playerFirstName(passer?.name, 'QB');
         const newDown = s.down + 1;
@@ -477,7 +475,7 @@ export default function GamePage() {
         return { ...s, ...afterNormalPlay({ ...s, playType: 'pass' }, s.yardLine, false, newDown), log: addPlay(s.log, entry) };
       }
 
-      if (t === 'interception' && coopMode) {
+      if (t === 'interception') {
         const spotHere = s.newSpot ?? s.yardLine;
         const newPoss = s.possession === 'home' ? 'away' : 'home';
         const passer = s.selectedOffender ?? unknownOffense;
@@ -546,7 +544,7 @@ export default function GamePage() {
           });
         }
         const yds         = yardsGained(s.yardLine, spot, s.possession, s.homeAttacksRight);
-        const fd          = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight, s.hasFortyYard);
+        const fd          = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight, s.hasFortyYard, firstDownMarkerYard(s));
         const newDown     = fd ? 1 : s.down + 1;
         const driveResult = newDown > 4 ? 'Turnover on Downs' : undefined;
         const _outcome    = newDown > 4 ? 'turnover_on_downs' : 'complete';
@@ -554,7 +552,7 @@ export default function GamePage() {
         return { ...s, ...afterNormalPlay({ ...s, playType: 'rush' }, spot, fd, newDown), log: addPlay(s.log, entry) };
       }
 
-      if (t === 'pass' && coopMode) {
+      if (t === 'pass') {
         const passer = s.selectedOffender ?? unknownOffense;
         const receiver = unknownOffense;
         const recFirst = playerFirstName(receiver?.name, 'Unknown');
@@ -577,8 +575,6 @@ export default function GamePage() {
         }
         return { ...withType, ...afterNormalPlay(withType, spot, result.fd, result.newDown), log: addPlay(s.log, result.entry) };
       }
-
-      if (t === 'pass') return { ...s, playType: t, playPhase: 'pass-receiver' };
 
       if (t === 'penalty') {
         const ballMovedForward = yardsGained(s.yardLine, spot, s.possession, s.homeAttacksRight) > 0;
@@ -629,7 +625,7 @@ export default function GamePage() {
 
       return s;
     });
-  }, [homeName, awayName, homePlayers, awayPlayers, coopMode]);
+  }, [homeName, awayName, homePlayers, awayPlayers]);
 
   const handlePassReceiver = useCallback((p) => {
     setGs(s => ({ ...s, selectedReceiver: p, playPhase: 'pass-result' }));
@@ -652,7 +648,7 @@ export default function GamePage() {
       const entry = { ...baseEntry(s), description: `${offFirst} passes to ${recFirst} for a touchdown`, yardsGained: yds, homeScore: newHome, awayScore: newAway, driveResult: 'Touchdown', _playType: 'pass', _outcome: 'td', _passer, _receiver, _defender };
       return { type: 'td', entry, newHome, newAway };
     }
-    const fd          = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight, s.hasFortyYard);
+    const fd          = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight, s.hasFortyYard, firstDownMarkerYard(s));
     const newDown     = fd ? 1 : s.down + 1;
     const driveResult = newDown > 4 ? 'Turnover on Downs' : undefined;
     const _outcome    = newDown > 4 ? 'turnover_on_downs' : 'complete';
@@ -791,8 +787,8 @@ export default function GamePage() {
           : spot - fdTarget;
         return { ...s, ...reset, yardLine: spot, down: 1, distance, fdTarget, log: addPlay(s.log, entry) };
       }
-      const fd        = s.fdTarget ?? firstDownYard(s.yardLine, s.possession, s.homeAttacksRight, s.hasFortyYard);
-      const crossedFD = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight, s.hasFortyYard);
+      const fd        = firstDownMarkerYard(s);
+      const crossedFD = crossedFirstDown(s.yardLine, spot, s.possession, s.homeAttacksRight, s.hasFortyYard, fd);
       if (crossedFD) {
         const fdTarget = firstDownYard(spot, s.possession, s.homeAttacksRight, s.hasFortyYard);
         const distance = attacksIncreasing(s.possession, s.homeAttacksRight)
@@ -937,13 +933,14 @@ export default function GamePage() {
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain pb-[env(safe-area-inset-bottom)]">
         <div className="sticky top-0 z-20 bg-slate-900 border-b border-slate-800">
-          {(!coopMode || gs.playPhase === 'conversion') && (
-            <PlayStepBar gs={gs} convStep={convStep} pulseStep={pulseStep} shortFlow={coopMode} />
+          {gs.playPhase === 'conversion' && (
+            <PlayStepBar gs={gs} convStep={convStep} pulseStep={pulseStep} shortFlow />
           )}
           <div className="px-3 sm:px-4 py-2 sm:py-3">
             <FieldSpot
               yardLine={gs.yardLine}
               distance={gs.distance}
+              fdTarget={gs.fdTarget}
               possession={gs.possession}
               homeAttacksRight={gs.homeAttacksRight ?? true}
               hasFortyYard={gs.hasFortyYard !== false}
@@ -955,7 +952,7 @@ export default function GamePage() {
               disabled={gs.playPhase === 'conversion'}
             />
           </div>
-          {coopMode && gs.playPhase !== 'conversion' && (
+          {gs.playPhase !== 'conversion' && (
             <div className="px-3 sm:px-4 pb-2 sm:pb-3">
               <CoopPlayBar
                 gs={gs}
@@ -982,12 +979,12 @@ export default function GamePage() {
                 awayName={awayName}
                 onJerseyUpdate={updateJersey}
                 pulse={activeStep === 0 && pulseStep === 0}
-                hideDefense={coopMode}
-                collapsible={coopMode}
+                hideDefense
+                collapsible
                 playCount={gs.log.length}
               />
             )}
-            {((!coopMode && gs.selectedOffender) || gs.playPhase === 'conversion') && (
+            {gs.playPhase === 'conversion' && (
               <PlayControls
                 gs={gs}
                 convStep={convStep}
@@ -1019,6 +1016,15 @@ export default function GamePage() {
           onUndo={() => { handleUndo(); setUndoToast(null); }}
           onDismiss={() => setUndoToast(null)}
         />
+        <div className="shrink-0 border-t border-slate-800 bg-slate-900 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={() => setShowJerseys(true)}
+            className="w-full min-h-11 rounded-xl border border-slate-600 bg-slate-800 text-sm font-bold text-white"
+          >
+            Jersey numbers
+          </button>
+        </div>
       </div>
 
       <div className="hidden md:flex w-80 shrink-0 border-l border-slate-700 bg-slate-800 flex-col h-full overflow-hidden">
@@ -1043,6 +1049,7 @@ export default function GamePage() {
             homePlayers={homePlayers}
             awayPlayers={awayPlayers}
             onEditCredit={handleEditCredit}
+            emphasizeIncomplete={!coopMode}
           />
         </div>
       </div>
@@ -1076,11 +1083,41 @@ export default function GamePage() {
               homePlayers={homePlayers}
               awayPlayers={awayPlayers}
               onEditCredit={handleEditCredit}
+              emphasizeIncomplete={!coopMode}
               showHeader={false}
             />
           </div>
         </div>
       )}
+
+      {showJerseys && (
+        <JerseyNumbers
+          homeName={homeName}
+          awayName={awayName}
+          homePlayers={homePlayers}
+          awayPlayers={awayPlayers}
+          onJerseyUpdate={updateJersey}
+          onAddPlayer={addPlayer}
+          onClose={() => setShowJerseys(false)}
+        />
+      )}
+
+      {followUpId && (() => {
+        const followUp = gs.log.find((entry) => entry.id === followUpId);
+        if (!followUp?.playId) return null;
+        return (
+          <EditPlayCredit
+            key={followUp.id}
+            entry={followUp}
+            homePlayers={homePlayers}
+            awayPlayers={awayPlayers}
+            onClose={() => setFollowUpId(null)}
+            onSave={(changes) => handleEditCredit(followUp, changes)}
+            onFinished={() => setFollowUpId(null)}
+            focusMissing
+          />
+        );
+      })()}
     </div>
   );
 }

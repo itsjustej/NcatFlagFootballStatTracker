@@ -190,14 +190,20 @@ export default function EditPlayCredit({
   const [showFilled, setShowFilled] = useState(false);
   const [doneRoles, setDoneRoles] = useState([]);
   const doneRef = useRef([]);
+  const [queue] = useState(() => {
+    const initial = (entry.credits || []).filter(
+      (credit) => !(credit.role === 'defender' && isOffensiveTouchdown(entry)),
+    );
+    return creditsNeedingPlayers({ ...entry, credits: initial });
+  });
 
   const credits = (entry.credits || []).filter(
     (credit) => !(credit.role === 'defender' && isOffensiveTouchdown(entry)),
   );
   const missing = creditsNeedingPlayers({ ...entry, credits });
   const filled = credits.filter((credit) => !isUnknownPlayer(credit.playerName));
-  const visible = focusMissing && !showFilled && missing.length ? missing : credits;
-  const remaining = missing.filter((credit) => !doneRoles.includes(credit.role));
+  const visible = focusMissing && !showFilled && queue.length ? queue : credits;
+  const remaining = queue.filter((credit) => !doneRoles.includes(credit.role));
   const current = remaining[0];
 
   function commit(credit, player) {
@@ -217,7 +223,7 @@ export default function EditPlayCredit({
           fromName: credit.playerName,
           remove: true,
         };
-    const still = missing.filter((item) => item.role !== credit.role && !doneRoles.includes(item.role));
+    const still = queue.filter((item) => item.role !== credit.role && !doneRoles.includes(item.role));
     setDoneRoles((prev) => [...prev, credit.role]);
     setDraft((prev) => ({ ...prev, [credit.role]: player ? String(player.id) : '' }));
     setError('');
@@ -230,7 +236,7 @@ export default function EditPlayCredit({
     });
   }
 
-  if (focusMissing && !showFilled && missing.length) {
+  if (focusMissing && !showFilled && queue.length) {
     if (!current) {
       return (
         <div className="fixed inset-0 z-50 bg-slate-900 text-white flex items-center justify-center">
@@ -242,7 +248,7 @@ export default function EditPlayCredit({
       rosterFor(current.role, entry, homePlayers, awayPlayers) || [],
     ));
     const unknownIds = new Set(
-      missing.map((credit) => String(credit.playerId)),
+      queue.map((credit) => String(credit.playerId)),
     );
     const taken = new Set(
       Object.entries(draft)
@@ -256,7 +262,7 @@ export default function EditPlayCredit({
         players={fullRoster}
         taken={taken}
         step={doneRoles.length + 1}
-        total={missing.length}
+        total={queue.length}
         nextAsk={remaining[1] ? (ASK[remaining[1].role] ?? null) : null}
         error={error}
         onPick={(player) => commit(current, player)}

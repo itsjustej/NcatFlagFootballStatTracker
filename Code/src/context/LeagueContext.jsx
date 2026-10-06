@@ -111,7 +111,8 @@ export function LeagueProvider({ children }) {
     initialGameState,
     loading: gameLoading,
     error: gameError,
-    updateJersey,  // ← added
+    updateJersey,
+    addPlayer,
   } = useGame(pathname === "/game" ? currentGameId : null);
 
   const startGame = (gameId) => {
@@ -146,7 +147,8 @@ export function LeagueProvider({ children }) {
         initialGameState,
         gameLoading,
         gameError,
-        updateJersey,  // ← added
+        updateJersey,
+        addPlayer,
       }}
     >
       {children}

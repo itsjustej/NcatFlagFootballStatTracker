@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { distanceToFirst, firstDownYard, kickoffYard } from '../gameLogic';
-import { cleanPlayerName } from '../utils/playerName';
+import { cleanPlayerName, isUnknownPlayer } from '../utils/playerName';
 import { ensureUnknownPlayers, withUnknownLast } from '../utils/unknownPlayer';
 
 /**
@@ -167,7 +167,7 @@ export function useGame(gameId) {
 
     // Optimistic local update
     const applyUpdate = (list) =>
-      sortByJersey(list.map(p => p.id === String(playerId) ? { ...p, number: jersey } : p));
+      withUnknownLast(sortByJersey(list.map(p => p.id === String(playerId) ? { ...p, number: jersey } : p)));
 
     setHomePlayers(prev => applyUpdate(prev));
     setAwayPlayers(prev => applyUpdate(prev));
@@ -179,6 +179,38 @@ export function useGame(gameId) {
                { onConflict: 'game_id,player_id' });
   }, [gameId]);
 
+  const addPlayer = useCallback(async (side, rawName) => {
+    if (!gameId || !game) throw new Error('No game is open.');
+    const name = cleanPlayerName(rawName);
+    if (!name || isUnknownPlayer(name)) throw new Error('Enter a player name.');
+
+    const teamId = side === 'away' ? game.awayTeamId : game.homeTeamId;
+    const existing = side === 'away' ? awayPlayers : homePlayers;
+    if (existing.some((player) => cleanPlayerName(player.name).toLowerCase() === name.toLowerCase())) {
+      throw new Error('That player is already on this team.');
+    }
+
+    const { data, error: insertError } = await supabase
+      .from('Player')
+      .insert([{ name, team_id: teamId }])
+      .select('player_id, name')
+      .single();
+    if (insertError) throw new Error(insertError.message || 'Could not add that player.');
+
+    const mapped = {
+      id: String(data.player_id),
+      name: cleanPlayerName(data.name),
+      number: null,
+      team: side === 'away' ? 'away' : 'home',
+    };
+    const add = (list) => withUnknownLast(sortByJersey(
+      list.some((player) => player.id === mapped.id) ? list : [...list, mapped],
+    ));
+    if (mapped.team === 'away') setAwayPlayers(add);
+    else setHomePlayers(add);
+    return mapped.id;
+  }, [gameId, game, homePlayers, awayPlayers]);
+
   return {
     game,
     homePlayers,
@@ -187,5 +219,6 @@ export function useGame(gameId) {
     loading,
     error,
     updateJersey,
+    addPlayer,
   };
 }

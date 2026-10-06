@@ -1,11 +1,11 @@
 import {
-  attacksIncreasing,
   teamAttackingToward,
   yardLabel as fieldYardLabel,
   yardsGained,
   fieldMarkerYards,
   fieldMarkerLabel,
   fieldLength,
+  firstDownMarkerYard,
 } from '../../gameLogic';
 import { possessionColor, TEAM_COLORS } from '../../constants/teamColors';
 
@@ -24,6 +24,7 @@ function pctToYard(pct, length) {
 export default function FieldSpot({
   yardLine,
   distance,
+  fdTarget = null,
   possession,
   homeAttacksRight = true,
   hasFortyYard = true,
@@ -40,9 +41,15 @@ export default function FieldSpot({
   const rightName    = rightTeamKey === 'home' ? homeName : awayName;
   const leftColor    = leftTeamKey === 'home' ? TEAM_COLORS.home.bg : TEAM_COLORS.away.bg;
   const rightColor   = rightTeamKey === 'home' ? TEAM_COLORS.home.bg : TEAM_COLORS.away.bg;
-  const increasing   = attacksIncreasing(possession, homeAttacksRight);
   const length       = fieldLength(hasFortyYard);
-  const firstDown    = increasing ? yardLine + distance : yardLine - distance;
+  const firstDown    = firstDownMarkerYard({
+    yardLine,
+    distance,
+    possession,
+    homeAttacksRight,
+    hasFortyYard,
+    fdTarget,
+  });
 
   function handleClick(e) {
     if (disabled) return;

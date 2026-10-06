@@ -16,7 +16,7 @@ import {
 import { cleanPlayerName, isUnknownPlayer, playerFirstName } from "../utils/playerName";
 import { ensureUnknownPlayers, withUnknownLast } from "../utils/unknownPlayer";
 import { sortByJersey } from "../context/useGame";
-import { creditsFromParticipants, removePlayCredit, updatePlayCredit } from "../utils/playCredit";
+import { creditsFromParticipants, patchLogEntry, removePlayCredit, updatePlayCredit } from "../utils/playCredit";
 import { playPeriod } from "../gameLogic";
 
 // ── Outcome → driveResult mapping (inverse of useSavePlay) ───────────────────
@@ -508,6 +508,9 @@ export default function GameViewPage() {
   }, [id]);
 
   const handleEditCredit = useCallback(async (entry, changes) => {
+    setData((current) => (
+      current ? { ...current, log: patchLogEntry(current.log, entry, changes) } : current
+    ));
     await Promise.all(changes.map((change) => (
       change.remove
         ? removePlayCredit({
@@ -523,7 +526,18 @@ export default function GameViewPage() {
           })
     )));
     const fresh = await fetchGameData(Number(id));
-    setData(fresh);
+    setData((current) => {
+      if (!current?.log?.length) return fresh;
+      const rank = new Map(current.log.map((item, index) => [Number(item.playId), index]));
+      const log = [...fresh.log]
+        .sort((a, b) => {
+          const aRank = rank.has(Number(a.playId)) ? rank.get(Number(a.playId)) : rank.size + Number(a.playId);
+          const bRank = rank.has(Number(b.playId)) ? rank.get(Number(b.playId)) : rank.size + Number(b.playId);
+          return aRank - bRank;
+        })
+        .map((item, index) => ({ ...item, playNumber: index + 1 }));
+      return { ...fresh, log };
+    });
   }, [id]);
 
   if (loading) return (

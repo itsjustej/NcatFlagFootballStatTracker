@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { firstDownYard, kickoffYard, yardsGained as calcYardsGained, distanceToFirst, effectiveHomeAttacksRight, playPeriod, otHomeAttacksRight } from '../gameLogic';
+import { firstDownYard, firstDownMarkerYard, crossedFirstDown, kickoffYard, yardsGained as calcYardsGained, distanceToFirst, attacksIncreasing, effectiveHomeAttacksRight, playPeriod, otHomeAttacksRight } from '../gameLogic';
 import { playerFirstName } from '../utils/playerName';
 import { creditsFromParticipants } from '../utils/playCredit';
 
@@ -291,13 +291,50 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
     currentYard       = lastNonConv.new_yard_line ?? lastNonConv.yard_line;
   }
 
-  const fdTarget = firstDownYard(currentYard, currentPossession, currentHomeAttacksRight, hasFortyYard);
-  const distance = distanceToFirst(currentYard, currentPossession, currentHomeAttacksRight, hasFortyYard);
+  // A new series (score, punt, turnover, kickoff) puts the chains on the next
+  // painted line. A series that is still going keeps the chains from the last
+  // snap — the same yard the yellow marker used — and only resets to 1st down
+  // when the ball actually reached that line.
+  const newSeriesOutcomes = ['td', 'pick_6', 'punt_return_td', 'safety', 'punt', 'interception', 'turnover_on_downs'];
+  const seriesContinues = !newSeriesOutcomes.includes(lastNonConvOutcome) && !conversionPending;
 
-  // Determine down: if the last non-conv play advanced the ball or scored,
-  // the next play is 1st down. Otherwise use the stored down + 1 (capped at 4).
-  const advancingOutcomes = ['td', 'pick_6', 'punt_return_td', 'safety', 'punt', 'interception', 'turnover_on_downs'];
-  const nextDown = advancingOutcomes.includes(lastNonConvOutcome) ? 1 : Math.min((lastNonConv.down ?? 1) + 1, 4);
+  let fdTarget;
+  let distance;
+  let nextDown;
+
+  if (!seriesContinues) {
+    fdTarget = firstDownYard(currentYard, currentPossession, currentHomeAttacksRight, hasFortyYard);
+    distance = distanceToFirst(currentYard, currentPossession, currentHomeAttacksRight, hasFortyYard);
+    nextDown = 1;
+  } else {
+    const marker = firstDownMarkerYard({
+      yardLine: lastNonConv.yard_line,
+      distance: lastNonConv.distance,
+      possession: lastPossession,
+      homeAttacksRight: currentHomeAttacksRight,
+      hasFortyYard,
+    });
+    const spot = lastNonConv.new_yard_line ?? lastNonConv.yard_line;
+    const earned = crossedFirstDown(
+      lastNonConv.yard_line,
+      spot,
+      lastPossession,
+      currentHomeAttacksRight,
+      hasFortyYard,
+      marker,
+    );
+    if (earned) {
+      nextDown = 1;
+      fdTarget = firstDownYard(currentYard, currentPossession, currentHomeAttacksRight, hasFortyYard);
+      distance = distanceToFirst(currentYard, currentPossession, currentHomeAttacksRight, hasFortyYard);
+    } else {
+      nextDown = Math.min((lastNonConv.down ?? 1) + 1, 4);
+      fdTarget = marker;
+      distance = attacksIncreasing(currentPossession, currentHomeAttacksRight)
+        ? marker - currentYard
+        : currentYard - marker;
+    }
+  }
 
   const lastDriveId    = driveIds[plays.length - 1];
   const currentDriveId = isDriveComplete(lastPlay) ? lastDriveId + 1 : lastDriveId;

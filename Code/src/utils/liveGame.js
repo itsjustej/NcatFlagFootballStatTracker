@@ -86,6 +86,7 @@ export function useRemoteCreditSync(gameId, log, setGs) {
   setGsRef.current = setGs;
   const playIdsRef = useRef(new Set());
   playIdsRef.current = new Set((log || []).map((entry) => Number(entry.playId)).filter((id) => id));
+  const playIdKey = [...playIdsRef.current].sort((a, b) => a - b).join(',');
   const knownIds = useRef(new Set());
   const pendingIds = useRef(new Set());
   const seededFor = useRef(null);
@@ -125,7 +126,7 @@ export function useRemoteCreditSync(gameId, log, setGs) {
       cancelled = true;
       fresh.forEach((id) => pendingIds.current.delete(id));
     };
-  }, [gameId, log]);
+  }, [gameId, playIdKey]);
 
   useEffect(() => {
     if (!gameId) return undefined;
