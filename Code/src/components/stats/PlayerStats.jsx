@@ -159,8 +159,8 @@ export default function PlayerStats() {
       const playersData = season.players.filter(
         (p) => String(p.team_id) === String(teamId) && !isUnknownPlayer(p),
       );
-      const { plays, participants, games } = season;
-      const gamesByPlayer = gamesPlayedByPlayer(participants, plays);
+      const { plays, participants, games, roster } = season;
+      const gamesByPlayer = gamesPlayedByPlayer(participants, plays, roster);
 
       // Build game→home map
       const ghMap = {};

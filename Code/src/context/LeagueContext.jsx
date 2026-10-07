@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "../supabaseClient";
+import { useAuth } from "../auth/AuthContext";
 import { useGame } from "./useGame";
 
 const LeagueContext = createContext(null);
@@ -36,6 +37,7 @@ function storeLeague(league) {
 
 export function LeagueProvider({ children }) {
   const { pathname } = useLocation();
+  const { user, ready } = useAuth();
   // ── League state ──────────────────────────────────────────────────
   const [leagues, setLeagues] = useState([]);
   const [currentLeague, setCurrentLeague] = useState(readStoredLeague);
@@ -59,8 +61,9 @@ export function LeagueProvider({ children }) {
         storeLeague(data[0]);
       }
     };
+    if (!ready || !user) return;
     fetchLeagues();
-  }, []);
+  }, [ready, user]);
 
   const switchLeague = (league) => {
     setCurrentLeague(league);
@@ -80,8 +83,12 @@ export function LeagueProvider({ children }) {
   };
 
   const deleteLeague = async (id) => {
-    const { error } = await supabase.from("League").delete().eq("league_id", id);
-    if (error) { console.error(error); return; }
+    const { data, error } = await supabase.from("League").delete().eq("league_id", id).select();
+    if (error) {
+      console.error(error);
+      return error.message || "Could not delete that season.";
+    }
+    if (!data?.length) return "You don't have permission to delete that season.";
 
     const remaining = leagues.filter((l) => l.league_id !== id);
     setLeagues(remaining);

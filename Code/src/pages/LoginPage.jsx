@@ -7,6 +7,7 @@ export default function LoginPage() {
   const { login, isAuthenticated, isSocial } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const homePath = isSocial ? "/stats" : "/";
@@ -15,13 +16,13 @@ export default function LoginPage() {
     if (isAuthenticated) navigate(homePath, { replace: true });
   }, [isAuthenticated, navigate, homePath]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const success = login(username);
+    const success = await login(username, password);
 
     if (!success) {
-      setError('Unknown username. Type social.');
+      setError("That username or password is wrong.");
       return;
     }
 
@@ -35,7 +36,7 @@ export default function LoginPage() {
           StatTracker Login
         </h1>
         <p className="text-slate-400 text-sm text-center mb-6">
-          Enter your username to continue
+          Enter your username and password
         </p>
 
         {error && (
@@ -61,6 +62,21 @@ export default function LoginPage() {
             />
           </div>
 
+          <div>
+            <label className="block text-sm text-slate-300 mb-1">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError("");
+              }}
+              className="w-full px-3 py-3 rounded-lg bg-slate-700 text-white border border-slate-600 placeholder:text-slate-500 text-base"
+              autoComplete="current-password"
+              required
+            />
+          </div>
+
           <button
             type="submit"
             className="w-full bg-orange-600 hover:bg-orange-700 transition py-3 rounded-lg text-white font-semibold text-base min-h-[44px]"
@@ -70,7 +86,7 @@ export default function LoginPage() {
         </form>
 
         <p className="text-slate-400 text-sm text-center mt-5">
-          To view stats, type <span className="text-white font-medium">social</span> into the username.
+          The password is the same as the username: admin, worker, or social.
         </p>
       </div>
     </div>

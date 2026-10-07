@@ -131,26 +131,34 @@ export function countPlayerDefensiveTDs(playerId, participants, plays) {
   ).length;
 }
 
-/** INTs caught — interceptor role, or defender on an INT/pick-6 play. */
-/** Games a player was credited in. Jersey numbers are optional, so they are not the count. */
-export function gamesPlayedByPlayer(participants, plays) {
+function addPlayedGame(games, playerId, gameId) {
+  const id = Number(playerId);
+  if (!id || gameId == null) return;
+  let ids = games.get(id);
+  if (!ids) {
+    ids = new Set();
+    games.set(id, ids);
+  }
+  ids.add(gameId);
+}
+
+/** A game counts when the player is credited on a play or has a jersey for that game. */
+export function gamesPlayedByPlayer(participants, plays, roster) {
   const playById = new Map((plays || []).map((play) => [play.play_id, play]));
   const games = new Map();
   for (const credit of participants || []) {
     const play = playById.get(credit.play_id);
     if (!play?.game_id) continue;
-    const playerId = Number(credit.player_id);
-    if (!playerId) continue;
-    let ids = games.get(playerId);
-    if (!ids) {
-      ids = new Set();
-      games.set(playerId, ids);
-    }
-    ids.add(play.game_id);
+    addPlayedGame(games, credit.player_id, play.game_id);
+  }
+  for (const row of roster || []) {
+    if (row.jersey == null) continue;
+    addPlayedGame(games, row.player_id, row.game_id);
   }
   return games;
 }
 
+/** INTs caught — interceptor role, or defender on an INT/pick-6 play. */
 export function countPlayerInterceptions(playerId, participants, plays) {
   const intPlayIds = new Set(
     plays

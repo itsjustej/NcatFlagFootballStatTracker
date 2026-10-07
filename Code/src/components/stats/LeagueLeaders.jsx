@@ -389,8 +389,8 @@ export default function LeagueLeaders() {
         setLoading(false);
         return;
       }
-      const { teams, players, games, plays, participants } = season;
-      const gamesByPlayer = gamesPlayedByPlayer(participants, plays);
+      const { teams, players, games, plays, participants, roster } = season;
+      const gamesByPlayer = gamesPlayedByPlayer(participants, plays, roster);
 
       // Build game→home map
       const ghMap = {};
@@ -443,6 +443,8 @@ export default function LeagueLeaders() {
         const receptions     = receiverData.filter(p => isReceivingOutcome(p.outcome)).length;
         const receivingYards = receiverData.filter(p => isReceivingOutcome(p.outcome)).reduce((s, p) => s + yg(p), 0);
         const receivingTDs   = receiverData.filter(p => p.outcome === 'td').length;
+        const conversionsThrown = getPlays(passerIds).filter(p => p.is_conversion && p.outcome === 'complete').length;
+        const conversionsCaught = getPlays(receiverIds).filter(p => p.is_conversion && p.outcome === 'complete').length;
 
         const gamesPlayed = gamesByPlayer.get(Number(pid))?.size ?? 0;
         const perGame = (total) => (gamesPlayed > 0 ? total / gamesPlayed : 0);
@@ -453,10 +455,10 @@ export default function LeagueLeaders() {
         const rushingTdpg = perGame(rushingTDs);
         const receivingYpg = perGame(receivingYards);
         const receivingTdpg = perGame(receivingTDs);
-        const leaderScore = (ypg, tdpg, yardsWeight) => round2(ypg * yardsWeight + tdpg * 2.5);
-        const passingFanPts = leaderScore(passingYpg, passingTdpg, 0.25);
+        const leaderScore = (ypg, tdpg, yardsWeight, convPg = 0) => round2(ypg * yardsWeight + tdpg * 2.5 + convPg * 0.5);
+        const passingFanPts = leaderScore(passingYpg, passingTdpg, 0.25, perGame(conversionsThrown));
         const rushingFanPts = leaderScore(rushingYpg, rushingTdpg, 0.1);
-        const receivingFanPts = leaderScore(receivingYpg, receivingTdpg, 0.1);
+        const receivingFanPts = leaderScore(receivingYpg, receivingTdpg, 0.1, perGame(conversionsCaught));
 
         const interceptions    = countPlayerInterceptions(pid, participants, plays);
         const flagPulls        = defenderData.length;

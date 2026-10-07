@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const [newLeagueName, setNewLeagueName] = useState("");
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const handleLogout = () => {
     logout();
@@ -28,7 +29,12 @@ export default function SettingsPage() {
 
   const handleDelete = async () => {
     if (!canDelete) return;
-    await deleteLeague(confirmDelete);
+    const message = await deleteLeague(confirmDelete);
+    if (message) {
+      setDeleteError(message);
+      return;
+    }
+    setDeleteError("");
     setConfirmDelete(null);
   };
 
@@ -73,6 +79,9 @@ export default function SettingsPage() {
               </p>
             ) : (
               <div className="space-y-2">
+                {deleteError && (
+                  <p className="text-red-300 text-sm px-1">{deleteError}</p>
+                )}
                 {leagues.map((league) => {
                   const isActive = currentLeague?.league_id === league.league_id;
                   return (
