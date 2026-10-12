@@ -10,8 +10,8 @@ export default function StatsPage() {
   const [tab, setTab] = useState("team");
 
   return (
-    <div className="bg-slate-900 pt-4 sm:pt-5 px-4 pb-8">
-      <div className="max-w-6xl mx-auto space-y-6 sm:space-y-10">
+    <div className="bg-slate-900 pt-4 sm:pt-5 pb-8">
+      <div className="max-w-6xl mx-auto px-4 space-y-6 sm:space-y-10">
 
         <header>
           <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">Season Statistics</h1>

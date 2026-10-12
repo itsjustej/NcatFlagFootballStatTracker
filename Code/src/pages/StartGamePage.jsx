@@ -4,6 +4,7 @@ import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
 import { cleanPlayerName, isUnknownPlayer } from "../utils/playerName";
 import TeamSelector from "../components/start-game/TeamSelector";
+import { todayDateInput } from "../utils/gameDate";
 
 export default function StartGamePage() {
   const { currentLeague, startGame } = useLeague();
@@ -105,6 +106,7 @@ export default function StartGamePage() {
           opening_possession:   openingPossession,
           home_attacks_right:   homeAttacksRight,
           has_forty_yard:       hasFortyYard,
+          played_on:            todayDateInput(),
         }])
         .select()
         .single();

@@ -207,7 +207,7 @@ const LEADER_TABS = {
       sortKey: "passingFanPts",
       secondary: [
         { key: "completionPct", label: "COMP%", short: "CMP", digits: 0, suffix: "%" },
-        { key: "passingYpg", label: "YDS/G", short: "YPG", digits: 1 },
+        { key: "passingYpg", label: "YDS/G", short: "YPG", digits: 0 },
         { key: "yardsPerAttempt", label: "YDS/A", short: "YPA", digits: 1 },
         { key: "passingTdpg", label: "TD/G", short: "TD/G", digits: 1 },
       ],
@@ -219,7 +219,7 @@ const LEADER_TABS = {
       sortKey: "rushingFanPts",
       secondary: [
         { key: "rushesPerGame", label: "RUSH/G", short: "RSH", digits: 1 },
-        { key: "rushingYpg", label: "YDS/G", short: "YPG", digits: 1 },
+        { key: "rushingYpg", label: "YDS/G", short: "YPG", digits: 0 },
         { key: "rushingTdpg", label: "TD/G", digits: 1 },
       ],
     },
@@ -230,7 +230,7 @@ const LEADER_TABS = {
       sortKey: "receivingFanPts",
       secondary: [
         { key: "receptionsPerGame", label: "REC/G", short: "REC", digits: 1 },
-        { key: "receivingYpg", label: "YDS/G", short: "YPG", digits: 1 },
+        { key: "receivingYpg", label: "YDS/G", short: "YPG", digits: 0 },
         { key: "receivingTdpg", label: "TD/G", digits: 1 },
       ],
     },
@@ -261,9 +261,9 @@ const LEADER_TABS = {
   ],
   offense: [
     { key: "ppg", label: "Points", card: "team", valueKey: "ppg" },
-    { key: "pass-yds", label: "Pass Yards", card: "team", valueKey: "passYpg" },
-    { key: "rush-yds", label: "Rush Yards", card: "team", valueKey: "rushYpg" },
-    { key: "total-yds", label: "Total Yards", card: "team", valueKey: "totalYpg" },
+    { key: "pass-yds", label: "Pass Yards", card: "team", valueKey: "passYpg", digits: 0 },
+    { key: "rush-yds", label: "Rush Yards", card: "team", valueKey: "rushYpg", digits: 0 },
+    { key: "total-yds", label: "Total Yards", card: "team", valueKey: "totalYpg", digits: 0 },
     { key: "ypp", label: "Yards/Play", card: "team", valueKey: "yardsPerPlay" },
     { key: "comp", label: "Completion", card: "team", valueKey: "completionPct", suffix: "%" },
     { key: "success", label: "Success", card: "team", valueKey: "successFor", suffix: "%" },
@@ -283,9 +283,9 @@ const LEADER_TABS = {
   ],
   defense: [
     { key: "papg", label: "Pts Against", card: "team", valueKey: "papg", lowerIsBetter: true },
-    { key: "pass-against", label: "Pass Against", card: "team", valueKey: "passYpgAgainst", lowerIsBetter: true },
-    { key: "rush-against", label: "Rush Against", card: "team", valueKey: "rushYpgAgainst", lowerIsBetter: true },
-    { key: "total-against", label: "Total Against", card: "team", valueKey: "totalYpgAgainst", lowerIsBetter: true },
+    { key: "pass-against", label: "Pass Against", card: "team", valueKey: "passYpgAgainst", digits: 0, lowerIsBetter: true },
+    { key: "rush-against", label: "Rush Against", card: "team", valueKey: "rushYpgAgainst", digits: 0, lowerIsBetter: true },
+    { key: "total-against", label: "Total Against", card: "team", valueKey: "totalYpgAgainst", digits: 0, lowerIsBetter: true },
     { key: "ypp-against", label: "Yards/Play", card: "team", valueKey: "yardsPerPlayAgainst", lowerIsBetter: true },
     { key: "success-against", label: "Success", card: "team", valueKey: "successAgainst", suffix: "%", lowerIsBetter: true },
     { key: "explosive-against", label: "Explosive", card: "team", valueKey: "explosivePlaysAgainst", lowerIsBetter: true },

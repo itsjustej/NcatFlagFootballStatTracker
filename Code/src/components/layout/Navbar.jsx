@@ -43,7 +43,7 @@ export default function Navbar() {
 
   return (
     <header className="bg-slate-900 border-b border-slate-700 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between gap-3">
+      <div className="max-w-6xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-2 min-w-0" onClick={() => setOpen(false)}>
           <span className="text-xl sm:text-2xl shrink-0">🏈</span>
           <h1 className="text-lg sm:text-2xl font-bold text-white truncate">
