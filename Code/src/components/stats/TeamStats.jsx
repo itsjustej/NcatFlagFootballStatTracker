@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ChevronDown, TrendingUp, Shield, RefreshCw } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useLeague } from "../../context/LeagueContext";
 import { loadLeagueSeason } from "../../utils/leagueSeason";
 import {
@@ -50,54 +50,51 @@ function rankTone(rank, total) {
   return `rgb(${rgb.join(', ')})`;
 }
 
-// ---------------- STAT ROW ---------------- //
-function StatRow({ label, short, value, rank, total, isPercentage, pctValue }) {
-  const barWidth = isPercentage
-    ? parseFloat(pctValue) || 0
-    : total > 0 && rank > 0
-      ? ((total - rank + 1) / total) * 100
-      : 0;
-  const tone = rankTone(rank, total);
+function Mark({ value, rank, total }) {
+  const tone = rank != null ? rankTone(rank, total) : "#e2e8f0";
   return (
-    <div className="py-1.5 sm:py-3 border-b border-slate-700/50 last:border-0">
-      <div className="flex items-baseline justify-between gap-1.5 sm:gap-3 mb-1">
-        <span className="text-slate-300 text-[11px] sm:text-sm min-w-0 leading-tight">
-          <span className="sm:hidden">{short || label}</span>
-          <span className="hidden sm:inline">{label}</span>
-        </span>
-        <span className="flex items-baseline gap-1 sm:gap-2 shrink-0">
-          <span className="text-white font-bold text-[11px] sm:text-sm tabular-nums">{value}</span>
-          {rank != null && (
-            <span className="text-[10px] sm:text-[11px] font-bold tabular-nums" style={{ color: tone }}>#{rank}</span>
-          )}
-        </span>
-      </div>
-      <div className="bg-slate-700 rounded-full h-1 sm:h-1.5">
-        <div className="h-1 sm:h-1.5 rounded-full" style={{ width: `${Math.min(barWidth, 100)}%`, background: tone }} />
+    <span className="inline-flex items-baseline gap-1.5 shrink-0">
+      <span className="text-sm sm:text-base font-bold tabular-nums" style={{ color: tone }}>{value}</span>
+      {rank != null && (
+        <span className="text-[11px] font-bold tabular-nums" style={{ color: tone }}>#{rank}</span>
+      )}
+    </span>
+  );
+}
+
+function CompareRow({ label, offense, defense, total }) {
+  return (
+    <div className="border-b border-slate-800/80 py-2.5 last:border-0">
+      <p className="mb-1.5 text-sm text-slate-300 sm:hidden">{label}</p>
+      <div className="grid grid-cols-2 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_7.25rem_7.25rem] sm:gap-3">
+        <p className="hidden text-sm text-slate-300 sm:block">{label}</p>
+        <div className="flex min-h-11 items-center justify-between gap-2 rounded-md bg-blue-500/10 px-2.5 sm:min-h-0 sm:justify-end sm:bg-transparent sm:px-0">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-300 sm:hidden">Off</span>
+          <Mark value={offense.value} rank={offense.rank} total={total} />
+        </div>
+        <div className="flex min-h-11 items-center justify-between gap-2 rounded-md bg-red-500/10 px-2.5 sm:min-h-0 sm:justify-end sm:bg-transparent sm:px-0">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-red-300 sm:hidden">Def</span>
+          <Mark value={defense.value} rank={defense.rank} total={total} />
+        </div>
       </div>
     </div>
   );
 }
 
-// ---------------- CONVERSION BAR ---------------- //
-function ConversionBar({ label, attempts, completions, rank, total }) {
-  const pct = attempts > 0 ? ((completions / attempts) * 100).toFixed(1) : 0;
-  const tone = rankTone(rank, total);
+function RateLine({ label, made, attempts, rank, total }) {
+  const hasTries = attempts > 0;
+  const pct = hasTries ? `${((made / attempts) * 100).toFixed(1)}%` : "—";
+  const tone = rank != null ? rankTone(rank, total) : "#e2e8f0";
   return (
-    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-4">
-      <div className="flex items-center justify-between gap-1 mb-1 sm:mb-2">
-        <span className="text-slate-400 text-[10px] sm:text-xs">{label}</span>
+    <div className="flex min-h-11 items-center justify-between gap-3 border-b border-slate-800/80 py-2 last:border-0">
+      <span className="text-sm text-slate-300">{label}</span>
+      <span className="flex items-baseline gap-2.5 shrink-0">
+        <span className="text-xs tabular-nums text-slate-500">{made}/{attempts}</span>
+        <span className="text-base font-bold tabular-nums" style={{ color: tone }}>{pct}</span>
         {rank != null && (
-          <span className="text-[10px] sm:text-xs font-bold" style={{ color: tone }}>#{rank}</span>
+          <span className="text-[11px] font-bold tabular-nums" style={{ color: tone }}>#{rank}</span>
         )}
-      </div>
-      <div className="flex items-center gap-2 sm:gap-4">
-        <span className="text-white font-bold text-sm sm:text-lg shrink-0 tabular-nums">{pct}%</span>
-        <div className="flex-1 bg-slate-700 rounded-full h-1.5 sm:h-2">
-          <div className="h-1.5 sm:h-2 rounded-full" style={{ width: `${pct}%`, background: tone }} />
-        </div>
-        <span className="text-slate-400 text-[10px] sm:text-xs text-right shrink-0">{completions}/{attempts}</span>
-      </div>
+      </span>
     </div>
   );
 }
@@ -118,41 +115,11 @@ function placeColor(rank) {
   return "text-white";
 }
 
-function RecordCard({ label, value, color }) {
+function PlaceChip({ label, value, color }) {
   return (
-    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-4 text-center">
-      <p className={`text-base sm:text-4xl font-bold leading-none ${color}`}>{value}</p>
-      <p className="text-slate-400 text-[10px] sm:text-sm mt-0.5 sm:mt-1">{label}</p>
-    </div>
-  );
-}
-
-// ---------------- DOWN CONVERSION CARD ---------------- //
-function DownConversionCard({ label, short, attempts, conversions, rank, total, hint }) {
-  const pct = attempts > 0 ? ((conversions / attempts) * 100).toFixed(1) : '—';
-  const barWidth = attempts > 0 ? (conversions / attempts) * 100 : 0;
-  const tone = rankTone(rank, total);
-  return (
-    <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-5">
-      <div className="flex items-start justify-between gap-1 mb-1 sm:mb-3">
-        <span className="text-[11px] sm:text-sm font-bold text-white leading-tight">
-          <span className="sm:hidden">{short || label}</span>
-          <span className="hidden sm:inline">{label}</span>
-        </span>
-        {rank != null && (
-          <span className="text-[10px] sm:text-xs font-bold shrink-0" style={{ color: tone }}>#{rank}</span>
-        )}
-      </div>
-      <div className="flex items-end gap-1.5 sm:gap-3 mb-1.5 sm:mb-3">
-        <span className="text-white font-black text-lg sm:text-3xl tabular-nums">
-          {pct}{attempts > 0 ? '%' : ''}
-        </span>
-        <span className="text-slate-400 text-[10px] sm:text-sm mb-0.5">{conversions}/{attempts}</span>
-      </div>
-      <div className="bg-slate-700 rounded-full h-1.5 sm:h-2">
-        <div className="h-1.5 sm:h-2 rounded-full transition-all" style={{ width: `${barWidth}%`, background: tone }} />
-      </div>
-      {hint && <p className="hidden sm:block text-slate-500 text-xs mt-2">{hint}</p>}
+    <div className="min-w-0 text-center">
+      <p className={`text-xl font-black leading-none tabular-nums sm:text-2xl ${color}`}>{value}</p>
+      <p className="mt-1 truncate text-[10px] sm:text-xs text-slate-400">{label}</p>
     </div>
   );
 }
@@ -474,7 +441,7 @@ export default function TeamStats() {
             <select
               value={teamId}
               onChange={e => setTeamId(e.target.value)}
-              className="w-full px-4 py-2.5 pr-10 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full min-h-11 px-4 py-2.5 pr-10 bg-slate-900 border border-slate-600 rounded-lg text-white text-base sm:text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/40"
             >
               <option value="">Select a team</option>
               {teams.map(t => <option key={t.team_id} value={t.team_id}>{t.name}</option>)}
@@ -491,91 +458,80 @@ export default function TeamStats() {
         )}
 
         {stats && (
-          <div className="p-3 sm:p-4 space-y-3 sm:space-y-6">
-          <div className="grid grid-cols-4 gap-2 sm:gap-4">
-            <RecordCard label="WINS"   value={stats.wins}          color="text-green-400" />
-            <RecordCard label="LOSSES" value={stats.losses}        color="text-red-400" />
-            <RecordCard label="TIES"   value={stats.ties}          color="text-yellow-400" />
-            <RecordCard label="WIN %"  value={`${stats.winPct}%`} color="text-white" />
-          </div>
-
-          <div className="grid grid-cols-4 gap-2 sm:gap-4">
-            <RecordCard label="STANDINGS" value={standingsPlace.value} color={standingsPlace.color} />
-            <RecordCard label="POWER" value={powerPlace.value} color={powerPlace.color} />
-            <RecordCard label="OFFENSE" value={offensePlace.value} color={offensePlace.color} />
-            <RecordCard label="DEFENSE" value={defensePlace.value} color={defensePlace.color} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:gap-6">
-            <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-6">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
-                <TrendingUp className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-blue-400" />
-                <h3 className="text-white text-xs sm:text-base font-bold tracking-wide">OFFENSE</h3>
+          <div className="grid grid-cols-1 gap-8 p-3 sm:p-5 lg:grid-cols-2 lg:gap-x-12 lg:gap-y-8">
+            <div className="lg:col-start-2">
+              <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+                <div className="min-w-0 shrink-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Record</p>
+                  <p className="mt-1 text-4xl font-black leading-none tracking-tight text-white tabular-nums">
+                    {stats.wins}
+                    <span className="text-slate-600">–</span>
+                    {stats.losses}
+                    {Number(stats.ties) > 0 && (
+                      <>
+                        <span className="text-slate-600">–</span>
+                        {stats.ties}
+                      </>
+                    )}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">{stats.winPct}% wins</p>
+                </div>
+                <div className="grid min-w-[16rem] flex-1 grid-cols-4 gap-2">
+                  <PlaceChip label="Standings" value={standingsPlace.value} color={standingsPlace.color} />
+                  <PlaceChip label="Power" value={powerPlace.value} color={powerPlace.color} />
+                  <PlaceChip label="Offense" value={offensePlace.value} color={offensePlace.color} />
+                  <PlaceChip label="Defense" value={defensePlace.value} color={defensePlace.color} />
+                </div>
               </div>
-              <StatRow label="Points per game" short="PPG" value={stats.ppg} rank={rank('ppg')} total={rankedTotal} />
-              <StatRow label="Passing yards / game" short="Pass" value={stats.passYpg} rank={rank('passYpg')} total={rankedTotal} />
-              <StatRow label="Rushing yards / game" short="Rush" value={stats.rushYpg} rank={rank('rushYpg')} total={rankedTotal} />
-              <StatRow label="Total yards / game" short="Yds" value={stats.totalYpg} rank={rank('totalYpg')} total={rankedTotal} />
-              <StatRow label="Plays per game" short="Plays" value={stats.playsPerGame} rank={rank('playsPerGame')} total={rankedTotal} />
-              <StatRow label="Yards per play" short="YPP" value={stats.yardsPerPlay} rank={rank('yardsPerPlay')} total={rankedTotal} />
-              <StatRow label="Success rate" short="Succ" value={`${stats.successFor}%`} rank={rank('successFor')} total={rankedTotal} isPercentage pctValue={stats.successFor} />
-              <StatRow label="Explosive plays / game" short="Expl" value={stats.explosivePlays} rank={rank('explosivePlays')} total={rankedTotal} />
-              <StatRow label="Completion %" short="Cmp%" value={`${stats.completionPct}%`} rank={rank('completionPct')} total={rankedTotal} isPercentage pctValue={stats.completionPct} />
-              <StatRow label="Passing TDs / game" short="P-TD" value={stats.passingTDs} rank={rank('passingTDs')} total={rankedTotal} />
-              <StatRow label="Rushing TDs / game" short="R-TD" value={stats.rushingTDs} rank={rank('rushingTDs')} total={rankedTotal} />
-              <StatRow label="Interceptions thrown / game" short="INT" value={stats.interceptionsThrown} rank={rank('interceptionsThrown', true)} total={rankedTotal} />
-              <StatRow label="TFLs allowed / game" short="TFL" value={stats.tflsAllowed} rank={rank('tflsAllowed', true)} total={rankedTotal} />
-              <StatRow label="Penalties per game" short="Pen/G" value={stats.offPenaltiesPerGame} rank={rank('offPenaltiesPerGame', true)} total={rankedTotal} />
-              <StatRow label="Penalty yards per game" short="Pen Yds" value={stats.offPenaltyYardsPerGame} rank={rank('offPenaltyYardsPerGame', true)} total={rankedTotal} />
             </div>
 
-            <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-6">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
-                <Shield className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-red-400" />
-                <h3 className="text-white text-xs sm:text-base font-bold tracking-wide">DEFENSE</h3>
+            <div className="lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:grid lg:h-full lg:grid-rows-[auto_1fr]">
+              <div>
+                <div className="mb-1 hidden grid-cols-[minmax(0,1fr)_7.25rem_7.25rem] gap-3 sm:grid">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Per game</p>
+                  <p className="text-right text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-300">Offense</p>
+                  <p className="text-right text-[11px] font-semibold uppercase tracking-[0.16em] text-red-300">Defense</p>
+                </div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:hidden">Per game</p>
               </div>
-              <StatRow label="Points against / game" short="PPG" value={stats.papg} rank={rank('papg', true)} total={rankedTotal} />
-              <StatRow label="Pass yards against / game" short="Pass" value={stats.passYpgAgainst} rank={rank('passYpgAgainst', true)} total={rankedTotal} />
-              <StatRow label="Rush yards against / game" short="Rush" value={stats.rushYpgAgainst} rank={rank('rushYpgAgainst', true)} total={rankedTotal} />
-              <StatRow label="Total yards against / game" short="Yds" value={stats.totalYpgAgainst} rank={rank('totalYpgAgainst', true)} total={rankedTotal} />
-              <StatRow label="Plays per game against" short="Plays" value={stats.playsPerGameAgainst} rank={rank('playsPerGameAgainst', true)} total={rankedTotal} />
-              <StatRow label="Yards per play against" short="YPP" value={stats.yardsPerPlayAgainst} rank={rank('yardsPerPlayAgainst', true)} total={rankedTotal} />
-              <StatRow label="Success rate against" short="Succ" value={`${stats.successAgainst}%`} rank={rank('successAgainst', true)} total={rankedTotal} isPercentage pctValue={stats.successAgainst} />
-              <StatRow label="Explosive plays allowed / game" short="Expl" value={stats.explosivePlaysAgainst} rank={rank('explosivePlaysAgainst', true)} total={rankedTotal} />
-              <StatRow label="Completion % against" short="Cmp%" value={`${stats.completionPctAgainst}%`} rank={rank('completionPctAgainst', true)} total={rankedTotal} isPercentage pctValue={stats.completionPctAgainst} />
-              <StatRow label="Passing TDs against / game" short="P-TD" value={stats.passingTDsAgainst} rank={rank('passingTDsAgainst', true)} total={rankedTotal} />
-              <StatRow label="Rushing TDs against / game" short="R-TD" value={stats.rushingTDsAgainst} rank={rank('rushingTDsAgainst', true)} total={rankedTotal} />
-              <StatRow label="Interceptions / game" short="INT" value={stats.interceptions} rank={rank('interceptions')} total={rankedTotal} />
-              <StatRow label="TFLs forced / game" short="TFL" value={stats.tflsForced} rank={rank('tflsForced')} total={rankedTotal} />
-              <StatRow label="Penalties per game" short="Pen/G" value={stats.defPenaltiesPerGame} rank={rank('defPenaltiesPerGame', true)} total={rankedTotal} />
-              <StatRow label="Penalty yards per game" short="Pen Yds" value={stats.defPenaltyYardsPerGame} rank={rank('defPenaltyYardsPerGame', true)} total={rankedTotal} />
+              <div className="lg:flex lg:flex-col lg:justify-between">
+                <CompareRow label="Points" offense={{ value: stats.ppg, rank: rank("ppg") }} defense={{ value: stats.papg, rank: rank("papg", true) }} total={rankedTotal} />
+                <CompareRow label="Pass yards" offense={{ value: stats.passYpg, rank: rank("passYpg") }} defense={{ value: stats.passYpgAgainst, rank: rank("passYpgAgainst", true) }} total={rankedTotal} />
+                <CompareRow label="Rush yards" offense={{ value: stats.rushYpg, rank: rank("rushYpg") }} defense={{ value: stats.rushYpgAgainst, rank: rank("rushYpgAgainst", true) }} total={rankedTotal} />
+                <CompareRow label="Total yards" offense={{ value: stats.totalYpg, rank: rank("totalYpg") }} defense={{ value: stats.totalYpgAgainst, rank: rank("totalYpgAgainst", true) }} total={rankedTotal} />
+                <CompareRow label="Plays" offense={{ value: stats.playsPerGame, rank: rank("playsPerGame") }} defense={{ value: stats.playsPerGameAgainst, rank: rank("playsPerGameAgainst", true) }} total={rankedTotal} />
+                <CompareRow label="Explosive plays" offense={{ value: stats.explosivePlays, rank: rank("explosivePlays") }} defense={{ value: stats.explosivePlaysAgainst, rank: rank("explosivePlaysAgainst", true) }} total={rankedTotal} />
+                <CompareRow label="Pass TDs" offense={{ value: stats.passingTDs, rank: rank("passingTDs") }} defense={{ value: stats.passingTDsAgainst, rank: rank("passingTDsAgainst", true) }} total={rankedTotal} />
+                <CompareRow label="Rush TDs" offense={{ value: stats.rushingTDs, rank: rank("rushingTDs") }} defense={{ value: stats.rushingTDsAgainst, rank: rank("rushingTDsAgainst", true) }} total={rankedTotal} />
+                <CompareRow label="Interceptions" offense={{ value: stats.interceptionsThrown, rank: rank("interceptionsThrown", true) }} defense={{ value: stats.interceptions, rank: rank("interceptions") }} total={rankedTotal} />
+                <CompareRow label="TFLs" offense={{ value: stats.tflsAllowed, rank: rank("tflsAllowed", true) }} defense={{ value: stats.tflsForced, rank: rank("tflsForced") }} total={rankedTotal} />
+                <CompareRow label="Penalties" offense={{ value: stats.offPenaltiesPerGame, rank: rank("offPenaltiesPerGame", true) }} defense={{ value: stats.defPenaltiesPerGame, rank: rank("defPenaltiesPerGame", true) }} total={rankedTotal} />
+                <CompareRow label="Penalty yards" offense={{ value: stats.offPenaltyYardsPerGame, rank: rank("offPenaltyYardsPerGame", true) }} defense={{ value: stats.defPenaltyYardsPerGame, rank: rank("defPenaltyYardsPerGame", true) }} total={rankedTotal} />
               </div>
-          </div>
-
-          <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-6">
-            <h3 className="text-white text-xs sm:text-base font-bold tracking-wide mb-2 sm:mb-4">
-              <span className="sm:hidden">Situational</span>
-              <span className="hidden sm:inline">Situational Conversions</span>
-            </h3>
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              <DownConversionCard label="3rd Down Conversion" short="3rd" attempts={stats.thirdDownAttempts}  conversions={stats.thirdDownConversions}  rank={stats.thirdDownAttempts  > 0 ? rank('thirdDownPct')  : null} total={rankedTotal} hint="A conversion is a 1st down gained or a score" />
-              <DownConversionCard label="4th Down Conversion" short="4th" attempts={stats.fourthDownAttempts} conversions={stats.fourthDownConversions} rank={stats.fourthDownAttempts > 0 ? rank('fourthDownPct') : null} total={rankedTotal} hint="A conversion is a 1st down gained or a score" />
-              <DownConversionCard label="Red Zone Success" short="Red Zone" attempts={stats.redZoneAttempts} conversions={stats.redZoneScores} rank={stats.redZoneAttempts > 0 ? rank('redZonePct') : null} total={rankedTotal} hint="Trips inside the opponent's 20 that result in a touchdown" />
             </div>
-          </div>
 
-          <div className="bg-slate-900/50 border border-slate-700/80 rounded-lg p-2 sm:p-6">
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-4">
-              <RefreshCw className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-green-400" />
-              <h3 className="text-white text-xs sm:text-base font-bold tracking-wide">CONVERSIONS</h3>
+            <div className="lg:col-start-2">
+              <div className="mb-1 hidden grid-cols-[minmax(0,1fr)_7.25rem_7.25rem] gap-3 sm:grid">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Rates</p>
+                <p className="text-right text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-300">Offense</p>
+                <p className="text-right text-[11px] font-semibold uppercase tracking-[0.16em] text-red-300">Defense</p>
+              </div>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:hidden">Rates</p>
+              <CompareRow label="Yards / play" offense={{ value: stats.yardsPerPlay, rank: rank("yardsPerPlay") }} defense={{ value: stats.yardsPerPlayAgainst, rank: rank("yardsPerPlayAgainst", true) }} total={rankedTotal} />
+              <CompareRow label="Success" offense={{ value: `${stats.successFor}%`, rank: rank("successFor") }} defense={{ value: `${stats.successAgainst}%`, rank: rank("successAgainst", true) }} total={rankedTotal} />
+              <CompareRow label="Completion" offense={{ value: `${stats.completionPct}%`, rank: rank("completionPct") }} defense={{ value: `${stats.completionPctAgainst}%`, rank: rank("completionPctAgainst", true) }} total={rankedTotal} />
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              <ConversionBar label="1-POINT" attempts={stats.conv1Attempts} completions={stats.conv1Made} rank={rank('conv1Pct')} total={rankedTotal} />
-              <ConversionBar label="2-POINT" attempts={stats.conv2Attempts} completions={stats.conv2Made} rank={rank('conv2Pct')} total={rankedTotal} />
-              <ConversionBar label="3-POINT" attempts={stats.conv3Attempts} completions={stats.conv3Made} rank={rank('conv3Pct')} total={rankedTotal} />
-            </div>
-          </div>
 
+            <div className="lg:col-start-2">
+              <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Situational</h3>
+              <RateLine label="3rd down" made={stats.thirdDownConversions} attempts={stats.thirdDownAttempts} rank={stats.thirdDownAttempts > 0 ? rank("thirdDownPct") : null} total={rankedTotal} />
+              <RateLine label="4th down" made={stats.fourthDownConversions} attempts={stats.fourthDownAttempts} rank={stats.fourthDownAttempts > 0 ? rank("fourthDownPct") : null} total={rankedTotal} />
+              <RateLine label="Red zone" made={stats.redZoneScores} attempts={stats.redZoneAttempts} rank={stats.redZoneAttempts > 0 ? rank("redZonePct") : null} total={rankedTotal} />
+              <h3 className="mb-1 mt-8 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Extra points</h3>
+              <RateLine label="1-point" made={stats.conv1Made} attempts={stats.conv1Attempts} rank={stats.conv1Attempts > 0 ? rank("conv1Pct") : null} total={rankedTotal} />
+              <RateLine label="2-point" made={stats.conv2Made} attempts={stats.conv2Attempts} rank={stats.conv2Attempts > 0 ? rank("conv2Pct") : null} total={rankedTotal} />
+              <RateLine label="3-point" made={stats.conv3Made} attempts={stats.conv3Attempts} rank={stats.conv3Attempts > 0 ? rank("conv3Pct") : null} total={rankedTotal} />
+            </div>
           </div>
         )}
       </div>

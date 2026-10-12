@@ -1,47 +1,66 @@
 import { supabase } from "../supabaseClient";
 
 const FRESH_MS = 20000;
+const PAGE_SIZE = 1000;
+const ID_CHUNK = 80;
 const cached = new Map();
 const inflight = new Map();
 
-function rowsOrEmpty(result) {
-  if (result.error) throw result.error;
-  return result.data || [];
+export function chunkIds(ids) {
+  const unique = [...new Set((ids || []).filter((id) => id != null))];
+  const chunks = [];
+  for (let i = 0; i < unique.length; i += ID_CHUNK) chunks.push(unique.slice(i, i + ID_CHUNK));
+  return chunks;
+}
+
+/** Read every matching row. PostgREST stops at 1,000 unless the query asks for the next page. */
+export async function fetchAllRows(makeQuery) {
+  const rows = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await makeQuery().range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const batch = data || [];
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+
+export async function fetchWhereIn(table, column, ids, columns, orderBy) {
+  const rows = [];
+  const orderKeys = [].concat(orderBy);
+  for (const slice of chunkIds(ids)) {
+    const part = await fetchAllRows(() => {
+      let query = supabase.from(table).select(columns).in(column, slice);
+      for (const key of orderKeys) query = query.order(key);
+      return query;
+    });
+    rows.push(...part);
+  }
+  return rows;
 }
 
 async function fetchLeagueSeason(leagueId) {
-  const [teamsResult, gamesResult] = await Promise.all([
-    supabase.from("Team").select("*").eq("league_id", leagueId),
-    supabase.from("Game").select("*").eq("league_id", leagueId),
+  const [teams, games] = await Promise.all([
+    fetchAllRows(() => supabase.from("Team").select("*").eq("league_id", leagueId).order("team_id")),
+    fetchAllRows(() => supabase.from("Game").select("*").eq("league_id", leagueId).order("game_id")),
   ]);
-  const teams = rowsOrEmpty(teamsResult);
-  const games = rowsOrEmpty(gamesResult);
 
   const teamIds = teams.map((team) => team.team_id);
   const gameIds = games.map((game) => game.game_id);
 
-  const [playersResult, playsResult] = await Promise.all([
-    teamIds.length
-      ? supabase.from("Player").select("*").in("team_id", teamIds)
-      : Promise.resolve({ data: [], error: null }),
-    gameIds.length
-      ? supabase.from("Play").select("*").in("game_id", gameIds)
-      : Promise.resolve({ data: [], error: null }),
+  const [players, plays] = await Promise.all([
+    fetchWhereIn("Player", "team_id", teamIds, "*", "player_id"),
+    fetchWhereIn("Play", "game_id", gameIds, "*", "play_id"),
   ]);
-  const players = rowsOrEmpty(playersResult);
-  const plays = rowsOrEmpty(playsResult);
 
   const playIds = plays.map((play) => play.play_id);
   const playerIds = players.map((player) => player.player_id);
   const leagueGameIds = new Set(gameIds);
 
-  const [participantsResult, rosterResult] = await Promise.all([
-    playIds.length
-      ? supabase.from("Participants").select("*").in("play_id", playIds)
-      : Promise.resolve({ data: [], error: null }),
-    playerIds.length
-      ? supabase.from("Roster").select("player_id, game_id, jersey").in("player_id", playerIds)
-      : Promise.resolve({ data: [], error: null }),
+  const [participants, roster] = await Promise.all([
+    fetchWhereIn("Participants", "play_id", playIds, "*", ["play_id", "player_id", "role"]),
+    fetchWhereIn("Roster", "player_id", playerIds, "player_id, game_id, jersey", ["player_id", "game_id"]),
   ]);
 
   return {
@@ -49,8 +68,8 @@ async function fetchLeagueSeason(leagueId) {
     games,
     players,
     plays,
-    participants: rowsOrEmpty(participantsResult),
-    roster: rowsOrEmpty(rosterResult).filter((row) => leagueGameIds.has(row.game_id)),
+    participants,
+    roster: roster.filter((row) => leagueGameIds.has(row.game_id)),
   };
 }
 

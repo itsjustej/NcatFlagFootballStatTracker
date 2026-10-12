@@ -5,7 +5,7 @@ import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
 import { useAuth } from "../auth/AuthContext";
 import { pointsForTeam } from "../utils/statsHelpers";
-import { invalidateLeagueSeason } from "../utils/leagueSeason";
+import { fetchAllRows, fetchWhereIn, invalidateLeagueSeason } from "../utils/leagueSeason";
 import { formatGameDate, todayDateInput } from "../utils/gameDate";
 
 function formatGame(g) {
@@ -30,9 +30,32 @@ const GAME_COLUMNS = `
   played_on,
   forfeit,
   home_team:home_team ( team_id, name ),
-  away_team:away_team ( team_id, name ),
-  Play ( offense_team, defense_team, outcome, is_conversion, conv_points )
+  away_team:away_team ( team_id, name )
 `;
+
+const SCORE_PLAY_COLUMNS = "play_id, game_id, offense_team, defense_team, outcome, is_conversion, conv_points";
+
+async function loadLeagueGames(leagueId) {
+  const games = await fetchAllRows(() =>
+    supabase.from("Game").select(GAME_COLUMNS).eq("league_id", leagueId).order("game_id")
+  );
+  const plays = await fetchWhereIn(
+    "Play",
+    "game_id",
+    games.map((game) => game.game_id),
+    SCORE_PLAY_COLUMNS,
+    "play_id",
+  );
+  const playsByGame = new Map();
+  for (const play of plays) {
+    const list = playsByGame.get(play.game_id);
+    if (list) list.push(play);
+    else playsByGame.set(play.game_id, [play]);
+  }
+  return games
+    .map((game) => formatGame({ ...game, Play: playsByGame.get(game.game_id) || [] }))
+    .sort((a, b) => b.game_id - a.game_id);
+}
 
 export default function GameHistoryPage() {
   const { currentLeague } = useLeague();
@@ -53,15 +76,18 @@ export default function GameHistoryPage() {
     const fetchGames = async () => {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from("Game")
-        .select(GAME_COLUMNS)
-        .eq("league_id", leagueId);
+      let games;
+      try {
+        games = await loadLeagueGames(leagueId);
+      } catch (error) {
+        if (cancelled) return;
+        console.error(error);
+        setLoading(false);
+        return;
+      }
 
       if (cancelled) return;
-      if (error) { console.error(error); setLoading(false); return; }
-
-      setGames((data || []).map(formatGame).sort((a, b) => b.game_id - a.game_id));
+      setGames(games);
       setTeamFilter("");
       setDateFilter("");
       setLoading(false);
@@ -91,12 +117,7 @@ export default function GameHistoryPage() {
     });
     if (error) throw new Error(error.message);
     invalidateLeagueSeason(leagueId);
-    const { data, error: reloadError } = await supabase
-      .from("Game")
-      .select(GAME_COLUMNS)
-      .eq("league_id", leagueId);
-    if (reloadError) throw new Error(reloadError.message);
-    setGames((data || []).map(formatGame).sort((a, b) => b.game_id - a.game_id));
+    setGames(await loadLeagueGames(leagueId));
   };
 
   const setGameDate = async (gameId, playedOn) => {

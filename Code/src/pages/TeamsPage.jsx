@@ -8,6 +8,7 @@ import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
 import { useAuth } from "../auth/AuthContext";
 import { isUnknownPlayer } from "../utils/playerName";
+import { chunkIds, fetchAllRows } from "../utils/leagueSeason";
 
 export default function TeamsPage() {
   const { currentLeague } = useLeague();
@@ -78,15 +79,25 @@ export default function TeamsPage() {
 
   const handleDelete = async (id) => {
     if (!canDelete) return;
-    const { data: playData } = await supabase
-      .from("Play")
-      .select("play_id")
-      .or(`offense_team.eq.${id},defense_team.eq.${id}`);
+    let playData;
+    try {
+      playData = await fetchAllRows(() =>
+        supabase
+          .from("Play")
+          .select("play_id")
+          .or(`offense_team.eq.${id},defense_team.eq.${id}`)
+          .order("play_id")
+      );
+    } catch (error) {
+      console.error(error);
+      return;
+    }
 
-    if (playData?.length > 0) {
-      const playIds = playData.map((p) => p.play_id);
-      await supabase.from("Participants").delete().in("play_id", playIds);
-      await supabase.from("Play").delete().in("play_id", playIds);
+    for (const slice of chunkIds(playData.map((play) => play.play_id))) {
+      const { error: creditError } = await supabase.from("Participants").delete().in("play_id", slice);
+      if (creditError) { console.error(creditError); return; }
+      const { error: playError } = await supabase.from("Play").delete().in("play_id", slice);
+      if (playError) { console.error(playError); return; }
     }
 
     await supabase.from("Game").delete().or(`home_team.eq.${id},away_team.eq.${id}`);
