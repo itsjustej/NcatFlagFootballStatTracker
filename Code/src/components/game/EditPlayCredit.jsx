@@ -3,7 +3,15 @@ import { X } from 'lucide-react';
 import { possessionColor } from '../../constants/teamColors';
 import { sortByJersey } from '../../context/useGame';
 import { playerFirstName } from '../../utils/playerName';
-import { creditsNeedingPlayers, isOffenseRole, isOffensiveTouchdown, ROLE_LABELS } from '../../utils/playCredit';
+import {
+  creditsNeedingPlayers,
+  isConversionEntry,
+  isOffenseRole,
+  isOffensiveTouchdown,
+  readConvPoints,
+  ROLE_LABELS,
+  updatePlayConversionPoints,
+} from '../../utils/playCredit';
 import { isUnknownPlayer } from '../../utils/playerName';
 import { withUnknownLast } from '../../utils/unknownPlayer';
 
@@ -185,6 +193,9 @@ export default function EditPlayCredit({
   const [draft, setDraft] = useState(() =>
     Object.fromEntries((entry.credits || []).map((c) => [c.role, String(c.playerId)])),
   );
+  const isConversion = isConversionEntry(entry);
+  const initialConvPoints = readConvPoints(entry);
+  const [convPoints, setConvPoints] = useState(initialConvPoints);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showFilled, setShowFilled] = useState(false);
@@ -274,6 +285,7 @@ export default function EditPlayCredit({
   }
 
   const changed = (entry.credits || []).some((c) => (draft[c.role] || '') !== String(c.playerId));
+  const convChanged = isConversion && convPoints !== initialConvPoints;
 
   async function handleSave() {
     const removals = (entry.credits || [])
@@ -302,7 +314,7 @@ export default function EditPlayCredit({
       });
     const changes = [...updates, ...removals];
 
-    if (!changes.length) {
+    if (!changes.length && !convChanged) {
       onClose();
       return;
     }
@@ -310,7 +322,14 @@ export default function EditPlayCredit({
     setSaving(true);
     setError('');
     try {
-      await onSave(changes);
+      if (convChanged && entry.playId) {
+        await updatePlayConversionPoints({ playId: entry.playId, convPoints });
+      }
+      if (changes.length) {
+        await onSave(changes, convChanged ? { convPoints } : {});
+      } else if (convChanged) {
+        await onSave([], { convPoints });
+      }
       onClose();
     } catch (err) {
       setError(err.message || 'Could not update credit');
@@ -347,6 +366,30 @@ export default function EditPlayCredit({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pb-3 flex flex-col gap-4">
+          {isConversion && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                Conversion type
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {[1, 2, 3].map((pts) => (
+                  <button
+                    key={pts}
+                    type="button"
+                    disabled={saving}
+                    onClick={() => setConvPoints(pts)}
+                    className={`min-h-11 rounded-lg border text-sm font-bold transition-colors ${
+                      convPoints === pts
+                        ? 'border-blue-500 bg-blue-500/20 text-white'
+                        : 'border-slate-600 bg-slate-900/60 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    {pts} pt
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {visible.map((credit) => {
             const takenIds = new Set(
               Object.entries(draft)
@@ -384,7 +427,7 @@ export default function EditPlayCredit({
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || !changed}
+            disabled={saving || (!changed && !convChanged)}
             className="flex-1 py-3 min-h-[44px] bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-lg"
           >
             {saving ? 'Saving…' : 'Save'}

@@ -394,6 +394,9 @@ export function computeTeamBoxStats(teamId, plays, homeTeamId, homeAttacksRight 
     thirdDownAttempts: thirdDownPlays.length,
     successRate: computeOffenseSuccessRate(offPlays, () => homeTeamId, () => homeAttacksRight, () => hasFortyYard),
     explosivePlays: countExplosivePlays(offPlays, () => homeTeamId, () => homeAttacksRight, () => hasFortyYard),
+    penalties: (plays || []).filter(
+      (p) => p.play_type === 'penalty' && p.penalty_team_id == teamId,
+    ).length,
   };
 }
 

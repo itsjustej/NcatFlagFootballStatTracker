@@ -215,3 +215,80 @@ export async function updatePlayCredit({ playId, role, fromPlayerId, toPlayerId 
   if (existing) return;
   throw new Error('Could not update that credit. Try again.');
 }
+
+export function isConversionEntry(entry) {
+  if (!entry) return false;
+  if (entry.isConversion === true || entry._isConversion === true) return true;
+  return /-point conversion|incomplete conversion/i.test(entry.description ?? '');
+}
+
+export function readConvPoints(entry) {
+  if (entry?.convPoints != null) return Number(entry.convPoints);
+  if (entry?._convPoints != null) return Number(entry._convPoints);
+  const fromDesc = entry?.description?.match(/(\d+)-point conversion/i);
+  if (fromDesc) return Number(fromDesc[1]);
+  const fromDrive = entry?.driveResult?.match(/Touchdown, (\d+) pt/i);
+  if (fromDrive) return Number(fromDrive[1]);
+  return 1;
+}
+
+function readConvOutcome(entry) {
+  if (entry?.outcome) return entry.outcome;
+  if (entry?._outcome) return entry._outcome;
+  if (/no good|incomplete conversion/i.test(entry?.description ?? '')) return 'incomplete';
+  return 'complete';
+}
+
+export function patchConversionDescription(description, convPoints) {
+  if (!description) return description;
+  return description
+    .replace(/\d+-point conversion/gi, `${convPoints}-point conversion`)
+    .replace(/(\d+) pt (good|no good)/i, `${convPoints} pt $2`);
+}
+
+export function applyConversionPointsChange(log, entry, newConvPoints) {
+  const idx = (log || []).findIndex((item) => samePlay(item, entry));
+  if (idx === -1) return log;
+
+  const outcome = readConvOutcome(entry);
+  const oldConv = readConvPoints(entry);
+  const oldDelta = outcome === 'complete' ? oldConv : 0;
+  const newDelta = outcome === 'complete' ? newConvPoints : 0;
+  const side = entry.drivePossession === 'away' ? 'away' : 'home';
+  const deltaHome = side === 'home' ? (newDelta - oldDelta) : 0;
+  const deltaAway = side === 'away' ? (newDelta - oldDelta) : 0;
+
+  return log.map((item, i) => {
+    if (i < idx) return item;
+    const next = i === idx
+      ? {
+          ...item,
+          convPoints: newConvPoints,
+          _convPoints: newConvPoints,
+          description: patchConversionDescription(item.description, newConvPoints),
+          driveResult: item.driveResult
+            ? item.driveResult.replace(/Touchdown, \d+ pt/i, `Touchdown, ${newConvPoints} pt`)
+            : item.driveResult,
+        }
+      : item;
+    return {
+      ...next,
+      homeScore: (next.homeScore ?? 0) + deltaHome,
+      awayScore: (next.awayScore ?? 0) + deltaAway,
+    };
+  });
+}
+
+/** Change 1/2/3-pt try on an existing conversion play (score updates if made). */
+export async function updatePlayConversionPoints({ playId, convPoints }) {
+  const id = Number(playId);
+  const pts = Number(convPoints);
+  if (!id || ![1, 2, 3].includes(pts)) throw new Error('Invalid conversion value');
+
+  const { error } = await supabase
+    .from('Play')
+    .update({ conv_points: pts })
+    .eq('play_id', id);
+
+  if (error) throw new Error(error.message || 'Could not update conversion');
+}

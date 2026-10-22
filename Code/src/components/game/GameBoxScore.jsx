@@ -199,6 +199,7 @@ export default function GameBoxScore({
           />
           <CmpRow label="Success" home={fmtPct(homeStats.successRate)} away={fmtPct(awayStats.successRate)} />
           <CmpRow label="Expl." home={homeStats.explosivePlays} away={awayStats.explosivePlays} />
+          <CmpRow label="Penalties" home={homeStats.penalties} away={awayStats.penalties} higherIsBetter={false} />
         </div>
       </div>
       )}

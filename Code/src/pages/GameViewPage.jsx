@@ -292,6 +292,9 @@ export async function fetchGameData(gameId) {
       driveResult,
       playId:          play.play_id,
       credits:         creditsFromParticipants(participants),
+      isConversion:    play.is_conversion === true,
+      convPoints:      play.conv_points ?? null,
+      outcome:         play.outcome,
     };
   });
 
@@ -409,7 +412,16 @@ export function mergeLivePlay(data, playRow) {
     return {
       ...data,
       log: data.log.map((entry) => (
-        Number(entry.playId) === playId ? { ...entry, description, credits } : entry
+        Number(entry.playId) === playId
+          ? {
+              ...entry,
+              description,
+              credits,
+              isConversion: play.is_conversion === true,
+              convPoints: play.conv_points ?? null,
+              outcome: play.outcome,
+            }
+          : entry
       )),
     };
   }
@@ -439,6 +451,9 @@ export function mergeLivePlay(data, playRow) {
     drivePossession: possession,
     playId,
     credits,
+    isConversion: play.is_conversion === true,
+    convPoints: play.conv_points ?? null,
+    outcome: play.outcome,
   };
 
   return {
@@ -508,10 +523,12 @@ export default function GameViewPage() {
   }, [id]);
 
   const handleEditCredit = useCallback(async (entry, changes) => {
-    setData((current) => (
-      current ? { ...current, log: patchLogEntry(current.log, entry, changes) } : current
-    ));
-    await Promise.all(changes.map((change) => (
+    if (changes?.length) {
+      setData((current) => (
+        current ? { ...current, log: patchLogEntry(current.log, entry, changes) } : current
+      ));
+    }
+    await Promise.all((changes || []).map((change) => (
       change.remove
         ? removePlayCredit({
             playId: entry.playId,

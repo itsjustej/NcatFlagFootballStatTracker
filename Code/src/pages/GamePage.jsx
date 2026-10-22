@@ -3,7 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useLeague } from '../context/LeagueContext';
 import { savePlay } from '../context/useSavePlay';
 import { useRemoteCreditSync } from '../utils/liveGame';
-import { creditsFromLogEntry, patchLogEntry, playNeedsPlayers, removePlayCredit, updatePlayCredit } from '../utils/playCredit';
+import {
+  creditsFromLogEntry,
+  patchLogEntry,
+  playNeedsPlayers,
+  removePlayCredit,
+  updatePlayCredit,
+  applyConversionPointsChange,
+} from '../utils/playCredit';
 import { resumeGame } from '../context/useResumeGame';
 import {
   firstDownYard,
@@ -265,8 +272,9 @@ export default function GamePage() {
     });
   }, []);
 
-  const handleEditCredit = useCallback(async (entry, changes) => {
-    for (const change of changes) {
+  const handleEditCredit = useCallback(async (entry, changes, options = {}) => {
+    const { convPoints } = options;
+    for (const change of changes || []) {
       if (change.remove) {
         await removePlayCredit({
           playId: entry.playId,
@@ -282,7 +290,17 @@ export default function GamePage() {
         toPlayerId: change.toPlayerId,
       });
     }
-    setGs((s) => ({ ...s, log: patchLogEntry(s.log, entry, changes) }));
+    setGs((s) => {
+      let log = patchLogEntry(s.log, entry, changes || []);
+      if (convPoints != null) log = applyConversionPointsChange(log, entry, convPoints);
+      const last = log[log.length - 1];
+      return {
+        ...s,
+        log,
+        homeScore: last?.homeScore ?? s.homeScore,
+        awayScore: last?.awayScore ?? s.awayScore,
+      };
+    });
   }, []);
 
   const handleUndo = useCallback(() => {

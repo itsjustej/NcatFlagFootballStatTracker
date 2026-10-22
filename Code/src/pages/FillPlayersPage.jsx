@@ -3,7 +3,14 @@ import { Link, useParams } from 'react-router-dom';
 import PlayByPlay, { orderedPlays } from '../components/game/PlayByPlay';
 import EditPlayCredit from '../components/game/EditPlayCredit';
 import { fetchGameData, fetchPlayBundle, mergeLivePlay, removeLivePlay } from './GameViewPage';
-import { updatePlayCredit, removePlayCredit, creditsNeedingPlayers, playNeedsPlayers, ROLE_LABELS, patchLogEntry } from '../utils/playCredit';
+import {
+  updatePlayCredit,
+  removePlayCredit,
+  creditsNeedingPlayers,
+  playNeedsPlayers,
+  ROLE_LABELS,
+  patchLogEntry,
+} from '../utils/playCredit';
 import { useLivePlays } from '../utils/liveGame';
 import { possessionColor, TEAM_COLORS } from '../constants/teamColors';
 
@@ -150,25 +157,27 @@ export default function FillPlayersPage() {
   }, []);
 
   const handleEditCredit = useCallback(async (entry, changes) => {
-    await Promise.all(changes.map((change) => (
-      change.remove
-        ? removePlayCredit({
-            playId: entry.playId,
-            role: change.role,
-            playerId: change.fromPlayerId,
-          })
-        : updatePlayCredit({
-            playId: entry.playId,
-            role: change.role,
-            fromPlayerId: change.fromPlayerId,
-            toPlayerId: change.toPlayerId,
-          })
-    )));
-
-    setData((current) => (
-      current ? { ...current, log: patchLogEntry(current.log, entry, changes) } : current
-    ));
-  }, []);
+    if (changes?.length) {
+      await Promise.all(changes.map((change) => (
+        change.remove
+          ? removePlayCredit({
+              playId: entry.playId,
+              role: change.role,
+              playerId: change.fromPlayerId,
+            })
+          : updatePlayCredit({
+              playId: entry.playId,
+              role: change.role,
+              fromPlayerId: change.fromPlayerId,
+              toPlayerId: change.toPlayerId,
+            })
+      )));
+      setData((current) => (
+        current ? { ...current, log: patchLogEntry(current.log, entry, changes) } : current
+      ));
+    }
+    await reload();
+  }, [reload]);
 
   if (loading && !data) {
     return (

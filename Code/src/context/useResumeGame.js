@@ -237,6 +237,9 @@ export async function resumeGame(gameId, homeTeamId, awayTeamId, homeAttacksRigh
       driveResult,
       playId:          play.play_id,
       credits:         creditsFromParticipants(parts),
+      isConversion:    play.is_conversion === true,
+      convPoints:      play.conv_points ?? null,
+      outcome:         play.outcome,
     };
   });
 
