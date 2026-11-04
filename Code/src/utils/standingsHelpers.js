@@ -6,6 +6,7 @@ import {
   isPassCompletionOutcome,
   isInterceptionOutcome,
 } from './statsHelpers';
+import { isPlayoffGame } from './gamePhase';
 
 export function formatRecord(wins, losses, ties = 0) {
   return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
@@ -16,14 +17,17 @@ export function isForfeitGame(game) {
   return game?.forfeit === true;
 }
 
+export { isPlayoffGame } from './gamePhase';
+
 /** League standings sorted by win %, then wins, then fewer losses, then point differential. */
 export function computeLeagueStandings(teams, games, plays) {
-  const leagueGameIds = new Set((games || []).map((g) => g.game_id));
+  const seasonGames = (games || []).filter((game) => !isPlayoffGame(game));
+  const leagueGameIds = new Set(seasonGames.map((g) => g.game_id));
   const leaguePlays = (plays || []).filter((p) => leagueGameIds.has(p.game_id));
 
   const rows = (teams || []).map((team) => {
     const tid = team.team_id;
-    const teamGames = (games || []).filter(
+    const teamGames = seasonGames.filter(
       (g) => g.home_team == tid || g.away_team == tid,
     );
     const playedGames = teamGames.filter((g) => !isForfeitGame(g));
@@ -96,36 +100,43 @@ function clampMargin(margin) {
 
 /**
  * Power ratings from adjusted scoring margin plus opponent strength.
+ * Regular-season and playoff games both count. Forfeits do not.
  * Each game sets teamRating − opponentRating = margin, capped at ±12.
  * Ratings are centered so teams that have played average 0.
  */
 export function computePowerRankings(teams, games, plays) {
-  const standings = computeLeagueStandings(teams, games, plays)
-    .filter((row) => row.gamesPlayed > 0);
-  if (standings.length === 0) return [];
+  const counted = (games || []).filter((game) => !isForfeitGame(game));
+  const leagueGameIds = new Set(counted.map((game) => game.game_id));
+  const leaguePlays = (plays || []).filter((play) => leagueGameIds.has(play.game_id));
 
-  const leagueGameIds = new Set((games || []).map((g) => g.game_id));
-  const leaguePlays = (plays || []).filter((p) => leagueGameIds.has(p.game_id));
-  const playedIds = new Set(standings.map((row) => String(row.team_id)));
+  const playedIds = new Set();
+  for (const game of counted) {
+    playedIds.add(String(game.home_team));
+    playedIds.add(String(game.away_team));
+  }
+  const active = (teams || []).filter((team) => playedIds.has(String(team.team_id)));
+  if (active.length === 0) return [];
 
   const matchups = [];
-  for (const game of games || []) {
-    if (isForfeitGame(game)) continue;
+  const pointDiff = new Map(active.map((team) => [String(team.team_id), 0]));
+  for (const game of counted) {
     const home = String(game.home_team);
     const away = String(game.away_team);
     if (!playedIds.has(home) || !playedIds.has(away)) continue;
-    const gamePlays = leaguePlays.filter((p) => p.game_id === game.game_id);
+    const gamePlays = leaguePlays.filter((play) => play.game_id === game.game_id);
     const homePts = pointsForTeam(gamePlays, game.home_team);
     const awayPts = pointsForTeam(gamePlays, game.away_team);
     matchups.push({ home, away, margin: clampMargin(homePts - awayPts) });
+    pointDiff.set(home, (pointDiff.get(home) || 0) + homePts - awayPts);
+    pointDiff.set(away, (pointDiff.get(away) || 0) + awayPts - homePts);
   }
 
-  const ratings = new Map(standings.map((row) => [String(row.team_id), 0]));
+  const ratings = new Map(active.map((team) => [String(team.team_id), 0]));
 
   for (let iter = 0; iter < 200; iter += 1) {
     const next = new Map();
-    for (const row of standings) {
-      const id = String(row.team_id);
+    for (const team of active) {
+      const id = String(team.team_id);
       const samples = [];
       for (const game of matchups) {
         if (game.home === id) samples.push(game.margin + (ratings.get(game.away) || 0));
@@ -147,9 +158,11 @@ export function computePowerRankings(teams, games, plays) {
     if (maxDelta < 1e-6) break;
   }
 
-  const rows = standings.map((row) => ({
-    ...row,
-    power: ratings.get(String(row.team_id)) || 0,
+  const rows = active.map((team) => ({
+    team_id: team.team_id,
+    name: team.name,
+    pointDiff: pointDiff.get(String(team.team_id)) || 0,
+    power: ratings.get(String(team.team_id)) || 0,
   }));
 
   rows.sort((a, b) => {
@@ -213,6 +226,8 @@ function unitScore(plays, yardsFn, gamesPlayed) {
 
 /**
  * One offense score and one defense score per team that has played a real game.
+ * Pass the games for the phase you want. Playoff games belong in a playoff list,
+ * not in the regular-season list.
  * Offense is what that team produced. Defense is the same score given up.
  * A higher offense score is better. A lower defense score is better.
  */

@@ -2,8 +2,10 @@ import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
+import { useLeague } from "../../context/LeagueContext";
 
 const ALL_NAV_LINKS = [
+  { to: "/playoffs", label: "Playoffs" },
   { to: "/", label: "Games" },
   { to: "/stats", label: "Stats" },
   { to: "/teams", label: "Teams" },
@@ -11,6 +13,7 @@ const ALL_NAV_LINKS = [
 ];
 
 const SOCIAL_NAV_LINKS = [
+  { to: "/playoffs", label: "Playoffs" },
   { to: "/", label: "Games" },
   { to: "/stats", label: "Stats" },
   { to: "/settings", label: "Settings" },
@@ -29,10 +32,13 @@ function isNavActive(pathname, to) {
 
 export default function Navbar() {
   const { user, logout, isSocial } = useAuth();
+  const { currentLeague } = useLeague();
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const navLinks = isSocial ? SOCIAL_NAV_LINKS : ALL_NAV_LINKS;
+  const showPlayoffs = currentLeague?.show_playoffs === true;
+  const navLinks = (isSocial ? SOCIAL_NAV_LINKS : ALL_NAV_LINKS)
+    .filter((link) => link.to !== "/playoffs" || showPlayoffs);
 
   const handleLogout = () => {
     logout();
@@ -51,7 +57,7 @@ export default function Navbar() {
           </h1>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-6 lg:gap-8">
+        <nav className="hidden md:flex items-center gap-4 lg:gap-6">
           {navLinks.map(({ to, label }) => (
             <Link
               key={to}

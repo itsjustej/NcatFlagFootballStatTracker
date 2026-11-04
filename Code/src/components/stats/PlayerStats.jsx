@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useLeague } from "../../context/LeagueContext";
 import { loadLeagueSeason } from "../../utils/leagueSeason";
+import { scopeSeason } from "../../utils/gamePhase";
 import { isUnknownPlayer } from "../../utils/playerName";
 
 import {
@@ -71,7 +72,7 @@ const CATEGORIES = [
   },
 ];
 
-export default function PlayerStats() {
+export default function PlayerStats({ phase = "regular" }) {
   const { currentLeague } = useLeague();
   const [teams, setTeams]     = useState([]);
   const [teamId, setTeamId]   = useState("");
@@ -159,7 +160,8 @@ export default function PlayerStats() {
       const playersData = season.players.filter(
         (p) => String(p.team_id) === String(teamId) && !isUnknownPlayer(p),
       );
-      const { plays, participants, games, roster } = season;
+      const scoped = scopeSeason(season, phase);
+      const { plays, participants, games, roster } = scoped;
       const gamesByPlayer = gamesPlayedByPlayer(participants, plays, roster);
 
       // Build game→home map
@@ -244,7 +246,7 @@ export default function PlayerStats() {
       setLoading(false);
     };
     fetchPlayers();
-  }, [teamId, season]);
+  }, [teamId, season, phase]);
 
   return (
     <div className="space-y-4">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { loadLeagueSeason } from "../../utils/leagueSeason";
+import { scopeSeason } from "../../utils/gamePhase";
 import { useLeague } from "../../context/LeagueContext";
 import { isUnknownPlayer } from "../../utils/playerName";
 
@@ -360,7 +361,7 @@ function LeaderCard({ stat, playerStats, teamStats }) {
   );
 }
 
-export default function LeagueLeaders() {
+export default function LeagueLeaders({ phase = "regular" }) {
   const { currentLeague } = useLeague();
   const [playerStats, setPlayerStats] = useState([]);
   const [teamStats, setTeamStats]     = useState([]);
@@ -389,7 +390,8 @@ export default function LeagueLeaders() {
         setLoading(false);
         return;
       }
-      const { teams, players, games, plays, participants, roster } = season;
+      const scoped = scopeSeason(season, phase);
+      const { teams, players, games, plays, participants, roster } = scoped;
       const gamesByPlayer = gamesPlayedByPlayer(participants, plays, roster);
 
       // Build game→home map
@@ -614,7 +616,7 @@ export default function LeagueLeaders() {
     };
 
     fetchAll();
-  }, [currentLeague]);
+  }, [currentLeague, phase]);
 
   if (loading) {
     return (

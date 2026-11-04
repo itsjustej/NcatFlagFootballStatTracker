@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { useLeague } from "../../context/LeagueContext";
 import { loadLeagueSeason } from "../../utils/leagueSeason";
+import { scopeSeason } from "../../utils/gamePhase";
 import {
   computeLeagueStandings,
   computePowerRankings,
@@ -125,7 +126,7 @@ function PlaceChip({ label, value, color }) {
 }
 
 // ---------------- MAIN ---------------- //
-export default function TeamStats() {
+export default function TeamStats({ phase = "regular" }) {
   const { currentLeague } = useLeague();
   const [teams, setTeams]       = useState([]);
   const [teamId, setTeamId]     = useState("");
@@ -153,7 +154,8 @@ export default function TeamStats() {
         setLoading(false);
         return;
       }
-      const { teams: teamsData, games, plays, participants } = season;
+      const scoped = scopeSeason(season, phase);
+      const { teams: teamsData, games, plays, participants } = scoped;
       setTeams(teamsData);
 
       // Build game→home map for direction-aware calculations
@@ -391,8 +393,8 @@ export default function TeamStats() {
 
       setAllStats(computed);
       setRankBoards({
-        standings: computeLeagueStandings(teamsData, games, plays),
-        power: computePowerRankings(teamsData, games, plays),
+        standings: computeLeagueStandings(teamsData, season.games, season.plays),
+        power: computePowerRankings(teamsData, season.games, season.plays),
         offense: computeOffenseRankings(teamsData, games, plays),
         defense: computeDefenseRankings(teamsData, games, plays),
       });
@@ -400,7 +402,7 @@ export default function TeamStats() {
     };
 
     fetchAll();
-  }, [currentLeague]);
+  }, [currentLeague, phase]);
 
   const stats = allStats[teamId];
   const place = (rows) => {
@@ -435,7 +437,9 @@ export default function TeamStats() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-4 border-b border-slate-700">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-white shrink-0">Team Statistics</h2>
-            <p className="hidden sm:block text-slate-400 text-sm mt-0.5">Per-game stats and conversion rates</p>
+            <p className="hidden sm:block text-slate-400 text-sm mt-0.5">
+              {phase === "playoff" ? "Playoff games only" : "Regular-season games only"}
+            </p>
           </div>
           <div className="relative w-full sm:w-auto sm:min-w-[220px] shrink-0">
             <select
@@ -462,7 +466,9 @@ export default function TeamStats() {
             <div className="lg:col-start-2">
               <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
                 <div className="min-w-0 shrink-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Record</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    {phase === "playoff" ? "Playoff record" : "Record"}
+                  </p>
                   <p className="mt-1 text-4xl font-black leading-none tracking-tight text-white tabular-nums">
                     {stats.wins}
                     <span className="text-slate-600">–</span>
@@ -476,8 +482,10 @@ export default function TeamStats() {
                   </p>
                   <p className="mt-2 text-sm text-slate-400">{stats.winPct}% wins</p>
                 </div>
-                <div className="grid min-w-[16rem] flex-1 grid-cols-4 gap-2">
-                  <PlaceChip label="Standings" value={standingsPlace.value} color={standingsPlace.color} />
+                <div className={`grid min-w-[16rem] flex-1 gap-2 ${phase === "playoff" ? "grid-cols-3" : "grid-cols-4"}`}>
+                  {phase !== "playoff" && (
+                    <PlaceChip label="Standings" value={standingsPlace.value} color={standingsPlace.color} />
+                  )}
                   <PlaceChip label="Power" value={powerPlace.value} color={powerPlace.color} />
                   <PlaceChip label="Offense" value={offensePlace.value} color={offensePlace.color} />
                   <PlaceChip label="Defense" value={defensePlace.value} color={defensePlace.color} />

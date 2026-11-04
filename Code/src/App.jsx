@@ -14,6 +14,7 @@ import TeamsPage from "./pages/TeamsPage";
 import SettingsPage from "./pages/SettingsPage";
 import StatsPage from "./pages/StatsPage";
 import GameHistoryPage from "./pages/GameHistoryPage";
+import PlayoffsPage from "./pages/PlayoffsPage";
 import GameViewPage from "./pages/GameViewPage";
 import FillPlayersPage from "./pages/FillPlayersPage";
 import DebugPage from "./pages/DebugPage";
@@ -37,6 +38,7 @@ export default function App() {
         {/* Protected */}
         <Route element={<RequireAuth />}>
           <Route path="/" element={<GameHistoryPage />} />
+          <Route path="/playoffs" element={<PlayoffsPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/games" element={<Navigate to="/" replace />} />
           <Route path="/games/:id" element={<GameViewPage />} />

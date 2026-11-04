@@ -8,11 +8,23 @@ import { Plus, Check, Trash2, Calendar } from "lucide-react";
 export default function SettingsPage() {
   const { user, canDelete, canTrackGames, logout } = useAuth();
   const navigate = useNavigate();
-  const { leagues, currentLeague, switchLeague, createLeague, deleteLeague } = useLeague();
+  const { leagues, currentLeague, switchLeague, createLeague, deleteLeague, setShowPlayoffs } = useLeague();
   const [newLeagueName, setNewLeagueName] = useState("");
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleteError, setDeleteError] = useState("");
+  const [playoffError, setPlayoffError] = useState("");
+  const [savingPlayoffs, setSavingPlayoffs] = useState(false);
+  const playoffsOn = currentLeague?.show_playoffs === true;
+
+  const togglePlayoffs = async () => {
+    if (!canDelete || savingPlayoffs) return;
+    setSavingPlayoffs(true);
+    setPlayoffError("");
+    const message = await setShowPlayoffs(!playoffsOn);
+    if (message) setPlayoffError(message);
+    setSavingPlayoffs(false);
+  };
 
   const handleLogout = () => {
     logout();
@@ -59,6 +71,39 @@ export default function SettingsPage() {
             </button>
           </div>
         </header>
+
+        {canDelete && (
+          <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+            <div className="flex items-center justify-between gap-4 px-4 py-4">
+              <div className="min-w-0">
+                <h2 className="text-xl font-bold text-white">Playoffs</h2>
+                <p className="text-sm text-slate-400 mt-1">
+                  {currentLeague
+                    ? `Hidden for ${currentLeague.name} until this is on. Workers and viewers see the Playoffs tab only while it is on.`
+                    : "Choose a season before turning playoffs on."}
+                </p>
+                {playoffError && <p className="text-sm text-red-300 mt-2">{playoffError}</p>}
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={playoffsOn}
+                aria-label="Show playoffs"
+                disabled={!currentLeague || savingPlayoffs}
+                onClick={togglePlayoffs}
+                className={`relative h-8 w-14 shrink-0 rounded-full transition disabled:opacity-40 ${
+                  playoffsOn ? "bg-blue-600" : "bg-slate-600"
+                }`}
+              >
+                <span
+                  className={`absolute top-1 left-1 h-6 w-6 rounded-full bg-white transition-transform ${
+                    playoffsOn ? "translate-x-6" : ""
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Seasons */}
         <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">

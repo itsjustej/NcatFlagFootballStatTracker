@@ -1,14 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
 import { cleanPlayerName, isUnknownPlayer } from "../utils/playerName";
 import TeamSelector from "../components/start-game/TeamSelector";
 import { todayDateInput } from "../utils/gameDate";
+import { slotById } from "../utils/bracket";
+import { invalidateLeagueSeason } from "../utils/leagueSeason";
 
 export default function StartGamePage() {
   const { currentLeague, startGame } = useLeague();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const playoffSlot = slotById(params.get("slot"));
+  const lockedHome = params.get("home");
+  const lockedAway = params.get("away");
+  const isPlayoff = Boolean(playoffSlot && lockedHome && lockedAway);
 
   const [teams, setTeams]         = useState([]);
   const [teamA, setTeamA]         = useState(null);
@@ -41,6 +48,12 @@ export default function StartGamePage() {
       }));
 
       setTeams(formatted);
+      if (isPlayoff) {
+        const home = formatted.find((team) => String(team.team_id) === String(lockedHome));
+        const away = formatted.find((team) => String(team.team_id) === String(lockedAway));
+        if (home) setTeamA(home);
+        if (away) setTeamB(away);
+      }
       // A new game never inherits jersey numbers. Ignore anything already in state.
       setJerseys(() => {
         const next = {};
@@ -49,7 +62,7 @@ export default function StartGamePage() {
       });
     };
     fetchTeams();
-  }, [currentLeague]);
+  }, [currentLeague, isPlayoff, lockedHome, lockedAway]);
 
   const handleJerseyChange = (playerId, value) => {
     setJerseys(prev => ({ ...prev, [playerId]: value }));
@@ -107,6 +120,8 @@ export default function StartGamePage() {
           home_attacks_right:   homeAttacksRight,
           has_forty_yard:       hasFortyYard,
           played_on:            todayDateInput(),
+          playoff:              isPlayoff,
+          bracket_slot:         isPlayoff ? playoffSlot.id : null,
         }])
         .select()
         .single();
@@ -136,7 +151,7 @@ export default function StartGamePage() {
 
       if (rosterError) throw new Error(rosterError.message);
 
-      // 3. Navigate into the game
+      invalidateLeagueSeason(currentLeague.league_id);
       startGame(gameId);
       navigate("/game");
     } catch (err) {
@@ -150,13 +165,17 @@ export default function StartGamePage() {
   return (
     <div className="bg-slate-900 pt-4 sm:pt-5 px-4 pb-8">
       <div className="max-w-5xl mx-auto">
-        <Link to="/" className="text-slate-400 text-sm hover:text-white transition-colors">
-          ← Games
+        <Link to={isPlayoff ? "/playoffs" : "/"} className="text-slate-400 text-sm hover:text-white transition-colors">
+          {isPlayoff ? "← Playoffs" : "← Games"}
         </Link>
-        <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2 mt-3">Start New Game</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2 mt-3">
+          {isPlayoff ? "Start Playoff Game" : "Start New Game"}
+        </h1>
         <p className="text-slate-400 mb-8">
           {currentLeague
-            ? `${currentLeague.name} — Pick the teams and enter jersey numbers. Two digits jumps to the next player.`
+            ? isPlayoff
+              ? `${currentLeague.name} — ${playoffSlot.round}. Enter jersey numbers, then start. This game stays out of the regular-season stats.`
+              : `${currentLeague.name} — Pick the teams and enter jersey numbers. Two digits jumps to the next player.`
             : 'Loading...'}
         </p>
 
@@ -183,6 +202,8 @@ export default function StartGamePage() {
           onHasFortyYardChange={setHasFortyYard}
           onNext={handleStartGame}
           isLoading={isStarting}
+          locked={isPlayoff}
+          startLabel={isPlayoff ? "Start Playoff Game" : "Start Game"}
         />
       </div>
     </div>

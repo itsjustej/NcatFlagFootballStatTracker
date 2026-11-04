@@ -31,6 +31,7 @@ function storeLeague(league) {
   localStorage.setItem(STORED_LEAGUE_KEY, JSON.stringify({
     league_id: league.league_id,
     name: league.name,
+    show_playoffs: league.show_playoffs === true,
   }));
   localStorage.setItem("currentLeagueId", String(league.league_id));
 }
@@ -103,6 +104,23 @@ export function LeagueProvider({ children }) {
     }
   };
 
+  const setShowPlayoffs = async (shown) => {
+    if (!currentLeague) return "Choose a season first.";
+    const { data, error } = await supabase
+      .from("League")
+      .update({ show_playoffs: shown })
+      .eq("league_id", currentLeague.league_id)
+      .select()
+      .single();
+    if (error || !data) return error?.message || "Could not update playoffs.";
+    setCurrentLeague(data);
+    storeLeague(data);
+    setLeagues((prev) => prev.map((league) => (
+      league.league_id === data.league_id ? data : league
+    )));
+    return "";
+  };
+
   // ── Game state ────────────────────────────────────────────────────
   const [currentGameId, setCurrentGameId] = useState(() => {
     const stored = localStorage.getItem("currentGameId");
@@ -143,6 +161,7 @@ export function LeagueProvider({ children }) {
         switchLeague,
         createLeague,
         deleteLeague,
+        setShowPlayoffs,
         // game
         currentGameId,
         startGame,

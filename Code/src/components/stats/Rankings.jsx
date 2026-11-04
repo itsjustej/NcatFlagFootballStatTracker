@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useLeague } from "../../context/LeagueContext";
 import { loadLeagueSeason } from "../../utils/leagueSeason";
+import { scopeSeason } from "../../utils/gamePhase";
 import {
   computeLeagueStandings,
   computePowerRankings,
@@ -66,11 +67,12 @@ export default function Rankings() {
     loadLeagueSeason(currentLeague.league_id)
       .then(({ teams, games, plays }) => {
         if (cancelled) return;
+        const regular = scopeSeason({ games, plays }, "regular");
         setBoards({
           standings: computeLeagueStandings(teams, games, plays),
           power: computePowerRankings(teams, games, plays),
-          offense: computeOffenseRankings(teams, games, plays),
-          defense: computeDefenseRankings(teams, games, plays),
+          offense: computeOffenseRankings(teams, regular.games, regular.plays),
+          defense: computeDefenseRankings(teams, regular.games, regular.plays),
         });
       })
       .catch((err) => {
@@ -106,6 +108,7 @@ export default function Rankings() {
     <div className="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
       <div className="px-4 py-4 border-b border-slate-700">
         <h2 className="text-xl sm:text-2xl font-bold text-white">Rankings</h2>
+        <p className="text-sm text-slate-400 mt-1">Standings, offense, and defense use the regular season. Power rankings include playoff games.</p>
       </div>
       <div className="p-2 sm:p-4 grid grid-cols-1 lg:grid-cols-4 gap-3">
         <RankingBoard title="Standings" rows={standings} valueFor={(team) => team.record} />

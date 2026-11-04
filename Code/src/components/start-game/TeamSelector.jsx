@@ -329,6 +329,8 @@ export default function TeamSelector({
   onHasFortyYardChange,
   onNext,
   isLoading = false,
+  locked = false,
+  startLabel = "Start Game",
 }) {
   const canStart = teamA && teamB && teamA.team_id !== teamB.team_id;
   const receivingIsAway = openingPossession === 'away';
@@ -344,6 +346,12 @@ export default function TeamSelector({
         {/* HOME TEAM */}
         <div>
           <h2 className="text-2xl font-bold text-white mb-4">Home Team</h2>
+          {locked ? (
+            <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+              <p className="text-lg font-bold text-white">{teamA?.name || "Home"}</p>
+              <p className="text-xs text-amber-200/80 mt-1">Set by this bracket game</p>
+            </div>
+          ) : (
           <TeamPickGrid
             teams={teams}
             selectedId={teamA?.team_id}
@@ -351,6 +359,7 @@ export default function TeamSelector({
             onSelect={onTeamASelect}
             accent="blue"
           />
+          )}
 
           {teamA && (
             <TeamRoster
@@ -365,6 +374,12 @@ export default function TeamSelector({
         {/* AWAY TEAM */}
         <div>
           <h2 className="text-2xl font-bold text-white mb-4">Away Team</h2>
+          {locked ? (
+            <div className="mb-4 rounded-lg border border-[#C9A84C]/40 bg-[#C9A84C]/10 px-4 py-3">
+              <p className="text-lg font-bold text-white">{teamB?.name || "Away"}</p>
+              <p className="text-xs text-[#C9A84C] mt-1">Set by this bracket game</p>
+            </div>
+          ) : (
           <TeamPickGrid
             teams={teams}
             selectedId={teamB?.team_id}
@@ -372,6 +387,7 @@ export default function TeamSelector({
             onSelect={onTeamBSelect}
             accent="gold"
           />
+          )}
 
           {teamB && (
             <TeamRoster
@@ -485,7 +501,7 @@ export default function TeamSelector({
           disabled={isLoading || !canStart}
           className="w-full sm:w-auto px-6 py-3 rounded-lg transition font-semibold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:cursor-not-allowed min-h-12"
         >
-          {isLoading ? "Starting…" : "Start Game"}
+          {isLoading ? "Starting…" : startLabel}
         </button>
       </div>
     </div>
