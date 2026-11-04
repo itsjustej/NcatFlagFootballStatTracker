@@ -9,6 +9,7 @@ export default function TeamList({
   onAddPlayer,
   onRemovePlayer,
   onUpdatePlayer,
+  onMovePlayer,
 }) {
   if (teams.length === 0) {
     return (
@@ -30,6 +31,7 @@ export default function TeamList({
           onAddPlayer={onAddPlayer}
           onRemovePlayer={onRemovePlayer}
           onUpdatePlayer={onUpdatePlayer}
+          onMovePlayer={onMovePlayer}
         />
       ))}
     </div>

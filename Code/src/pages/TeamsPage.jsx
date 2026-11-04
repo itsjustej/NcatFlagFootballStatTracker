@@ -3,12 +3,13 @@ import { ConfirmDeleteDialog } from "../components/teams/ConfirmDeleteDialog";
 import TeamList from "../components/teams/TeamList";
 import { CreateTeamDialog } from "../components/teams/CreateTeamDialog";
 import { EditTeamDialog } from "../components/teams/EditTeamDialog";
+import { MovePlayerDialog } from "../components/teams/MovePlayerDialog";
 import { Plus } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useLeague } from "../context/LeagueContext";
 import { useAuth } from "../auth/AuthContext";
 import { isUnknownPlayer } from "../utils/playerName";
-import { chunkIds, fetchAllRows } from "../utils/leagueSeason";
+import { chunkIds, fetchAllRows, invalidateLeagueSeason } from "../utils/leagueSeason";
 
 export default function TeamsPage() {
   const { currentLeague } = useLeague();
@@ -17,6 +18,7 @@ export default function TeamsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingTeam, setEditingTeam] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [movingPlayer, setMovingPlayer] = useState(null);
 
   useEffect(() => {
     if (!currentLeague) return;
@@ -153,6 +155,17 @@ export default function TeamsPage() {
     ));
   };
 
+  const handleMovePlayer = async (playerId, teamId, replaceId) => {
+    const { error } = await supabase.rpc("move_player", {
+      p_player_id: playerId,
+      p_team_id: teamId,
+      p_replace_id: replaceId ?? null,
+    });
+    if (error) throw new Error(error.message || "Could not move that player.");
+    invalidateLeagueSeason(currentLeague.league_id);
+    await fetchTeams();
+  };
+
   const handleUpdatePlayer = async (teamId, playerId, name) => {
     const { data, error } = await supabase
       .from("Player")
@@ -184,7 +197,7 @@ export default function TeamsPage() {
         <header>
           <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2">Manage Teams</h1>
           <p className="text-slate-400 text-sm sm:text-base">
-            Create teams, manage rosters, and configure players for {currentLeague.name}.
+            Create teams, manage rosters, and move players when they change teams in {currentLeague.name}.
           </p>
         </header>
 
@@ -212,6 +225,7 @@ export default function TeamsPage() {
               onAddPlayer={handleAddPlayer}
               onRemovePlayer={handleRemovePlayer}
               onUpdatePlayer={handleUpdatePlayer}
+              onMovePlayer={teams.length > 1 ? (team, player) => setMovingPlayer({ team, player }) : undefined}
             />
           </div>
         </div>
@@ -236,6 +250,16 @@ export default function TeamsPage() {
           team={editingTeam}
           onUpdate={handleUpdate}
           onClose={() => setEditingTeam(null)}
+        />
+      )}
+
+      {movingPlayer && (
+        <MovePlayerDialog
+          player={{ ...movingPlayer.player, teamId: movingPlayer.team.id }}
+          teamName={movingPlayer.team.name}
+          teams={teams}
+          onMove={handleMovePlayer}
+          onClose={() => setMovingPlayer(null)}
         />
       )}
     </div>

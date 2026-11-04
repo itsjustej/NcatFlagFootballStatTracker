@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Edit, Trash2, Plus, X, Check } from "lucide-react";
+import { ArrowRightLeft, Edit, Trash2, Plus, X, Check } from "lucide-react";
 
 export default function TeamCard({
   team,
@@ -9,6 +9,7 @@ export default function TeamCard({
   onAddPlayer,
   onRemovePlayer,
   onUpdatePlayer,
+  onMovePlayer,
 }) {
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [playerName, setPlayerName] = useState("");
@@ -82,10 +83,10 @@ export default function TeamCard({
                     autoFocus
                   />
                 ) : (
-                  <p className="font-medium text-white text-sm">{player.name}</p>
+                  <p className="font-medium text-white text-sm min-w-0 flex-1 truncate">{player.name}</p>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex gap-1 shrink-0">
                   {editingPlayer?.id === player.id ? (
                     <>
                       <button onClick={handleUpdatePlayer} className="p-1 hover:bg-slate-700 rounded">
@@ -104,6 +105,16 @@ export default function TeamCard({
                       >
                         <Edit className="w-4 h-4 text-slate-300 hover:text-white" />
                       </button>
+                      {onMovePlayer && (
+                        <button
+                          type="button"
+                          onClick={() => onMovePlayer(team, player)}
+                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center hover:bg-slate-700 rounded"
+                          aria-label={`Move ${player.name}`}
+                        >
+                          <ArrowRightLeft className="w-4 h-4 text-slate-300 hover:text-white" />
+                        </button>
+                      )}
                       {canDelete && (
                         <button
                           onClick={() => onRemovePlayer(team.id, player.id)}
